@@ -1,17 +1,17 @@
 {
-  "name": "agent-arena",
+  "name": "@agent-arena/agent",
+  "version": "0.1.0",
   "private": true,
-  "workspaces": [
-    "apps/*",
-    "packages/*"
-  ],
+  "type": "module",
+  "main": "dist/index.js",
   "scripts": {
-    "build": "tsc -b packages/*/tsconfig.json",
-    "dev": "tsx watch packages/relayer/src/index.ts"
+    "build": "tsc",
+    "start": "tsx src/index.ts",
+    "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
+    "@modelcontextprotocol/sdk": "^1.0.0",
     "@0glabs/0g-serving-broker": "^0.6.5",
-    "@0glabs/0g-ts-sdk": "^0.3.3",
     "dotenv": "^16.0.0",
     "ethers": "^6.13.0"
   },
