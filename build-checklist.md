@@ -1,379 +1,348 @@
-# Agent Arena - Build Checklist (Zero to Demo)
+# Agent Arena - Build Checklist (5.5 Hours Dev, 14 Hours Testing/Polish)
 
-Tasks are ordered by dependency and grouped for parallel execution by Sonnet subagents. Each task lists the Claude skills (from `.claude/skills/` and `.0g-skills/`) that the executing agent should load.
+## Team
+
+- **Dev A** (Senior, scoring + agents focus) — Shared interfaces + Agent base + AgentManager contract + Agent strategies
+- **Dev B** (Senior, Uniswap + infra focus) — Satellite contract + Relayer + All deployments
+- **PM** (Vibe coding with Claude) — Project setup + MCP server + Dashboard
+
+**Rule**: everyone works in parallel at all times. If you need something from someone else, **mock it** and move on. Replace mocks with real implementations when the dependency is delivered.
+
+**Development scope**: everything needed to have a working system. Testing, integration, demo prep, and polish happen in the 14-hour buffer.
 
 ---
 
-## Phase 0: Project Setup (30 min)
+## Hour 0:00 - 0:30 — Setup (all parallel)
 
-All tasks in this phase can run in parallel.
+### Dev A — Shared interfaces + agent base
+- [ ] Define `Intent` struct (agentId, actionType, params)
+- [ ] Define all cross-chain event signatures (Deposited, AgentRegistered, WithdrawRequested, IntentQueued, ValuesReported, EpochSettled, WithdrawApproved, CommissionAccrued, ProtocolFeeAccrued, CommissionClaimRequested, CommissionApproved, PauseRequested, WithdrawFromArenaRequested)
+- [ ] Define all cross-chain function signatures for both contracts
+- [ ] Write `IVault.sol`, `IAgentManager.sol`, and `ISatellite.sol` interface files
+- [ ] Push to `contracts/interfaces/` so Dev B can start satellite immediately
+- **Skills**: `.0g-skills/patterns/CHAIN.md`
 
-### 0.1 - Scaffold project structure
-- [ ] Initialize monorepo with `contracts/`, `relayer/`, `agent/`, `subgraph-mcp/`, `dashboard/` directories
-- [ ] Set up root `package.json` with workspaces
-- [ ] Create `.env.example` with all required variables (private keys, RPCs, contract addresses)
-- [ ] Add `.gitignore` (include `.env`, node_modules, artifacts, cache)
-- **Skills**: `scaffold-project`, `.0g-skills/patterns/NETWORK_CONFIG.md`
-
-### 0.2 - Set up Foundry/Hardhat for dual-chain deployment
-- [ ] Configure Hardhat with both 0G testnet and Sepolia networks
-- [ ] Set `evmVersion: "cancun"` for 0G contracts
+### Dev B — Forge + tooling
+- [ ] Configure Forge: 0G testnet (`evmVersion: "cancun"`) + Sepolia networks
 - [ ] Set up deployment scripts for both chains
-- [ ] Install OpenZeppelin contracts (Math.sqrt, ERC721, ERC20)
+- [ ] Install OpenZeppelin contracts (Math, ERC721, ERC20)
 - **Skills**: `deploy-contract`, `.0g-skills/patterns/CHAIN.md`
 
-### 0.3 - Fund wallets on both testnets
-- [ ] Get 0G testnet tokens from faucet
-- [ ] Get Sepolia ETH from faucet
-- [ ] Get or deploy test USDC.e on Sepolia
-- [ ] Set up deployer wallet, relayer wallet, and 3 agent wallets
-- **Skills**: `.0g-skills/patterns/NETWORK_CONFIG.md`, `.0g-skills/patterns/SECURITY.md`
+### PM — Scaffold + infra
+- [ ] Scaffold monorepo: `contracts/`, `relayer/`, `agent/`, `subgraph-mcp/`, `dashboard/`, `shared/`
+- [ ] Create `.env.example`, `.gitignore`, root `package.json` with workspaces
+- [ ] Start funding wallets: faucets for 0G testnet + Sepolia, set up deployer/relayer/3 agent wallets
+- **Skills**: `scaffold-project`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
 ---
 
-## Phase 1: Vault Contract on 0G (3-4 hours)
+## Hour 0:30 - 1:15 — Agent Base + Pool Setup (all parallel)
 
-### 1.1 - Core vault: share token + accounting
-- [ ] Implement share token (ERC20) with mint/burn controlled by vault logic
-- [ ] Implement `totalAssets()` derived from reported values
-- [ ] Implement `sharePrice()` computation
-- [ ] Implement `recordDeposit(user, amount)` -- callable by messenger only, mints shares
-- [ ] Implement `processWithdraw(user, shares)` -- burns shares, emits `WithdrawApproved`
-- [ ] Add `onlyMessenger` modifier for all relayer-called functions
-- [ ] Add `epochCheck` modifier with lazy evaluation
-- **Skills**: `deploy-contract`, `interact-contract`, `viem-integration`, `.0g-skills/patterns/CHAIN.md`
+### Dev A — Agent base loop + intent format
+Build the agent foundation that all 3 strategies will extend. **Mock**: agents log intents to console instead of submitting on-chain (vault doesn't exist yet).
 
-### 1.2 - Agent registry + iNFT
-- [ ] Implement ERC-721 iNFT contract (mint on registration, ownerOf for auth)
-- [ ] Implement `recordRegistration(agentId, agentAddress, deployer, provingAmount)` -- registers agent, mints iNFT
-- [ ] Implement agent state tracking: phase (PROVING/VAULT), provingBalance, provingDeployed
-- [ ] Implement `paused` mapping + `processPause(agentId, caller, paused)` with ownership check
-- [ ] Implement withdraw-from-arena flow (deregister, clear state, free slot)
-- **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/CHAIN.md`
+- [ ] Set up OpenClaw agent project structure
+- [ ] Configure MCP connection interface (will connect to real MCP server later)
+- [ ] Implement base agent loop: read market data -> decide -> produce Intent struct -> log/queue intent
+- [ ] Define intent action types: OPEN_POSITION, CLOSE_POSITION, MODIFY_POSITION
+- [ ] Implement intent serialization matching the `Intent` struct from interfaces
+- [ ] Verify agent can produce well-formed intents with mock market data
+- **Skills**: `.0g-skills/AGENTS.md`, `.0g-skills/patterns/COMPUTE.md`, `backend-developer`
 
-### 1.3 - Intent queue + token bucket
-- [ ] Implement `submitIntent(agentId, actionType, params)` with full validation
-- [ ] Implement proving agent path: check `provingBalance - provingDeployed`
-- [ ] Implement vault agent path: credit refill, credit check, `idleBalance()` check
-- [ ] Implement cooldown check (`minActionInterval`)
-- [ ] Implement credit refund on position close
-- [ ] Emit `IntentQueued` event with all intent data
-- **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/CHAIN.md`
+### Dev B — Start satellite contract
+Begin satellite immediately using shared interfaces from Dev A.
 
-### 1.4 - Epoch settlement + Sharpe scoring
-- [ ] Implement `_settleEpoch()` with all 9 steps
-- [ ] Implement EMA updates (emaReturn, emaReturnSq) with alpha decay
-- [ ] Implement Sharpe computation with `Math.sqrt`, `MIN_VARIANCE` floor, negative clamping
-- [ ] Implement all-zero fallback (equal allocation)
-- [ ] Implement score-to-credit allocation (refillRate, maxCredits)
-- [ ] Implement promotion ramp (effectiveMaxCredits with MAX_PROMOTION_SHARE and RAMP_EPOCHS)
-- [ ] Implement `reportValues(agentId, positionValue, feesCollected)` -- stores last reported values
-- [ ] Emit `EpochSettled(sharePrice, totalShares, totalAssets)`
-- **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/CHAIN.md`
+- [ ] Start 2.1 - Core: `deposit()`, `registerAgent()`, `requestWithdraw()`, `release()`, `updateSharePrice()`, idle reserve tracking, `onlyMessenger` modifier
+- **Skills**: `.0g-skills/patterns/CHAIN.md`, `swap-integration`, `liquidity-planner`
 
-### 1.5 - Promotion, eviction, fee waterfall
-- [ ] Implement promotion check: `epochsCompleted >= provingEpochsRequired` AND `sharpe >= minPromotionSharpe`
-- [ ] Implement eviction: `zeroSharpeStreak` counter, skip paused agents, evict at `EVICTION_EPOCHS`
-- [ ] Implement vault agent eviction (force-close vault positions, drop to proving, reset EMAs)
-- [ ] Implement proving agent eviction (force-close, return capital)
-- [ ] Implement fee waterfall: `protocolFee` first, then `agentCommission`, remainder to depositors
-- [ ] Implement `protocolFeesAccrued` + `commissionsOwed[agentId]` tracking
-- [ ] Implement `processCommissionClaim(agentId, caller)` with iNFT ownership check
-- [ ] Emit `ProtocolFeeAccrued`, `CommissionAccrued`, `CommissionApproved` events
-- **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/CHAIN.md`
-
-### 1.6 - Withdrawal processing
-- [ ] Implement Tier 1: instant withdrawal path (check idle balance, burn shares, emit `WithdrawApproved`)
-- [ ] Implement Tier 2: queued withdrawal (lock shares, record epoch, queue)
-- [ ] Implement force-close logic during epoch settlement (lowest-Sharpe first)
-- [ ] Implement `claimWithdraw` processing
-- **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/CHAIN.md`
-
-### 1.7 - Deploy vault to 0G testnet
-- [ ] Deploy iNFT contract
-- [ ] Deploy vault contract with all constructor parameters
-- [ ] Verify contracts on 0G explorer
-- [ ] Record deployed addresses in `.env`
-- **Skills**: `deploy-contract`, `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/NETWORK_CONFIG.md`
+### PM — Pool setup + start MCP server
+- [ ] Finish funding wallets
+- [ ] Deploy or identify test USDC.e token on Sepolia
+- [ ] Deploy or identify Uniswap v3 pool on Sepolia (e.g., USDC.e/WETH)
+- [ ] Seed pool with initial liquidity
+- [ ] Record pool address, token addresses, fee tier in `.env`
+- [ ] Start MCP server: set up Node.js project with @modelcontextprotocol/sdk
+- **Skills**: `liquidity-planner`, `swap-integration`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
 ---
 
-## Phase 2: Satellite Contract on Sepolia (3-4 hours)
+## Hour 1:15 - 4:45 — Core Build (all parallel)
 
-Can start in parallel with Phase 1 once interfaces are agreed.
+### Dev A — AgentManager contract (2.5 hours) then help with Vault
+The agent lifecycle contract — scoring, intents, token bucket. Separate from the Vault for clarity and to stay under 24KB contract size limit.
 
-### 2.1 - Core satellite: deposits + withdrawals
-- [ ] Implement `deposit(amount)` -- transfer USDC.e from user, emit `Deposited(user, amount)`
-- [ ] Implement `registerAgent(agentAddress, provingAmount)` -- earmark funds, assign agentId, emit `AgentRegistered`
-- [ ] Implement `requestWithdraw(tokenAmount)` -- convert to shares using cached sharePrice, emit `WithdrawRequested`
-- [ ] Implement `claimWithdraw()` -- check approval via relayer, transfer tokens
-- [ ] Implement `release(user, amount)` -- callable by messenger only
-- [ ] Implement `updateSharePrice(sharePrice)` -- callable by messenger only
-- [ ] Implement idle reserve tracking (20% of total assets)
-- [ ] Add `onlyMessenger` modifier
-- **Skills**: `viem-integration`, `liquidity-planner`, `.0g-skills/patterns/CHAIN.md`
+**Skills**: `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/SECURITY.md`
 
-### 2.2 - Uniswap execution: zap-in/out + LP management
-- [ ] Implement `executeBatch(intents)` -- callable by messenger only
-- [ ] Implement zap-in: swap half USDC.e for paired token via SwapRouter
-- [ ] Implement LP open: call NonfungiblePositionManager.mint() with tick range
-- [ ] Implement LP close: call NonfungiblePositionManager.decreaseLiquidity() + collect()
-- [ ] Implement LP modify: decrease + re-mint at new range
-- [ ] Implement zap-out: swap paired token back to USDC.e
-- [ ] Track position NFTs per agentId
-- [ ] Implement `collect()` on all positions at epoch reporting time
-- [ ] Implement position valuation: read token amounts + slot0 price
-- [ ] Emit `ValuesReported(agentId, positionValue, feesCollected)`
-- **Skills**: `swap-integration`, `liquidity-planner`, `viem-integration`
+- [ ] Agent registry: agent state (phase PROVING/VAULT, provingBalance, provingDeployed, agentAddress, epochsCompleted, zeroSharpeStreak)
+- [ ] iNFT contract (ERC-721): mint on registration, `ownerOf` for auth checks
+- [ ] `recordRegistration(agentId, agentAddress, deployer, provingAmount)` — registers agent, mints iNFT
+- [ ] `submitIntent(agentId, actionType, params)` — proving/vault branching, cooldown (`minActionInterval`), credit refill/check for vault agents, `provingBalance - provingDeployed` for proving agents, calls `Vault.idleBalance()` for vault agents, credit refund on close, emit `IntentQueued`
+- [ ] Token bucket: credits, refillRate, maxCredits per agent, credit refill logic
+- [ ] `reportValues(agentId, positionValue, feesCollected)` — stores last reported values + `lastReportedBlock` (messenger only)
+- [ ] `settleAgents()` — called by Vault during epoch settlement:
+  - EMA updates (emaReturn, emaReturnSq) with alpha decay
+  - Sharpe computation with `Math.sqrt`, `MIN_VARIANCE` floor, negative clamping, all-zero fallback
+  - Score-to-credit allocation (refillRate, maxCredits), promotion ramp (effectiveMaxCredits, MAX_PROMOTION_SHARE, RAMP_EPOCHS)
+  - Promotion check (epochsCompleted + minPromotionSharpe)
+  - Eviction check (zeroSharpeStreak, skip paused, EVICTION_EPOCHS), vault eviction (drop to proving, reset EMAs), proving eviction (return capital)
+  - Returns per-agent feesCollected, eviction/promotion results, force-close intents
+- [ ] `processPause(agentId, caller, paused)` — checks `iNFT.ownerOf(agentId) == caller`
+- [ ] `processCommissionClaim(agentId, caller)` — checks `iNFT.ownerOf(agentId) == caller`, then calls `Vault.approveCommissionRelease(agentId, amount)`
+- [ ] Withdraw-from-arena: deregister agent, clear state, free `maxAgents` slot
+- [ ] `setVault(address)` — one-time initialization to set circular reference after Vault deploys
+- [ ] Compile AgentManager + iNFT, generate ABIs, push to `shared/abis/`
 
-### 2.3 - Fee reserves + claims
-- [ ] Implement `reserveFees(protocolFeeAmount, agentId, commissionAmount)` -- messenger only
-- [ ] Implement `protocolReserve` and `commissionReserve` pools
-- [ ] Implement `claimProtocolFees()` -- callable by protocolTreasury address
-- [ ] Implement `claimCommissions(agentId)` -- emit `CommissionClaimRequested(agentId, caller)`
-- [ ] Implement `releaseCommission(caller, amount)` -- messenger only, pay from commissionReserve
-- **Skills**: `interact-contract`, `viem-integration`
+**After AgentManager is done (~hour 3:45)**: Dev A starts building agent strategies (see Hour 4:45 section) or helps Dev B with Vault if needed.
 
-### 2.4 - Agent management via satellite
-- [ ] Implement `pauseAgent(agentId)` / `unpauseAgent(agentId)` -- emit `PauseRequested`
-- [ ] Implement `withdrawFromArena(agentId)` -- emit `WithdrawFromArenaRequested`
-- **Skills**: `interact-contract`, `viem-integration`
+### Dev B — Vault (accounting) + Satellite + deploy + relayer (3.5 hours)
 
-### 2.5 - Deploy satellite to Sepolia
-- [ ] Deploy satellite contract with constructor params (pool, depositToken, messenger)
-- [ ] Verify contract on Etherscan Sepolia
-- [ ] Record deployed address in `.env`
-- [ ] Deploy or identify USDC.e and target Uniswap pool on Sepolia
-- [ ] Seed the Uniswap pool with initial liquidity for testing
-- **Skills**: `deploy-contract`, `liquidity-planner`, `.0g-skills/patterns/NETWORK_CONFIG.md`
+**Hour 1:15 - 2:00: Vault contract (45 min)**
 
----
+The Vault is now simpler — pure accounting, no agent logic. AgentManager handles all agent state.
 
-## Phase 3: Relayer Script (2-3 hours)
+**Skills**: `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/SECURITY.md`
 
-Can start once vault and satellite interfaces are defined (before deployment).
+- [ ] Share token (ERC20 mint/burn), `totalAssets()`, `sharePrice()`, `idleBalance()`
+- [ ] `recordDeposit(user, amount)` — messenger only, mints shares
+- [ ] `processWithdraw(user, shares)` — burns shares, emits `WithdrawApproved`
+- [ ] Withdrawal queue: Tier 1 instant (check idle, burn, approve), Tier 2 queued (lock shares, record epoch), `claimWithdraw` processing
+- [ ] `epochCheck` modifier + `_settleEpoch()` orchestration + public `triggerSettleEpoch()` (called by AgentManager's epochCheck): calls `AgentManager.settleAgents()`, applies fee waterfall (protocolFee first, then agentCommission), handles pending withdrawals (reduce allocations, queue force-close for lowest-Sharpe), emits `EpochSettled(sharePrice, totalShares, totalAssets)`
+- [ ] Fee waterfall: `protocolFeesAccrued`, `commissionsOwed[agentId]`, `approveCommissionRelease(agentId, amount)` — called by AgentManager after ownership check, zeroes commissionsOwed and emits CommissionApproved
+- [ ] `onlyMessenger` modifier
+- [ ] Compile Vault, generate ABIs, push to `shared/abis/`
 
-### 3.1 - Core relayer: event watching + transaction submission
+**Hour 2:00 - 3:15: Finish satellite (1.25 hours)**
+
+- [ ] Finish 2.1 - Core: `claimWithdraw()`, idle reserve tracking refinement
+- [ ] 2.2 - Uniswap execution: `executeBatch()` (messenger only), zap-in (swap half USDC.e for paired token via SwapRouter), LP open (NonfungiblePositionManager.mint), LP close (decreaseLiquidity + collect), LP modify (decrease + re-mint), zap-out (swap back to USDC.e), position NFT tracking per agentId, `collect()` on all positions at epoch reporting, position valuation (slot0 + token amounts), emit `ValuesReported(agentId, positionValue, feesCollected)`
+- [ ] 2.3 - Fee reserves: `reserveFees()` (messenger only), `protocolReserve`/`commissionReserve` pools, `claimProtocolFees()` (protocolTreasury only), `claimCommissions()` (emit CommissionClaimRequested), `releaseCommission()` (messenger only, from commissionReserve)
+- [ ] 2.4 - Agent management: `pauseAgent()`/`unpauseAgent()` (emit PauseRequested), `withdrawFromArena()` (emit WithdrawFromArenaRequested)
+- [ ] 2.5 - Force-close: `forceClose()` (messenger only), close all agent positions via zap-out, return capital to correct destination
+- [ ] Compile satellite, generate ABIs, push to `shared/abis/`
+
+**Skills**: `.0g-skills/patterns/CHAIN.md`, `swap-integration`, `liquidity-planner`
+
+**Hour 3:15 - 3:30: Deploy satellite (15 min)**
+
+- [ ] Deploy satellite to Sepolia with constructor params (pool, depositToken, messenger, protocolTreasury)
+- [ ] Verify on Etherscan Sepolia
+- [ ] Record address in `.env`, announce to team
+
+**Skills**: `deploy-contract`, `.0g-skills/patterns/NETWORK_CONFIG.md`
+
+**Hour 3:30 - 4:45: Relayer (1.25 hours)**
+
 - [ ] Set up ethers v6 providers for both 0G testnet and Sepolia
-- [ ] Implement event listener for Sepolia satellite events: `Deposited`, `AgentRegistered`, `WithdrawRequested`, `ValuesReported`, `CommissionClaimRequested`, `PauseRequested`, `WithdrawFromArenaRequested`
-- [ ] Implement event listener for 0G vault events: `IntentQueued`, `WithdrawApproved`, `CommissionApproved`, `ProtocolFeeAccrued`, `CommissionAccrued`, `EpochSettled`
-- [ ] Implement transaction submission to both chains with retry logic
-- [ ] Implement nonce management to prevent nonce conflicts
-- **Skills**: `viem-integration`, `.0g-skills/patterns/NETWORK_CONFIG.md`
+- [ ] Load ABIs from `shared/abis/`
+- [ ] Implement all 12 event routes (note: some go to Vault, some to AgentManager):
+  - [ ] `Deposited` -> `vault.recordDeposit()`
+  - [ ] `AgentRegistered` -> `agentManager.recordRegistration()`
+  - [ ] `WithdrawRequested` -> `vault.processWithdraw()`
+  - [ ] `IntentQueued` -> `satellite.executeBatch()`
+  - [ ] `ValuesReported` -> `agentManager.reportValues()`
+  - [ ] `EpochSettled` -> `satellite.updateSharePrice()`
+  - [ ] `WithdrawApproved` -> `satellite.release()`
+  - [ ] `CommissionAccrued` + `ProtocolFeeAccrued` -> `satellite.reserveFees()`
+  - [ ] `CommissionClaimRequested` -> `agentManager.processCommissionClaim()`
+  - [ ] `CommissionApproved` -> `satellite.releaseCommission()`
+  - [ ] `PauseRequested` -> `agentManager.processPause()`
+  - [ ] `WithdrawFromArenaRequested` -> agentManager withdraw-from-arena flow
+- [ ] Event deduplication (don't process same event twice)
+- [ ] Retry logic + nonce management
+- [ ] Structured logging (timestamp, event type, tx hash, chain)
+- [ ] Health check endpoint (for monitoring during demo)
+- [ ] Start relayer as persistent process (pm2 or background node)
 
-### 3.2 - Relayer message routing
-- [ ] Route `Deposited` -> `vault.recordDeposit()`
-- [ ] Route `AgentRegistered` -> `vault.recordRegistration()`
-- [ ] Route `WithdrawRequested` -> `vault.processWithdraw()`
-- [ ] Route `IntentQueued` -> `satellite.executeBatch()`
-- [ ] Route `ValuesReported` -> `vault.reportValues()`
-- [ ] Route `EpochSettled` -> `satellite.updateSharePrice()`
-- [ ] Route `WithdrawApproved` -> `satellite.release()`
-- [ ] Route `CommissionAccrued` + `ProtocolFeeAccrued` -> `satellite.reserveFees()`
-- [ ] Route `CommissionClaimRequested` -> `vault.processCommissionClaim()`
-- [ ] Route `CommissionApproved` -> `satellite.releaseCommission()`
-- [ ] Route `PauseRequested` -> `vault.processPause()`
-- [ ] Route `WithdrawFromArenaRequested` -> vault withdraw-from-arena flow
-- **Skills**: `viem-integration`, `interact-contract`
+**Skills**: `backend-developer`, `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
-### 3.3 - Relayer error handling + logging
-- [ ] Implement graceful error handling (don't crash on single failed relay)
-- [ ] Implement event deduplication (don't process same event twice)
-- [ ] Add structured logging (timestamp, event type, tx hash, chain)
-- [ ] Implement health check endpoint (for monitoring during demo)
-- **Skills**: `viem-integration`
+### PM — MCP server + dashboard (3.5 hours)
 
----
+**Hour 1:15 - 2:15: Finish MCP server (1 hour)**
 
-## Phase 4: Subgraph MCP Server (1-2 hours)
-
-Can run fully in parallel with Phases 1-3.
-
-### 4.1 - MCP server setup
-- [ ] Set up Node.js MCP server (using @modelcontextprotocol/sdk)
-- [ ] Define MCP tools: `getPoolPrice`, `getPoolTicks`, `getPoolVolume`, `getPoolFees`, `getRecentSwaps`, `getPoolTVL`
+- [ ] Implement MCP tools: `getPoolPrice`, `getPoolTicks`, `getPoolVolume`, `getPoolFees`, `getRecentSwaps`, `getPoolTVL`
 - [ ] Connect to Uniswap v3 subgraph on Sepolia via TheGraph
 - [ ] Implement GraphQL queries for each tool
 - [ ] Add RPC fallback for current spot price (direct `slot0()` read)
-- **Skills**: `viem-integration`
+- [ ] Test against live Sepolia pool data
+- [ ] Deploy/run MCP server, record endpoint URL in `.env`
 
-### 4.2 - Test MCP server
-- [ ] Test each tool against live Sepolia subgraph data
-- [ ] Verify response format matches what OpenClaw agents expect
-- [ ] Test RPC fallback when subgraph is stale
-- **Skills**: (none specific -- standard testing)
+**Skills**: `backend-developer`, `viem-integration`
 
----
+**Hour 2:15 - 4:45: Dashboard (2.5 hours)**
 
-## Phase 5: OpenClaw Agents (2-3 hours)
+Start with **mock data** (hardcoded agents, scores, positions). Wire to real contracts when ABIs arrive.
 
-Depends on: Subgraph MCP (Phase 4), Vault deployed (Phase 1.7).
+- [ ] 6.1 - Scaffold: Next.js app, viem clients for both chains, wagmi wallet connection for Sepolia
+- [ ] 6.2 - Agent performance view: Sharpe scores, EMA returns, credit allocation, token bucket state (credits, maxCredits, refillRate), agent phase (proving/vault), zeroSharpeStreak, highlight starved vs rewarded agents
+- [ ] 6.3 - Position view: agent Uniswap positions (tick range, liquidity, current price), recent intents + execution status, fees collected per agent per epoch
+- [ ] 6.4 - Depositor view: share price, total assets, user share balance, deposit form (`satellite.deposit()`), withdraw form (`satellite.requestWithdraw()`), pending/claimable withdrawals
+- [ ] 6.5 - iNFT marketplace view: list iNFTs with track record (Sharpe, returns, commission yield), commission claim button (`satellite.claimCommissions()`), pause/unpause controls (`satellite.pauseAgent()`), withdraw-from-arena button (`satellite.withdrawFromArena()`)
+- [ ] 6.6 - Fee waterfall display: protocol fees accrued, commission pool, depositor yield, per-epoch breakdown
+- [ ] Wire all mock data to real contract reads when ABIs land in `shared/abis/` (~hour 3:15+)
 
-### 5.1 - Agent scaffold + OpenClaw integration
-- [ ] Set up OpenClaw agent project on fly.io
-- [ ] Configure MCP connection to Subgraph MCP server
-- [ ] Configure agent wallet (EOA) for submitting intents to 0G vault
-- [ ] Implement base agent loop: read market data -> decide -> submit intent
-- **Skills**: `.0g-skills/AGENTS.md`, `.0g-skills/patterns/COMPUTE.md`
-
-### 5.2 - Strategy: Aggressive agent (Agent A)
-- [ ] Implement tight-range strategy: concentrate liquidity within 2-3% of current price
-- [ ] Implement frequent rebalancing: rebalance when price drifts >2% from range center
-- [ ] Submit intents to vault via `submitIntent()`
-- **Skills**: `liquidity-planner`, `.0g-skills/patterns/COMPUTE.md`
-
-### 5.3 - Strategy: Conservative agent (Agent B)
-- [ ] Implement wide-range strategy: spread liquidity across 10-20% of current price
-- [ ] Implement rare rebalancing: only rebalance when price exits range entirely
-- [ ] Submit intents to vault via `submitIntent()`
-- **Skills**: `liquidity-planner`, `.0g-skills/patterns/COMPUTE.md`
-
-### 5.4 - Strategy: Bad agent (Agent C)
-- [ ] Implement intentionally poor strategy: random tick ranges, unnecessary rebalances
-- [ ] Designed to demonstrate capital flowing away from bad performers
-- [ ] Submit intents to vault via `submitIntent()`
-- **Skills**: `liquidity-planner`, `.0g-skills/patterns/COMPUTE.md`
-
-### 5.5 - Deploy agents to fly.io
-- [ ] Deploy 3 sandboxed OpenClaw instances on fly.io
-- [ ] Configure environment variables (agent wallets, vault address, MCP endpoint)
-- [ ] Verify agents can read from Subgraph MCP and submit intents to vault
-- **Skills**: `.0g-skills/patterns/COMPUTE.md`, `.0g-skills/patterns/SECURITY.md`
+**Skills**: `frontend-dev`, `viem-integration`
 
 ---
 
-## Phase 6: Dashboard (2-3 hours)
+## Hour 3:45 - 5:15 — Agent Strategies + Deploy All + Wire (all parallel)
 
-Can start once contract interfaces are defined. Full data available after Phase 7.
+### Dev A — Build 3 strategies + deploy agents (1.5 hours)
+AgentManager is done. Now build the strategies that use it.
 
-### 6.1 - Dashboard scaffold
-- [ ] Set up Next.js or React app
-- [ ] Configure viem clients for both 0G testnet (vault reads) and Sepolia (satellite reads)
-- [ ] Set up wallet connection (wagmi) for user deposits/withdrawals on Sepolia
-- **Skills**: `viem-integration`, `frontend-dev`
+- [ ] Build 3 agent strategies (simple variations of the base loop):
+  - [ ] Aggressive (Agent A): tight range (2-3% of price), rebalance when drift > 2%
+  - [ ] Conservative (Agent B): wide range (10-20%), rebalance only when price exits range
+  - [ ] Bad (Agent C): random tick ranges, unnecessary rebalances
+- [ ] Wire agents to real MCP server endpoint (from PM)
+- [ ] Wire agents to submit intents to real AgentManager address on 0G
+- [ ] Deploy 3 OpenClaw instances to fly.io
+- [ ] Verify agents produce and submit well-formed intents
+- **Skills**: `.0g-skills/patterns/COMPUTE.md`, `liquidity-planner`, `backend-developer`
 
-### 6.2 - Agent performance view
-- [ ] Display all agents: Sharpe score, EMA returns, credit allocation, deployed capital
-- [ ] Show token bucket state: current credits, maxCredits, refillRate
-- [ ] Show agent phase (proving/vault) and zeroSharpeStreak
-- [ ] Highlight which agents are being starved vs rewarded
-- [ ] Real-time updates via polling or event subscriptions
-- **Skills**: `viem-integration`, `interact-contract`, `frontend-dev`
+### Dev B — Deploy all 0G contracts + verify relayer
+- [ ] Deploy iNFT contract to 0G testnet
+- [ ] Deploy AgentManager to 0G testnet (with constructor params: alpha, maxAgents, totalRefillBudget, provingEpochsRequired, minPromotionSharpe, minActionInterval, messenger)
+- [ ] Deploy Vault to 0G testnet (with constructor params: agentManager address, epochLength, maxExposureRatio, protocolFeeRate, protocolTreasury, commissionRate, depositToken, pool, messenger, satellite)
+- [ ] Call `AgentManager.setVault(vaultAddress)` to complete circular reference
+- [ ] Verify all contracts on 0G explorer
+- [ ] Record all addresses in `.env`, announce to team
+- [ ] Smoke test: deposit on satellite -> relayer -> shares minted on vault
+- [ ] Verify relayer routes correctly to both Vault and AgentManager
+- **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
-### 6.3 - Position + transaction view
-- [ ] Show each agent's active Uniswap positions (tick range, liquidity, current price)
-- [ ] Show recent intents and their execution status
-- [ ] Show fees collected per agent per epoch
-- **Skills**: `viem-integration`, `frontend-dev`
-
-### 6.4 - Depositor view
-- [ ] Show vault share price, total assets, user's share balance
-- [ ] Deposit form (calls `satellite.deposit()`)
-- [ ] Withdraw form (calls `satellite.requestWithdraw()`)
-- [ ] Show pending/claimable withdrawals
-- **Skills**: `viem-integration`, `swap-integration`, `frontend-dev`
-
-### 6.5 - iNFT marketplace view
-- [ ] List all iNFTs with agent track record (Sharpe, returns, commission yield)
-- [ ] Show commission balance and claim button (calls `satellite.claimCommissions()`)
-- [ ] Show pause/unpause controls (calls `satellite.pauseAgent()`)
-- [ ] Show withdraw-from-arena button
-- **Skills**: `viem-integration`, `interact-contract`, `frontend-dev`
-
-### 6.6 - Fee waterfall display
-- [ ] Show protocol fees accrued, commission pool, depositor yield
-- [ ] Show per-epoch breakdown: fees collected -> protocol cut -> agent cut -> depositor return
-- **Skills**: `viem-integration`, `frontend-dev`
+### PM — Wire dashboard to real contracts
+- [ ] Replace all mock data with real contract reads using deployed addresses + ABIs
+- [ ] Verify deposit/withdraw forms call real satellite functions
+- [ ] Verify agent performance view reads real AgentManager state (Sharpe, EMAs, credits)
+- **Skills**: `frontend-dev`, `viem-integration`
 
 ---
 
-## Phase 7: Integration + Demo Prep (2-3 hours)
+## Development Complete (~5.25 hours)
 
-All previous phases must be complete.
+At this point, all components are built and deployed:
+- Vault on 0G testnet (pure accounting: shares, deposits, withdrawals, fee waterfall, epoch orchestration)
+- AgentManager on 0G testnet (agent lifecycle: registry, intents, token bucket, Sharpe scoring, promotion, eviction)
+- iNFT on 0G testnet (ERC-721 ownership deeds)
+- Satellite on Sepolia (deposits, Uniswap LP execution, fee reserves)
+- Relayer running (12 event routes across Vault + AgentManager + Satellite)
+- MCP server running (Uniswap subgraph data for agents)
+- 3 agents on fly.io (submitting intents to AgentManager)
+- Dashboard reading real data from both chains
 
-### 7.1 - End-to-end integration test
-- [ ] Deposit USDC.e into satellite -> verify shares minted on vault
-- [ ] Register agent via satellite -> verify iNFT minted on vault
-- [ ] Agent submits intent -> relayer delivers -> satellite executes LP position
-- [ ] Satellite reports values -> relayer delivers -> vault updates EMAs
-- [ ] Trigger epoch settlement -> verify Sharpe scores, credit rebalancing
-- [ ] Test promotion flow: proving agent meets criteria -> promoted
-- [ ] Test eviction flow: bad agent accumulates zeroSharpeStreak -> evicted
-- [ ] Test withdrawal flow: Tier 1 (instant) and Tier 2 (queued)
-- [ ] Test commission claim flow end-to-end
-- [ ] Test pause/unpause flow
-- **Skills**: `interact-contract`, `viem-integration`, `.0g-skills/patterns/TESTING.md`
+---
 
-### 7.2 - Pre-compute demo state
-- [ ] Deploy vault with short `epochLength` (few seconds of blocks)
-- [ ] Register 2 bad agents (Agent B conservative + Agent C bad) with proving capital
-- [ ] Let bad agents trade for several epochs (build bad track records)
-- [ ] Register our good agent (Agent A aggressive) with proving capital
-- [ ] Let good agent complete proving phase (all cross-chain round trips)
+## 14-Hour Buffer: Testing, Integration, Demo Prep
+
+Everything below happens in the remaining ~14 hours. Order is flexible.
+
+### Integration testing (Dev B leads, all help)
+- [ ] End-to-end: deposit -> register agent -> submit intent -> relayer -> satellite executes LP -> report values -> epoch settlement -> Sharpe update
+- [ ] Test promotion: proving agent meets `provingEpochsRequired` + `minPromotionSharpe` -> promoted
+- [ ] Test eviction: bad agent accumulates `zeroSharpeStreak` >= `EVICTION_EPOCHS` -> evicted
+- [ ] Test withdrawal: Tier 1 instant + Tier 2 queued + force-close enforcement
+- [ ] Test commission claim: fee waterfall -> accrue -> claim on Sepolia -> satellite pays from commissionReserve
+- [ ] Test pause/unpause: iNFT owner pauses via satellite -> AgentManager rejects intents
+- [ ] Test withdraw-from-arena: force-close all positions, return capital, deregister
+- [ ] Fix bugs across all components
+
+### Demo state preparation (Dev A leads)
+- [ ] Deploy FRESH AgentManager + Vault on 0G with demo-tuned params (short epochLength, low provingEpochsRequired, low EVICTION_EPOCHS)
+- [ ] Call `AgentManager.setVault()` to link them
+- [ ] Deploy FRESH satellite on Sepolia with same messenger
+- [ ] Reconfigure relayer + dashboard + agents to new addresses
+- [ ] Register 2 bad agents with proving capital, let them trade (build bad Sharpe)
+- [ ] Register good agent with proving capital, let it complete proving phase
 - [ ] Pause good agent one epoch before promotion threshold
-- [ ] Verify dashboard shows: 2 bad agents with poor Sharpe, 1 good agent ready to promote
-- **Skills**: `interact-contract`, `viem-integration`
+- [ ] Verify bad agents have zeroSharpeStreak near eviction threshold
+- [ ] Verify dashboard shows correct state for demo
 
-### 7.3 - Demo rehearsal
-- [ ] Run through the full 3-minute demo script:
-  1. Show dashboard with bad agents
-  2. Show good agent's proving track record
-  3. Trigger promotion epoch live
-  4. Show commissions accruing + iNFT marketplace
-  5. Show bad agent eviction
-- [ ] Time each section (30s each, ~3 min total)
+### Dashboard polish (PM leads)
+- [ ] Color coding for good/bad agents (green/red Sharpe indicators)
+- [ ] Visual capital flow animation (credits moving between agents)
+- [ ] Responsive layout for presentation screen
+- [ ] Error states and loading indicators
+
+### Demo rehearsal (all together)
+- [ ] Run full 3-minute demo script:
+  1. Show bad agents on dashboard (~30s)
+  2. Show good agent's proving track record (~45s)
+  3. Trigger promotion epoch live (~30s)
+  4. Show commissions + iNFT marketplace (~30s)
+  5. Show bad agent eviction (~30s)
+- [ ] Time each section
 - [ ] Test relayer reliability under demo conditions
-- [ ] Prepare fallback: if 0G testnet is down, have Anvil fork ready
-- [ ] Prepare fallback: pre-recorded video of demo flow
-- **Skills**: (none -- manual rehearsal)
+
+### Fallback preparation (Dev B leads)
+- [ ] Set up Anvil fork of 0G testnet as backup
+- [ ] Verify contracts deploy and work on Anvil fork
+- [ ] Record fallback demo video
+
+### Stretch goal: 0G Storage for epoch history (PM)
+- [ ] Listen for `EpochSettled` events on vault
+- [ ] Upload epoch snapshots to 0G decentralized storage
+- [ ] Store root hashes on-chain for auditability
+- [ ] Dashboard reads historical data from 0G storage for charts
+- **Skills**: `upload-file`, `storage-plus-chain`, `.0g-skills/patterns/STORAGE.md`, `merkle-verification`
 
 ---
 
-## Parallel Execution Map
+## Handoff Protocol
 
-```
-Hour 0-1:    [Phase 0: Setup]
-             0.1 | 0.2 | 0.3  (all parallel)
+| What | From | To | Where | When |
+|------|------|----|-------|------|
+| Shared interfaces (`IVault.sol`, `ISatellite.sol`, `IAgentManager.sol`) | Dev A | Dev B | `contracts/interfaces/` | Hour 0:30 |
+| Sepolia pool address + USDC.e | PM | Dev A, Dev B | `.env` | Hour 1:15 |
+| Vault ABIs | Dev B | Dev A, PM | `shared/abis/` | Hour 2:00 |
+| MCP server endpoint | PM | Dev A | `.env` | Hour 2:15 |
+| Satellite ABIs | Dev B | Dev A, PM | `shared/abis/` | Hour 3:15 |
+| Deployed satellite address | Dev B | Dev A, PM | `.env` | Hour 3:30 |
+| AgentManager ABIs | Dev A | Dev B, PM | `shared/abis/` | Hour 3:45 |
+| Deployed vault + AgentManager + iNFT addresses | Dev B | Dev A, PM | `.env` | Hour 4:45 |
+| Running relayer | Dev B | Dev A (agents) | local / fly.io | Hour 4:45 |
 
-Hour 1-5:    [Phase 1: Vault]           [Phase 2: Satellite]      [Phase 4: MCP]
-             1.1 -> 1.2 -> 1.3          2.1 -> 2.2                4.1 -> 4.2
-                  -> 1.4 -> 1.5              -> 2.3 -> 2.4
-                       -> 1.6                      -> 2.5
-                            -> 1.7
+## Mocking Strategy
 
-Hour 4-7:    [Phase 3: Relayer]
-             3.1 -> 3.2 -> 3.3
+**Don't wait. Mock and move on.**
 
-Hour 6-9:    [Phase 5: Agents]          [Phase 6: Dashboard]
-             5.1 -> 5.2 | 5.3 | 5.4    6.1 -> 6.2 | 6.3
-                  -> 5.5                     -> 6.4 | 6.5
-                                             -> 6.6
-
-Hour 9-12:   [Phase 7: Integration + Demo Prep]
-             7.1 -> 7.2 -> 7.3
-```
-
-**Critical path**: Phase 0 -> Phase 1 (vault) -> Phase 3 (relayer) -> Phase 7 (integration)
-
-**Parallelizable**: Phase 2 (satellite) with Phase 1 (vault), Phase 4 (MCP) with everything, Phase 6 (dashboard) with Phase 5 (agents)
+| If you need... | Mock it with... | Replace when... |
+|---|---|---|
+| Contract ABIs | Hardcode interface types in your code | ABIs land in `shared/abis/` |
+| Deployed contract address | Use `0x0000...` placeholder in `.env` | Real address is deployed |
+| Vault for agent testing | Agents log intents to console | Vault is deployed + relayer runs |
+| MCP server for agents | Hardcoded pool price and tick data | PM's MCP server is running |
+| Real contract data for dashboard | Hardcoded JSON with fake agents/scores | Wire to real contracts with viem |
+| Relayer running | Submit intents directly to AgentManager for testing | Relayer is live |
+| Uniswap pool on Sepolia | Use any existing pool temporarily | PM sets up the real pool |
 
 ---
 
-## Skill Reference Quick Map
+## Skill Reference Per Developer
 
-| Skill | Used In Tasks |
-|-------|--------------|
-| `scaffold-project` | 0.1 |
-| `deploy-contract` | 0.2, 1.1-1.7, 2.1-2.5 |
-| `interact-contract` | 1.1-1.6, 2.1-2.4, 3.2, 6.2, 6.5, 7.1, 7.2 |
-| `viem-integration` | 1.1, 2.1-2.4, 3.1-3.3, 4.1, 6.1-6.6, 7.1, 7.2 |
-| `swap-integration` | 2.2, 6.4 |
-| `liquidity-planner` | 2.1, 2.2, 2.5, 5.2-5.4 |
-| `frontend-dev` | 6.1-6.6 |
-| `backend-developer` | 3.1-3.3, 4.1 |
-| `.0g-skills/patterns/CHAIN.md` | 0.2, 1.1-1.7, 2.1 |
-| `.0g-skills/patterns/NETWORK_CONFIG.md` | 0.1, 0.3, 1.7, 2.5, 3.1 |
-| `.0g-skills/patterns/COMPUTE.md` | 5.1-5.5 |
-| `.0g-skills/patterns/SECURITY.md` | 0.3, 5.5 |
-| `.0g-skills/patterns/TESTING.md` | 7.1 |
-| `.0g-skills/AGENTS.md` | 5.1 |
+| Developer | Skills to load |
+|-----------|---------------|
+| **Dev A** | `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/SECURITY.md`, `.0g-skills/AGENTS.md`, `.0g-skills/patterns/COMPUTE.md`, `liquidity-planner`, `backend-developer` |
+| **Dev B** | `.0g-skills/patterns/CHAIN.md`, `swap-integration`, `liquidity-planner`, `deploy-contract`, `interact-contract`, `backend-developer`, `.0g-skills/patterns/NETWORK_CONFIG.md` |
+| **PM** | `scaffold-project`, `frontend-dev`, `viem-integration`, `liquidity-planner`, `backend-developer`, `.0g-skills/patterns/NETWORK_CONFIG.md` |
+
+---
+
+## Timeline View
+
+```
+              0:00   0:30   1:15    2:00         3:15   3:30   3:45         4:45    5:15
+Dev A    [interfaces] [agent base] [-------- AgentManager contract --------] [-- strategies + deploy --]
+Dev B    [hardhat   ] [-- vault --] [--- satellite ---] [dep sat] [-- relayer --] [dep vault+AM]
+PM       [scaffold+fund] [pool+MCP server] [----------- dashboard (mock -> real) -----------]
+                                    ^        ^                         ^              ^
+                                    |        |                         |              |
+                               MCP ready  vault ABIs             sat ABIs       AM ABIs + all
+                              pool ready                        + deployed      deployed + relayer
+
+                     5:15 -------- 14 HOURS -------->
+                     [integration testing | demo prep | polish | fallbacks | 0G storage (stretch)]
+```
+
+**Critical path**: interfaces (0:30) -> AgentManager (1:15-3:45) -> strategies + deploy (3:45-5:15)
+
+**Key advantage of the split**: Dev B builds the simpler Vault (45 min) THEN satellite (1.25 hrs) — both money-flow contracts. Dev A builds AgentManager (2.5 hrs) — all scoring/lifecycle. They never touch the same `.sol` file. Dev B finishes Vault ABIs at hour 2:00, giving PM earlier access to contract types for dashboard wiring.
