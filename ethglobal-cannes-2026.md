@@ -19,10 +19,10 @@ A single vault where users deposit funds. Multiple AI agents, each running on 0G
 +-----------------------------+                     +------------------------------+
 | Vault (share token +        |                     | Satellite Contract           |
 |   accounting layer)         |     Relayer         | - holds ALL tokens (USDC.e)  |
-| - token bucket allocator    |    (JS script,      | - holds idle reserve (20%)   |
-| - Sharpe scoring / EMAs     |<--  simulates --->  | - owns all LP positions      |
-| - iNFT contract             |     CCIP)           | - executes Uniswap calls     |
-| - agent registry            |                     | - zap-in/out (swap for pairs)|
+| - token bucket allocator    |  (JS script for     | - holds idle reserve (20%)   |
+| - Sharpe scoring / EMAs     |<-- hackathon;    -->| - owns all LP positions      |
+| - iNFT contract             |   permissionless    | - executes Uniswap calls     |
+| - agent registry            |   network for prod) | - zap-in/out (swap for pairs)|
 | - intent queue              |                     | - reports position values    |
 | - commission ledger         |                     | - handles deposits/withdraws |
 +----------+------------------+                     +------------------------------+
@@ -65,15 +65,14 @@ Users **only interact with the satellite on Sepolia** -- they never need to touc
 
 #### Why ETH<>0G
 
-Ethereum has the best bridge support to 0G across all listed bridges (relevant for production CCIP messaging):
-- **USDC.e** supported by Interport, XSwap, and 0G Native Bridge (3 options for redundancy)
-- All powered by CCIP -- standard, well-documented, supports programmable messages
+Ethereum Sepolia is chosen because:
+- **Uniswap v3 is deployed on Sepolia** -- the primary execution layer for all agent LP positions
+- **USDC.e availability** -- supported by Interport, XSwap, and 0G Native Bridge for production token bridging if ever needed
+- Arbitrum/Base only support w0G bridging to 0G, which is insufficient for LP operations
 
-Arbitrum/Base only support w0G bridging to 0G, which is insufficient.
+#### Hackathon: Centralized relayer script
 
-#### Hackathon: Relayer script simulates CCIP
-
-Real CCIP between 0G testnet and Sepolia likely doesn't exist yet. A simple **Node.js relayer script** (~100 lines) bridges the two chains:
+A simple **Node.js relayer script** (~100 lines) bridges the two chains for the hackathon:
 
 ```
 Sepolia                       Relayer Script              0G Testnet
@@ -85,13 +84,32 @@ Sepolia                       Relayer Script              0G Testnet
 +-----------+                    +------+                     +----------+
 ```
 
-The relayer watches events on one chain and submits transactions on the other -- exactly what CCIP would do in production. Both contracts have a `messenger` address: set to relayer EOA for hackathon, swap to CCIP router address for production.
+The relayer watches events on one chain and submits transactions on the other. Both contracts have a `messenger` address: set to relayer EOA for hackathon, swap to the permissionless relayer network contract for production.
 
-**Known limitation (hackathon)**: the relayer is fully trusted -- it can report arbitrary position values. A malicious or buggy relayer could inflate valuations and manipulate Sharpe scores. In production, CCIP provides cryptographic guarantees on message authenticity. The satellite's valuation logic itself is auditable on-chain code.
+**Known limitation (hackathon)**: the relayer is fully trusted -- it can report arbitrary position values. A malicious or buggy relayer could inflate valuations and manipulate Sharpe scores. The production architecture below eliminates this trust assumption.
 
-#### Production: CCIP replaces relayer
+#### Production: Permissionless relayer network
 
-In production, the relayer is replaced by Chainlink CCIP via the 0G Native Bridge (Hub). The contract interface is identical -- only the transport layer changes. No contract modifications needed.
+In production, the single trusted relayer is replaced by an **open, economically-secured relayer network**. Anyone can participate:
+
+- **Bonding**: relayers stake a bond (e.g., on 0G) to be eligible to relay messages
+- **Relay & earn**: any bonded relayer can watch for events on one chain and submit them to the other. The first valid relay per message earns a **relay fee** (funded from protocol fees -- self-sustaining)
+- **Optimistic verification**: relayed messages enter a short challenge window (e.g., 10 blocks). During this window, any other bonded relayer can submit a **fraud proof** showing the message doesn't match the source chain event
+- **Slashing**: fraudulent relayers lose their bond. Challengers receive a reward from the slashed bond
+- **Liveness incentive**: if no relay is submitted within N blocks, the relay fee increases -- incentivizing timely delivery even during low activity
+
+```
+Source chain event --> Relayer submits message --> Challenge window (10 blocks)
+                                                    |
+                                              No challenge? Message accepted, execute.
+                                              Challenge + fraud proof? Slash relayer, reject message.
+```
+
+**Why not CCIP**: Chainlink CCIP is expensive and adds a third-party dependency. The permissionless relayer network is cheaper (relayers compete on fees), fully decentralized (anyone can join), and self-sustaining (relay fees come from protocol revenue).
+
+**Challenge window latency**: the challenge period adds a small delay (seconds to minutes depending on block time), but this fits naturally within the epoch cadence -- intents are already batched, not real-time.
+
+The `messenger` interface on both contracts remains unchanged -- the vault and satellite don't care who the messenger is, only that the messages are valid. The upgrade from hackathon relayer to permissionless network requires no contract modifications.
 
 ### Execution Model: Intent-Based with Batch Settlement
 
@@ -202,7 +220,7 @@ Where `epochReturn = (positionValue_end - positionValue_start + feesCollected) /
 
 At epoch reporting time, the satellite calls `collect()` on each position to realize accrued fees, then reports both values separately. The formula then correctly captures: change in LP principal (which includes impermanent loss) + earned fee income.
 
-These values are reported back to the vault on 0G via the relayer (production: CCIP). The vault doesn't need to do LP math -- it just receives the valuations.
+These values are reported back to the vault on 0G via the relayer (production: permissionless relayer network). The vault doesn't need to do LP math -- it just receives the valuations.
 
 ##### Sharpe score computation
 
@@ -272,13 +290,15 @@ The vault is deployer-configurable -- all key parameters are set at deployment v
 | `totalRefillBudget` | `uint256` | Total credits distributed across all agents per epoch -- controls overall vault deployment speed |
 | `maxExposureRatio` | `uint256` | Max fraction of vault value that can be deployed across all agents (scaled, e.g., 8000 = 80%) |
 | `epochLength` | `uint256` | Number of blocks per epoch -- how often bucket parameters are recalculated |
-| `commissionRate` | `uint256` | Percentage of agent profits directed to iNFT owner (scaled, e.g., 1000 = 10%) |
+| `protocolFeeRate` | `uint256` | Protocol's cut of collected fees before agent commissions (scaled, e.g., 500 = 5%) |
+| `protocolTreasury` | `address` | Address that receives protocol fees on Sepolia |
+| `commissionRate` | `uint256` | Percentage of remaining fees (after protocol cut) directed to iNFT owner (scaled, e.g., 1000 = 10%) |
 | `provingEpochsRequired` | `uint256` | Minimum number of epochs an agent must trade with its own funds before becoming eligible for vault capital |
 | `minPromotionSharpe` | `uint256` | Minimum Sharpe score required for promotion from proving to vault allocation (scaled) |
 | `minActionInterval` | `uint256` | Minimum number of blocks between consecutive actions by the same agent (anti-churn cooldown) |
 | `depositToken` | `address` | The ERC-20 token accepted for deposits (USDC.e -- used on Sepolia satellite side) |
 | `pool` | `address` | The Uniswap v3 pool all agents trade on (e.g., ETH/USDC). Single-pool per vault for the hackathon. Metadata on vault side; the satellite also receives this as its own constructor parameter since it executes the actual Uniswap calls |
-| `messenger` | `address` | Relayer EOA (hackathon) or CCIP router (production) -- authorized to relay cross-chain messages |
+| `messenger` | `address` | Relayer EOA (hackathon) or permissionless relayer network contract (production) -- authorized to relay cross-chain messages |
 | `satellite` | `address` | Address of the satellite contract on Sepolia |
 
 All ratio/percentage parameters use basis-point scaling (10000 = 100%) for fixed-point precision without floating point.
@@ -293,7 +313,7 @@ The satellite needs to convert between token amounts and share amounts. At each 
 
 #### Tier 1 -- Instant withdrawal (fits in idle reserve)
 
-User calls `satellite.requestWithdraw(tokenAmount)` on Sepolia. The satellite converts to shares using the cached share price: `shares = tokenAmount * 1e18 / sharePrice`. Relayer notifies vault on 0G. If the amount fits within the satellite's idle reserve (tracked via reported values), the vault burns shares and emits `WithdrawApproved`. Relayer instructs `satellite.release(user, tokenAmount)`. The satellite transfers tokens directly to the user on Sepolia. No delay beyond relayer round trip (seconds in hackathon, CCIP finality in production).
+User calls `satellite.requestWithdraw(tokenAmount)` on Sepolia. The satellite converts to shares using the cached share price: `shares = tokenAmount * 1e18 / sharePrice`. Relayer notifies vault on 0G. If the amount fits within the satellite's idle reserve (tracked via reported values), the vault burns shares and emits `WithdrawApproved`. Relayer instructs `satellite.release(user, tokenAmount)`. The satellite transfers tokens directly to the user on Sepolia. No delay beyond relayer round trip (seconds in hackathon; in production, relay + challenge window latency).
 
 #### Tier 2 -- Queued withdrawal (exceeds idle reserve)
 
@@ -313,7 +333,7 @@ The user stays on Sepolia for the entire flow.
 
 **Enforcement**: since the satellite owns all Uniswap positions, force-close instructions can be sent cross-chain. During epoch settlement, if idle balance doesn't cover pending withdrawals after reducing bucket params, the vault queues force-close intents starting from the **lowest-Sharpe agent** and working up the ranking until enough capital would be freed. The relayer relays these to the satellite, which closes the positions via zap-out. Worst performers get liquidated first -- this is both enforceable and incentive-compatible.
 
-**Timing note**: Tier 2 withdrawals wait for one epoch settlement plus the cross-chain round trip (relayer propagation + satellite execution). With a local relayer this takes seconds; in production with CCIP, it depends on bridge finality.
+**Timing note**: Tier 2 withdrawals wait for one epoch settlement plus the cross-chain round trip (relayer propagation + satellite execution). With a local relayer this takes seconds; in production, it includes the challenge window latency.
 
 ### Epoch Settlement: Lazy Evaluation
 
@@ -342,7 +362,7 @@ In practice, agents are actively submitting intents every epoch, so one of them 
 3. **Eviction check**: skip paused agents entirely (eviction timer frozen, EMAs unchanged -- owner made a deliberate choice). For active agents: increment `zeroSharpeStreak` for those with Sharpe == 0, reset for others. Evict agents whose streak reaches `EVICTION_EPOCHS` (force-close positions, free `maxAgents` slot)
 4. **Promotion check**: for proving agents with `epochsCompleted >= provingEpochsRequired` and `sharpe >= minPromotionSharpe`, promote to vault allocation (initialize token bucket with promotion ramp)
 5. Rebalance bucket parameters (`refillRate`, `maxCredits`) with promotion ramp applied for recently promoted agents
-6. Compute commissions from realized fees for agents with `feesCollected > 0`: `commission = feesCollected * commissionRate / 10000`, accrue to `commissionsOwed[agentId]`, emit `CommissionAccrued` for satellite to reserve
+6. Apply fee waterfall for agents with `feesCollected > 0`: compute `protocolFee` (protocol cut first), then `agentCommission` from remainder. Accrue to `protocolFeesAccrued` and `commissionsOwed[agentId]`. Emit `ProtocolFeeAccrued` and `CommissionAccrued` for satellite to reserve
 7. Account for pending queued withdrawals: reduce agent allocations proportionally, and if idle balance still insufficient, queue force-close intents for lowest-Sharpe agents (relayed to satellite)
 8. Emit `EpochSettled(sharePrice, totalShares, totalAssets)` for satellite share price sync
 9. Advance `lastEpochBlock` to current block
@@ -418,16 +438,32 @@ One storage slot per agent (`zeroSharpeStreak`), incremented or reset at each ep
 Commissions are computed at epoch settlement on the vault (0G):
 
 ```
-// Commission is only taken from REALIZED gains (collected fees), not unrealized position value changes.
-// This avoids the problem of commissioning paper gains that are still locked in LP positions.
+// Fee waterfall: protocol fee first, then agent commission, remainder to depositors.
+// All fees taken from REALIZED gains (collected fees) only -- not unrealized position value changes.
 // feesCollected = actual liquid USDC.e sitting in satellite after collect()
-commission = feesCollected * commissionRate / 10000
-commissionsOwed[agentId] += commission
+
+protocolFee = feesCollected * protocolFeeRate / 10000        // --> protocol treasury
+remainingFees = feesCollected - protocolFee
+agentCommission = remainingFees * commissionRate / 10000     // --> iNFT owner
+depositorReturn = remainingFees - agentCommission            // --> vault share value
+
+protocolFeesAccrued += protocolFee
+commissionsOwed[agentId] += agentCommission
 ```
 
-**Why fees only**: `positionValue` changes are unrealized -- the value is locked in the LP position. Only `feesCollected` (from Uniswap's `collect()`) produces liquid tokens on the satellite. Commissioning unrealized gains would require partially closing positions to pay out, adding complexity and harming strategy performance. Fee-only commissions are simpler, always liquid, and align with how traditional fund management fees work (management/performance fees on realized returns).
+**Fee waterfall**:
+```
+Collected Uniswap fees (100%)
+  └─> Protocol fee (e.g., 5%)                --> protocol treasury
+      └─> Agent commission (e.g., 10% of remainder)  --> iNFT owner
+          └─> Depositor return (remainder)            --> vault share value
+```
 
-Note: the Sharpe score still uses the full `epochReturn` formula (position value change + fees) for allocation decisions. Only the commission payout is limited to realized fees.
+**Why fees only**: `positionValue` changes are unrealized -- the value is locked in the LP position. Only `feesCollected` (from Uniswap's `collect()`) produces liquid tokens on the satellite. Commissioning unrealized gains would require partially closing positions to pay out, adding complexity and harming strategy performance. Fee-only fees are simpler, always liquid, and align with how traditional fund management fees work.
+
+**Why protocol fee first**: the protocol takes its cut before agent commissions, ensuring protocol revenue regardless of commission rate. This is the standard DeFi vault model (Yearn, Enzyme, etc.).
+
+Note: the Sharpe score still uses the full `epochReturn` formula (position value change + fees) for allocation decisions. Only payouts are limited to realized fees.
 
 The iNFT owner claims commissions on **Sepolia** (same chain as deposits -- no 0G interaction needed):
 
@@ -440,13 +476,14 @@ Commissions are denominated in the deposit token (USDC.e). The only actors who i
 
 **Note**: the iNFT itself lives on 0G, so transfers/sales require 0G interaction. For the hackathon this is acceptable (iNFT transfers aren't part of the demo flow). In production, the iNFT could be deployed on Sepolia instead.
 
-#### Commission reserve on satellite
+#### Fee reserves on satellite
 
-The satellite maintains a separate `commissionReserve` pool so commission payouts never compete with the idle reserve or agent allocations:
+The satellite maintains separate reserve pools so fee payouts never compete with the idle reserve or agent allocations:
 
-1. At epoch settlement, vault computes commissions from collected fees and emits `CommissionAccrued(agentId, amount)`
-2. Relayer calls `satellite.reserveCommission(agentId, amount)` -- satellite sets aside that amount from the collected fees (already liquid USDC.e) into `commissionReserve`
-3. When iNFT owner claims, satellite pays from `commissionReserve`
+1. At epoch settlement, vault applies the fee waterfall and emits `ProtocolFeeAccrued(amount)` and `CommissionAccrued(agentId, amount)`
+2. Relayer calls `satellite.reserveFees(protocolFeeAmount, agentId, commissionAmount)` -- satellite sets aside both amounts from collected fees (already liquid USDC.e) into `protocolReserve` and `commissionReserve`
+3. Protocol treasury claims from `protocolReserve` via `satellite.claimProtocolFees()` (callable by `protocolTreasury` address)
+4. iNFT owners claim from `commissionReserve` via the existing commission claim flow
 
 This ensures the 20% idle reserve remains fully available for depositor withdrawals.
 
@@ -498,10 +535,11 @@ In production, OpenClaw instances run inside TEEs (Trusted Execution Environment
 
 ## Economic Loop
 
-- **Agent creators** deploy strategies, mint iNFTs, earn commissions or sell iNFTs for profit
+- **Protocol** earns a fee on all collected Uniswap fees (first cut in the waterfall) -- this is the protocol's revenue model
+- **Agent creators** deploy strategies, mint iNFTs, earn commissions (after protocol cut) or sell iNFTs for profit
 - **Agents** are self-sustaining: infrastructure costs (TheGraph, compute) are deducted from commissions before paying the iNFT owner
 - **iNFT buyers** receive net commissions passively
-- **Vault depositors** get optimized liquidity management from competing agents
+- **Vault depositors** get optimized liquidity management from competing agents, earning the remainder after protocol and agent fees
 - In production, nobody subsidizes anything -- the system is self-sustaining. For the hackathon, infrastructure costs (compute, TheGraph) are covered by free tiers and team resources
 
 ### Infrastructure Costs (Production Vision)
@@ -549,7 +587,7 @@ Total potential: **$25,000 across 2 sponsors**
 | 2-3 hardcoded strategies with different parameters | Fully permissionless agent deployment |
 | Performance leaderboard in UI | Historical analytics |
 | Sharpe-based token bucket allocation (EMA + sqrt, not complex) | Multi-factor scoring (Sortino, Calmar, drawdown penalties) |
-| JS relayer simulating CCIP between 0G testnet and Sepolia | Real CCIP integration (swap `messenger` address for production) |
+| JS relayer script between 0G testnet and Sepolia | Permissionless relayer network with bonds and fraud proofs (swap `messenger` address for production) |
 | Satellite focused on core paths (deposit, execute batch, report values, release) | Multi-pool support, advanced zap routing, partial close logic |
 | Vault as accounting-only (no tokens on 0G) | Token bridging between chains |
 
@@ -598,7 +636,7 @@ Total potential: **$25,000 across 2 sponsors**
 | Vault contract security | Keep contract as simple as possible; no time for audit |
 | Cross-chain relayer reliability during demo | Run relayer locally, test thoroughly before pitch. Relayer is ~100 lines, failure modes are simple |
 | 0G testnet instability | Have Anvil fork fallback; keep satellite on Sepolia functional independently |
-| Relayer trust (hackathon only) | Relayer can fabricate position values. Acceptable for demo (we run it); production CCIP provides cryptographic guarantees |
+| Relayer trust (hackathon only) | Relayer can fabricate position values. Acceptable for demo (we run it); production uses permissionless relayer network with bonds, fraud proofs, and slashing |
 
 ---
 
