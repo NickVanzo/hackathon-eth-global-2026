@@ -15,23 +15,23 @@
 ## Hour 0:00 - 0:30 — Setup (all parallel)
 
 ### Dev A — Shared interfaces + agent base
-- [ ] Define `Intent` struct (agentId, actionType, params)
-- [ ] Define all cross-chain event signatures (Deposited, AgentRegistered, WithdrawRequested, IntentQueued, ValuesReported, EpochSettled, WithdrawApproved, CommissionAccrued, ProtocolFeeAccrued, CommissionClaimRequested, CommissionApproved, PauseRequested, WithdrawFromArenaRequested)
-- [ ] Define all cross-chain function signatures for both contracts
-- [ ] Write `IVault.sol`, `IAgentManager.sol`, and `ISatellite.sol` interface files
-- [ ] Push to `contracts/interfaces/` so Dev B can start satellite immediately
+- [x] Define `Intent` struct (agentId, actionType, params)
+- [x] Define all cross-chain event signatures (Deposited, AgentRegistered, WithdrawRequested, WithdrawalCompleted, IntentQueued, ValuesReported, EpochSettled, WithdrawApproved, CommissionAccrued, ProtocolFeeAccrued, CommissionClaimRequested, CommissionApproved, PauseRequested, WithdrawFromArenaRequested)
+- [x] Define all cross-chain function signatures for both contracts
+- [x] Write `IVault.sol`, `IAgentManager.sol`, and `ISatellite.sol` interface files
+- [x] Push to `contracts/interfaces/` so Dev B can start satellite immediately
 - **Skills**: `.0g-skills/patterns/CHAIN.md`
 
 ### Dev B — Forge + tooling
-- [ ] Configure Forge: 0G testnet (`evmVersion: "cancun"`) + Sepolia networks
-- [ ] Set up deployment scripts for both chains
-- [ ] Install OpenZeppelin contracts (Math, ERC721, ERC20)
+- [x] Configure Forge: 0G testnet (`evmVersion: "cancun"`) + Sepolia networks
+- [x] Set up deployment scripts for both chains
+- [x] Install OpenZeppelin contracts (Math, ERC721, ERC20)
 - **Skills**: `deploy-contract`, `.0g-skills/patterns/CHAIN.md`
 
 ### PM — Scaffold + infra
-- [ ] Scaffold monorepo: `contracts/`, `relayer/`, `agent/`, `subgraph-mcp/`, `dashboard/`, `shared/`
-- [ ] Create `.env.example`, `.gitignore`, root `package.json` with workspaces
-- [ ] Start funding wallets: faucets for 0G testnet + Sepolia, set up deployer/relayer/3 agent wallets
+- [x] Scaffold monorepo: `contracts/`, `relayer/`, `agent/`, `subgraph-mcp/`, `dashboard/`, `shared/`
+- [x] Create `.env.example`, `.gitignore`, root `package.json` with workspaces
+- [x] Start funding wallets: faucets for 0G testnet + Sepolia, set up deployer/relayer/3 agent wallets
 - **Skills**: `scaffold-project`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
 ---
