@@ -272,7 +272,9 @@ The vault is deployer-configurable -- all key parameters are set at deployment v
 | `totalRefillBudget` | `uint256` | Total credits distributed across all agents per epoch -- controls overall vault deployment speed |
 | `maxExposureRatio` | `uint256` | Max fraction of vault value that can be deployed across all agents (scaled, e.g., 8000 = 80%) |
 | `epochLength` | `uint256` | Number of blocks per epoch -- how often bucket parameters are recalculated |
-| `commissionRate` | `uint256` | Percentage of agent profits directed to iNFT owner (scaled, e.g., 1000 = 10%) |
+| `protocolFeeRate` | `uint256` | Protocol's cut of collected fees before agent commissions (scaled, e.g., 500 = 5%) |
+| `protocolTreasury` | `address` | Address that receives protocol fees on Sepolia |
+| `commissionRate` | `uint256` | Percentage of remaining fees (after protocol cut) directed to iNFT owner (scaled, e.g., 1000 = 10%) |
 | `provingEpochsRequired` | `uint256` | Minimum number of epochs an agent must trade with its own funds before becoming eligible for vault capital |
 | `minPromotionSharpe` | `uint256` | Minimum Sharpe score required for promotion from proving to vault allocation (scaled) |
 | `minActionInterval` | `uint256` | Minimum number of blocks between consecutive actions by the same agent (anti-churn cooldown) |
@@ -342,7 +344,7 @@ In practice, agents are actively submitting intents every epoch, so one of them 
 3. **Eviction check**: skip paused agents entirely (eviction timer frozen, EMAs unchanged -- owner made a deliberate choice). For active agents: increment `zeroSharpeStreak` for those with Sharpe == 0, reset for others. Evict agents whose streak reaches `EVICTION_EPOCHS` (force-close positions, free `maxAgents` slot)
 4. **Promotion check**: for proving agents with `epochsCompleted >= provingEpochsRequired` and `sharpe >= minPromotionSharpe`, promote to vault allocation (initialize token bucket with promotion ramp)
 5. Rebalance bucket parameters (`refillRate`, `maxCredits`) with promotion ramp applied for recently promoted agents
-6. Compute commissions from realized fees for agents with `feesCollected > 0`: `commission = feesCollected * commissionRate / 10000`, accrue to `commissionsOwed[agentId]`, emit `CommissionAccrued` for satellite to reserve
+6. Apply fee waterfall for agents with `feesCollected > 0`: compute `protocolFee` (protocol cut first), then `agentCommission` from remainder. Accrue to `protocolFeesAccrued` and `commissionsOwed[agentId]`. Emit `ProtocolFeeAccrued` and `CommissionAccrued` for satellite to reserve
 7. Account for pending queued withdrawals: reduce agent allocations proportionally, and if idle balance still insufficient, queue force-close intents for lowest-Sharpe agents (relayed to satellite)
 8. Emit `EpochSettled(sharePrice, totalShares, totalAssets)` for satellite share price sync
 9. Advance `lastEpochBlock` to current block
@@ -418,16 +420,32 @@ One storage slot per agent (`zeroSharpeStreak`), incremented or reset at each ep
 Commissions are computed at epoch settlement on the vault (0G):
 
 ```
-// Commission is only taken from REALIZED gains (collected fees), not unrealized position value changes.
-// This avoids the problem of commissioning paper gains that are still locked in LP positions.
+// Fee waterfall: protocol fee first, then agent commission, remainder to depositors.
+// All fees taken from REALIZED gains (collected fees) only -- not unrealized position value changes.
 // feesCollected = actual liquid USDC.e sitting in satellite after collect()
-commission = feesCollected * commissionRate / 10000
-commissionsOwed[agentId] += commission
+
+protocolFee = feesCollected * protocolFeeRate / 10000        // --> protocol treasury
+remainingFees = feesCollected - protocolFee
+agentCommission = remainingFees * commissionRate / 10000     // --> iNFT owner
+depositorReturn = remainingFees - agentCommission            // --> vault share value
+
+protocolFeesAccrued += protocolFee
+commissionsOwed[agentId] += agentCommission
 ```
 
-**Why fees only**: `positionValue` changes are unrealized -- the value is locked in the LP position. Only `feesCollected` (from Uniswap's `collect()`) produces liquid tokens on the satellite. Commissioning unrealized gains would require partially closing positions to pay out, adding complexity and harming strategy performance. Fee-only commissions are simpler, always liquid, and align with how traditional fund management fees work (management/performance fees on realized returns).
+**Fee waterfall**:
+```
+Collected Uniswap fees (100%)
+  └─> Protocol fee (e.g., 5%)                --> protocol treasury
+      └─> Agent commission (e.g., 10% of remainder)  --> iNFT owner
+          └─> Depositor return (remainder)            --> vault share value
+```
 
-Note: the Sharpe score still uses the full `epochReturn` formula (position value change + fees) for allocation decisions. Only the commission payout is limited to realized fees.
+**Why fees only**: `positionValue` changes are unrealized -- the value is locked in the LP position. Only `feesCollected` (from Uniswap's `collect()`) produces liquid tokens on the satellite. Commissioning unrealized gains would require partially closing positions to pay out, adding complexity and harming strategy performance. Fee-only fees are simpler, always liquid, and align with how traditional fund management fees work.
+
+**Why protocol fee first**: the protocol takes its cut before agent commissions, ensuring protocol revenue regardless of commission rate. This is the standard DeFi vault model (Yearn, Enzyme, etc.).
+
+Note: the Sharpe score still uses the full `epochReturn` formula (position value change + fees) for allocation decisions. Only payouts are limited to realized fees.
 
 The iNFT owner claims commissions on **Sepolia** (same chain as deposits -- no 0G interaction needed):
 
@@ -440,13 +458,14 @@ Commissions are denominated in the deposit token (USDC.e). The only actors who i
 
 **Note**: the iNFT itself lives on 0G, so transfers/sales require 0G interaction. For the hackathon this is acceptable (iNFT transfers aren't part of the demo flow). In production, the iNFT could be deployed on Sepolia instead.
 
-#### Commission reserve on satellite
+#### Fee reserves on satellite
 
-The satellite maintains a separate `commissionReserve` pool so commission payouts never compete with the idle reserve or agent allocations:
+The satellite maintains separate reserve pools so fee payouts never compete with the idle reserve or agent allocations:
 
-1. At epoch settlement, vault computes commissions from collected fees and emits `CommissionAccrued(agentId, amount)`
-2. Relayer calls `satellite.reserveCommission(agentId, amount)` -- satellite sets aside that amount from the collected fees (already liquid USDC.e) into `commissionReserve`
-3. When iNFT owner claims, satellite pays from `commissionReserve`
+1. At epoch settlement, vault applies the fee waterfall and emits `ProtocolFeeAccrued(amount)` and `CommissionAccrued(agentId, amount)`
+2. Relayer calls `satellite.reserveFees(protocolFeeAmount, agentId, commissionAmount)` -- satellite sets aside both amounts from collected fees (already liquid USDC.e) into `protocolReserve` and `commissionReserve`
+3. Protocol treasury claims from `protocolReserve` via `satellite.claimProtocolFees()` (callable by `protocolTreasury` address)
+4. iNFT owners claim from `commissionReserve` via the existing commission claim flow
 
 This ensures the 20% idle reserve remains fully available for depositor withdrawals.
 
@@ -498,10 +517,11 @@ In production, OpenClaw instances run inside TEEs (Trusted Execution Environment
 
 ## Economic Loop
 
-- **Agent creators** deploy strategies, mint iNFTs, earn commissions or sell iNFTs for profit
+- **Protocol** earns a fee on all collected Uniswap fees (first cut in the waterfall) -- this is the protocol's revenue model
+- **Agent creators** deploy strategies, mint iNFTs, earn commissions (after protocol cut) or sell iNFTs for profit
 - **Agents** are self-sustaining: infrastructure costs (TheGraph, compute) are deducted from commissions before paying the iNFT owner
 - **iNFT buyers** receive net commissions passively
-- **Vault depositors** get optimized liquidity management from competing agents
+- **Vault depositors** get optimized liquidity management from competing agents, earning the remainder after protocol and agent fees
 - In production, nobody subsidizes anything -- the system is self-sustaining. For the hackathon, infrastructure costs (compute, TheGraph) are covered by free tiers and team resources
 
 ### Infrastructure Costs (Production Vision)
