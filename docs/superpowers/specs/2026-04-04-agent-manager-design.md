@@ -285,6 +285,20 @@ Each task gets its own test file. Tests use a mock AgenticID that implements the
 
 ---
 
+## Agent Wallet Addresses (0G Testnet)
+
+These are the EOAs the OpenClaw agents use to submit intents:
+
+| Agent | Address |
+|---|---|
+| agent-alpha | `0xCf5a0E19ed62654e404A48577c4f1EB2A194B510` |
+| agent-beta | `0xA58383E7Fde3710f21b11fD1824254A4e5aF1074` |
+| agent-gamma | `0x27d95F3Bbd5334915c710C703FC56603CD861f8D` |
+
+These are passed as `agentAddress` in `recordRegistration()` and stored in `addressToAgentId` for `submitIntent()` caller auth.
+
+---
+
 ## Deployment
 
 1. Deploy AgentManager with constructor params (Forge script)
