@@ -64,6 +64,23 @@ repository contains 14 agent skills across 4 categories: Storage, Compute, Chain
 - `patterns/SECURITY.md` — Key management, TEE, data integrity
 - `patterns/TESTING.md` — Testing strategies & mock patterns
 
+## OpenClaw Gateway Tokens
+
+There are **two** OpenClaw instances with different `OPENCLAW_GATEWAY_TOKEN` values. Always use the right one:
+
+| Environment | How to get the token |
+|---|---|
+| **VM (fly.io)** | Injected automatically from fly secret — no action needed |
+| **Local (`~/.openclaw/`)** | `python3 -c "import json; d=json.load(open('$HOME/.openclaw/openclaw.json')); print(d['gateway']['auth']['token'])"` |
+
+When running `cron-trigger.js` locally:
+```bash
+OPENCLAW_GATEWAY_TOKEN=$(python3 -c "import json; d=json.load(open('$HOME/.openclaw/openclaw.json')); print(d['gateway']['auth']['token'])") \
+OPENCLAW_STATE_DIR=./local \
+DRY_RUN=true \
+node data-seed/cron-trigger.js
+```
+
 ## Quick Start
 
 When a developer asks to build something on 0G:
