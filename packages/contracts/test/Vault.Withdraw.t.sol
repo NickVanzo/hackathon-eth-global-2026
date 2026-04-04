@@ -72,7 +72,7 @@ contract VaultWithdrawTest is VaultTestBase {
         _seedVault(alice, TEN_K_USDC);
         // Reduce idle to exactly tokenAmount
         uint256 halfIdle = TEN_K_USDC / 2;
-        vault.setTrackedIdleBalance(halfIdle);
+        _setIdle(halfIdle);
 
         // Withdraw half the shares (tokenAmount = halfIdle = idle)
         // tokenAmount <= idle → Tier-1
@@ -88,7 +88,7 @@ contract VaultWithdrawTest is VaultTestBase {
 
     function test_processWithdraw_tier2_queuesWhenInsufficientIdle() public {
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0); // no idle
+        _setIdle(0); // no idle
 
         _processWithdraw(alice, TEN_K_USDC);
 
@@ -97,7 +97,7 @@ contract VaultWithdrawTest is VaultTestBase {
 
     function test_processWithdraw_tier2_noImmediateWithdrawApproved() public {
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         // No WithdrawApproved should fire
         vm.recordLogs();
@@ -111,19 +111,20 @@ contract VaultWithdrawTest is VaultTestBase {
         }
     }
 
-    function test_processWithdraw_tier2_burnsSharesImmediately() public {
+    function test_processWithdraw_tier2_locksSharesInVault() public {
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         _processWithdraw(alice, TEN_K_USDC);
 
-        assertEq(vault.balanceOf(alice), 0,   "shares burned");
-        assertEq(vault.totalSupply(),    0,   "supply zero");
+        assertEq(vault.balanceOf(alice),          0,          "alice balance zero");
+        assertEq(vault.balanceOf(address(vault)), TEN_K_USDC, "vault holds locked shares");
+        assertEq(vault.totalSupply(),             TEN_K_USDC, "supply unchanged");
     }
 
     function test_processWithdraw_tier2_doesNotDecrementTotalAssets() public {
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         _processWithdraw(alice, TEN_K_USDC);
 
@@ -133,7 +134,7 @@ contract VaultWithdrawTest is VaultTestBase {
 
     function test_processWithdraw_tier2_addsUserToPendingQueue() public {
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         _processWithdraw(alice, TEN_K_USDC);
 
@@ -144,10 +145,10 @@ contract VaultWithdrawTest is VaultTestBase {
 
     function test_processWithdraw_tier2_doesNotDuplicateUser() public {
         _seedVault(alice, 2 * TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
-        // Two separate queued withdrawals — share price changes between calls
-        // because burning shares without decrementing totalAssets inflates value.
+        // Two separate queued withdrawals — shares are locked (transferred to vault),
+        // so share price stays unchanged between calls.
         _processWithdraw(alice, TEN_K_USDC);
         _processWithdraw(alice, TEN_K_USDC);
 
@@ -162,7 +163,7 @@ contract VaultWithdrawTest is VaultTestBase {
         _seedVault(alice,   TEN_K_USDC);
         _seedVault(bob,     TEN_K_USDC);
         _seedVault(charlie, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         _processWithdraw(alice,   TEN_K_USDC);
         _processWithdraw(bob,     TEN_K_USDC);
@@ -214,7 +215,7 @@ contract VaultWithdrawTest is VaultTestBase {
 
     function test_pendingWithdrawal_view_reflectsTier2Entry() public {
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         _processWithdraw(alice, TEN_K_USDC);
 
@@ -260,11 +261,11 @@ contract VaultWithdrawTest is VaultTestBase {
         vm.assume(amount > 0);
 
         _seedVault(alice, uint256(amount));
-        vault.setTrackedIdleBalance(0); // force Tier-2
+        _setIdle(0); // force Tier-2
 
         _processWithdraw(alice, uint256(amount));
 
         assertEq(vault.internalPendingWithdrawal(alice), uint256(amount));
-        assertEq(vault.balanceOf(alice), 0, "shares burned");
+        assertEq(vault.balanceOf(alice), 0, "shares locked in vault");
     }
 }
