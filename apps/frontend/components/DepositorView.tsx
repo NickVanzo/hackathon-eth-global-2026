@@ -750,7 +750,9 @@ export default function DepositorView() {
             }}
           >
             CONTRACT:{" "}
-            <span style={{ color: "#9cf0ff" }}>0x71C...4f2E</span>
+            <span style={{ color: "#9cf0ff" }}>
+              {SATELLITE_ADDRESS.slice(0, 6)}...{SATELLITE_ADDRESS.slice(-4)}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <div

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MOCK_AGENTS, MOCK_POSITIONS, MOCK_INTENTS } from "@/lib/mock-data";
+import { INFT_ADDRESS } from "@/lib/contracts";
 
 // Chart data for the historical performance line chart (7 days)
 const CHART_POINTS = [
@@ -442,7 +443,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
             <div className="space-y-4">
               {[
                 { label: "TOKEN TYPE", value: "ERC-721i", color: "#e5e2e1" },
-                { label: "CONTRACT", value: "0x9a...f42c", color: "#00e5ff" },
+                { label: "CONTRACT", value: `${INFT_ADDRESS.slice(0, 6)}...${INFT_ADDRESS.slice(-4)}`, color: "#00e5ff" },
                 { label: "RARITY", value: "LEGENDARY", color: "#ffb5a0" },
               ].map((row) => (
                 <div key={row.label} className="flex justify-between items-center">

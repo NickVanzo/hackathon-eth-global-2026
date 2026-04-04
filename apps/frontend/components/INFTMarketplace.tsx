@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { MOCK_INFTS } from "@/lib/mock-data";
+import { useAgentCount, useAgentInfo, useAgentTokenId, useINFTOwner } from "@/lib/contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -708,6 +709,42 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
 export default function INFTMarketplace() {
   const [activeINFT, setActiveINFT] = useState<INFTEntry | null>(null);
 
+  // Real on-chain data (hooks must be called unconditionally at top level)
+  const { count } = useAgentCount();
+  const { agent: agent1 } = useAgentInfo(1);
+  const { agent: agent2 } = useAgentInfo(2);
+  const { agent: agent3 } = useAgentInfo(3);
+  const { tokenId: tid1 } = useAgentTokenId(1);
+  const { tokenId: tid2 } = useAgentTokenId(2);
+  const { tokenId: tid3 } = useAgentTokenId(3);
+  const { owner: owner1 } = useINFTOwner(tid1 ?? 0);
+  const { owner: owner2 } = useINFTOwner(tid2 ?? 0);
+  const { owner: owner3 } = useINFTOwner(tid3 ?? 0);
+
+  // Build iNFT list: prefer live data when available, fall back to mock
+  const liveAgents = [agent1, agent2, agent3].filter(Boolean);
+  const hasRealData = liveAgents.some(a => a && a.epochsCompleted > 0);
+
+  const infts: INFTEntry[] = hasRealData
+    ? liveAgents.map((agent, i) => {
+        const mock = MOCK_INFTS.find(m => m.agentId === agent!.id) ?? MOCK_INFTS[0];
+        const owners = [owner1, owner2, owner3];
+        const tids = [tid1, tid2, tid3];
+        return {
+          tokenId: tids[i] ?? mock.tokenId,
+          agentId: agent!.id,
+          agentName: mock.agentName,
+          owner: owners[i] ?? mock.owner,
+          sharpeScore: agent!.sharpeScore,
+          totalReturn: mock.totalReturn,
+          commissionYield: mock.commissionYield,
+          paused: false,
+        };
+      })
+    : MOCK_INFTS;
+
+  void count; // consumed indirectly via liveAgents length
+
   return (
     <section aria-label="iNFT Strategy Market">
       {/* Section header */}
@@ -744,7 +781,7 @@ export default function INFTMarketplace() {
               className="font-['Space_Grotesk'] font-bold"
               style={{ fontSize: "20px", color: "#00daf3" }}
             >
-              {MOCK_INFTS.length}
+              {infts.length}
             </p>
           </div>
         </div>
@@ -753,9 +790,9 @@ export default function INFTMarketplace() {
       {/* Cards grid */}
       <ul
         className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6 list-none p-0"
-        aria-label={`${MOCK_INFTS.length} iNFT strategies`}
+        aria-label={`${infts.length} iNFT strategies`}
       >
-        {MOCK_INFTS.map((inft) => (
+        {infts.map((inft) => (
           <li key={inft.tokenId}>
             <INFTCard inft={inft} onDeepScan={() => setActiveINFT(inft)} />
           </li>

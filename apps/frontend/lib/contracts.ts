@@ -27,6 +27,10 @@ export const USDC_E_ADDRESS =
   (process.env.NEXT_PUBLIC_USDC_E_ADDRESS as `0x${string}` | undefined) ??
   ZERO_ADDRESS;
 
+export const INFT_ADDRESS =
+  (process.env.NEXT_PUBLIC_INFT_ADDRESS as `0x${string}` | undefined) ??
+  ZERO_ADDRESS;
+
 export function isZeroAddress(addr: string): boolean {
   return addr === ZERO_ADDRESS;
 }
@@ -465,5 +469,61 @@ export function useFeeData(): {
 // ---------------------------------------------------------------------------
 // Re-exported ABIs for use in write hooks (deposit, withdraw, etc.)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// iNFT (ERC-721) ABI and hooks
+// ---------------------------------------------------------------------------
+
+const INFT_ABI = parseAbi([
+  "function ownerOf(uint256 tokenId) view returns (address)",
+]);
+
+/**
+ * Reads ownerOf(tokenId) from iNFT ERC-721 on 0G Galileo.
+ */
+export function useINFTOwner(tokenId: number): {
+  owner: string | undefined;
+  isLoading: boolean;
+} {
+  const enabled = !isZeroAddress(INFT_ADDRESS) && tokenId > 0;
+
+  const { data, isLoading } = useReadContract({
+    address: INFT_ADDRESS,
+    abi: INFT_ABI,
+    functionName: "ownerOf",
+    args: [BigInt(tokenId)],
+    chainId: ogGalileo.id,
+    query: { enabled },
+  });
+
+  return {
+    owner: data !== undefined ? (data as string) : undefined,
+    isLoading,
+  };
+}
+
+/**
+ * Reads agentToTokenId(agentId) from AgentManager on 0G Galileo.
+ */
+export function useAgentTokenId(agentId: number): {
+  tokenId: number | undefined;
+  isLoading: boolean;
+} {
+  const enabled = !isZeroAddress(AGENT_MANAGER_ADDRESS);
+
+  const { data, isLoading } = useReadContract({
+    address: AGENT_MANAGER_ADDRESS,
+    abi: AgentManagerABI as Abi,
+    functionName: "agentToTokenId",
+    args: [BigInt(agentId)],
+    chainId: ogGalileo.id,
+    query: { enabled },
+  });
+
+  return {
+    tokenId: data !== undefined ? Number(data as bigint) : undefined,
+    isLoading,
+  };
+}
 
 export { AgentManagerABI, VaultABI, SatelliteABI };
