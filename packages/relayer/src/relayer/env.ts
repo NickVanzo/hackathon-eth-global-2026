@@ -6,15 +6,15 @@ import "dotenv/config";
 
 export const SATELLITE_ADDRESS =
   (process.env.SATELLITE_ADDRESS as `0x${string}`) ||
-  "0xeFD9583eF616e9770ca98E4201e940315128C0BF";
+  "0x2346beaf07eed640166a2a921e9b650cbad0530b";
 
 export const VAULT_ADDRESS =
   (process.env.VAULT_ADDRESS as `0x${string}`) ||
-  "0x5192fD3147D8e1a2392c8cBe7E33B8ec46e07628";
+  "0x0c7704a97cc88f9e068c1f7a99881666f1db675a";
 
 export const AGENT_MANAGER_ADDRESS =
   (process.env.AGENT_MANAGER_ADDRESS as `0x${string}`) ||
-  "0x1c6e60F4DD431922Aa4E217e55a9238a96513a00";
+  "0x2346beaf07eed640166a2a921e9b650cbad0530b";
 
 // ---------------------------------------------------------------------------
 // Token addresses (Sepolia)
