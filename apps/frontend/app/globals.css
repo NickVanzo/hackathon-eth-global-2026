@@ -128,10 +128,10 @@
   --font-label: "Space Grotesk", sans-serif;
 
   /* Border radius */
-  --radius-DEFAULT: 0.125rem;
-  --radius-lg: 0.25rem;
-  --radius-xl: 0.5rem;
-  --radius-full: 0.75rem;
+  --radius-DEFAULT: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-full: 1.5rem;
 }
 
 /* ── Base styles ────────────────────────────────────────────────────────── */
@@ -185,6 +185,41 @@ body {
 .glass-panel {
   backdrop-filter: blur(20px);
   background: rgba(19, 19, 19, 0.7);
+}
+
+/* ── Global rounded corners for dark panels ────────────────────────────── */
+
+/* Round all dark surface panels globally.
+   React renders backgroundColor as "background-color" in DOM style attributes. */
+[style*="background-color: rgb(32"],   /* #201f1f */
+[style*="background-color: rgb(28"],   /* #1c1b1b */
+[style*="background-color: rgb(24"],   /* #181818 */
+[style*="background-color: rgb(42"],   /* #2a2a2a */
+[style*="background-color: rgb(53"],   /* #353534 */
+[style*="background-color: rgb(26"],   /* #1a1a1a */
+[style*="background-color: rgb(30"],   /* #1e1e1e */
+[style*="background: rgb(32"],
+[style*="background: rgb(28"],
+[style*="background: rgb(24"],
+[style*="background: rgb(42"],
+[style*="background: #201f1f"],
+[style*="background: #1c1b1b"],
+[style*="background: #181818"],
+[style*="background: #1a1a1a"],
+[style*="background: #1e1e1e"],
+[style*="background: #2a2a2a"],
+[style*="background: linear-gradient"] {
+  border-radius: 0.75rem;
+}
+
+/* ── Interactive cursor ─────────────────────────────────────────────────── */
+
+button, a, [role="button"], [tabindex="0"], input[type="submit"], select, label[for] {
+  cursor: pointer;
+}
+
+button:disabled, [aria-disabled="true"] {
+  cursor: not-allowed;
 }
 
 /* ── Glow utilities ─────────────────────────────────────────────────────── */

@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { useAgentCount, useAgentInfo, useAgentTokenId, useINFTOwner, type AgentInfo } from "@/lib/contracts";
+import { useAgentCount, useAgentInfo, useAgentTokenId, useINFTOwner, useCommissionsOwed, INFT_ADDRESS, type AgentInfo } from "@/lib/contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
@@ -242,12 +242,15 @@ interface DeepScanModalProps {
 }
 
 function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
-  const { tokenId, agentName, owner, sharpeScore, totalReturn, commissionYield } = inft;
-  const epochs = 114;
-  const marketPrice = (sharpeScore * 7 + 8).toFixed(2);
-  const dailyRoyalty = (commissionYield * 0.5).toFixed(3);
-  const cumCommission = (commissionYield * 200 + 10).toFixed(1);
-  const survivalPct = sharpeScore > 1 ? "98.2%" : sharpeScore > 0 ? "84.5%" : "61.0%";
+  const { tokenId, agentId, agentName, owner, sharpeScore, totalReturn, commissionYield } = inft;
+  const { agent } = useAgentInfo(agentId);
+  const { commissionsOwed } = useCommissionsOwed(agentId);
+
+  const epochs = agent?.epochsCompleted ?? 0;
+  const cumCommissionUsdc = commissionsOwed ? (Number(commissionsOwed) / 1e6).toFixed(6) : "0.000000";
+  const survivalPct = epochs > 0
+    ? `${Math.min(100, Math.round((1 - (agent?.zeroSharpeStreak ?? 0) / Math.max(epochs, 1)) * 100))}%`
+    : "N/A";
 
   return (
     /* Backdrop */
@@ -343,12 +346,15 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
               >
                 Contract ID (0G)
               </p>
-              <p
-                className="font-mono truncate"
+              <a
+                href={`https://chainscan-galileo.0g.ai/address/${INFT_ADDRESS}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-mono truncate block hover:underline"
                 style={{ fontSize: "12px", color: "#c3f5ff" }}
               >
-                0x9fA...42dB8c
-              </p>
+                {truncateAddress(INFT_ADDRESS)}
+              </a>
               <div className="mt-4">
                 <p
                   className="font-['Space_Grotesk'] uppercase mb-1"
@@ -356,12 +362,15 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
                 >
                   Current Owner
                 </p>
-                <p
-                  className="font-mono truncate"
+                <a
+                  href={`https://chainscan-galileo.0g.ai/address/${owner}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="font-mono truncate block hover:underline"
                   style={{ fontSize: "12px", color: "#e5e2e1" }}
                 >
                   {truncateAddress(owner)}
-                </p>
+                </a>
               </div>
             </div>
 
@@ -450,7 +459,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
             <MetricCard
               icon="payments"
               label="Cum. Commission"
-              value={`${cumCommission} ETH`}
+              value={`$${cumCommissionUsdc}`}
               sub="Total Fee Capture"
               subColor="#bac9cc"
             />
@@ -503,13 +512,13 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
                   className="font-['Space_Grotesk'] uppercase"
                   style={{ fontSize: "10px", color: "#bac9cc" }}
                 >
-                  Market Price
+                  Accrued Commission
                 </p>
                 <p
                   className="font-['Space_Grotesk'] font-black"
                   style={{ fontSize: "24px", color: "#e5e2e1" }}
                 >
-                  {marketPrice} ETH
+                  ${cumCommissionUsdc}
                 </p>
               </div>
               <div
@@ -521,13 +530,13 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
                   className="font-['Space_Grotesk'] uppercase"
                   style={{ fontSize: "10px", color: "#bac9cc" }}
                 >
-                  Daily Royalty
+                  Epochs Completed
                 </p>
                 <p
                   className="font-['Space_Grotesk'] font-bold"
                   style={{ fontSize: "18px", color: "#00daf3" }}
                 >
-                  {dailyRoyalty} ETH
+                  {epochs}
                 </p>
               </div>
             </div>

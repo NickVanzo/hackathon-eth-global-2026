@@ -106,3 +106,148 @@ export async function fetchAllAgentsLatestPerformance(): Promise<
   );
   return data.AgentPerformanceSnapshot;
 }
+
+// ---------------------------------------------------------------------------
+// Indexed Positions
+// ---------------------------------------------------------------------------
+
+export interface IndexedPosition {
+  id: string;
+  agentId: string;
+  tokenId: string;
+  tickLower: number;
+  tickUpper: number;
+  liquidity: string;
+  feesCollected: string;
+  status: string;
+  openTimestamp: string;
+  closeTimestamp: string;
+}
+
+interface PositionQueryResult {
+  IndexedPosition: IndexedPosition[];
+}
+
+export async function fetchPositions(
+  agentId?: number,
+  status?: "active" | "closed",
+): Promise<IndexedPosition[]> {
+  const where: Record<string, unknown> = {};
+  if (agentId !== undefined) where.agentId = { _eq: agentId };
+  if (status !== undefined) where.status = { _eq: status };
+
+  const data = await hasuraQuery<PositionQueryResult>(
+    `
+    query Positions($where: IndexedPosition_bool_exp!) {
+      IndexedPosition(
+        where: $where
+        order_by: { openTimestamp: desc }
+      ) {
+        id
+        agentId
+        tokenId
+        tickLower
+        tickUpper
+        liquidity
+        feesCollected
+        status
+        openTimestamp
+        closeTimestamp
+      }
+    }
+    `,
+    { where },
+  );
+  return data.IndexedPosition;
+}
+
+// ---------------------------------------------------------------------------
+// Indexed Intents
+// ---------------------------------------------------------------------------
+
+export interface IndexedIntent {
+  id: string;
+  agentId: string;
+  actionType: string;
+  status: string;
+  timestamp: string;
+  txHash: string;
+  blockNumber: string;
+}
+
+interface IntentQueryResult {
+  IndexedIntent: IndexedIntent[];
+}
+
+export async function fetchIntents(
+  agentId?: number,
+  limit = 50,
+): Promise<IndexedIntent[]> {
+  const where: Record<string, unknown> = {};
+  if (agentId !== undefined) where.agentId = { _eq: agentId };
+
+  const data = await hasuraQuery<IntentQueryResult>(
+    `
+    query Intents($where: IndexedIntent_bool_exp!, $limit: Int!) {
+      IndexedIntent(
+        where: $where
+        order_by: { timestamp: desc }
+        limit: $limit
+      ) {
+        id
+        agentId
+        actionType
+        status
+        timestamp
+        txHash
+        blockNumber
+      }
+    }
+    `,
+    { where, limit },
+  );
+  return data.IndexedIntent;
+}
+
+// ---------------------------------------------------------------------------
+// Fee Epoch History
+// ---------------------------------------------------------------------------
+
+export interface FeeEpoch {
+  id: string;
+  epoch: number;
+  protocolFee: string;
+  commission: string;
+  depositorYield: string;
+  sharePrice: string;
+  blockTimestamp: string;
+}
+
+interface FeeEpochQueryResult {
+  FeeEpochHistory: FeeEpoch[];
+}
+
+export async function fetchFeeEpochHistory(
+  limit = 20,
+): Promise<FeeEpoch[]> {
+  const data = await hasuraQuery<FeeEpochQueryResult>(
+    `
+    query FeeEpochs($limit: Int!) {
+      FeeEpochHistory(
+        order_by: { epoch: desc }
+        limit: $limit
+      ) {
+        id
+        epoch
+        protocolFee
+        commission
+        depositorYield
+        sharePrice
+        blockTimestamp
+      }
+    }
+    `,
+    { limit },
+  );
+  return data.FeeEpochHistory;
+}

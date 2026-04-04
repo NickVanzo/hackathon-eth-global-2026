@@ -1,12 +1,18 @@
 "use client";
 
 import { useState, useMemo } from "react";
-import { MOCK_AGENTS, MOCK_POSITIONS, MOCK_INTENTS } from "@/lib/mock-data";
+import dynamic from "next/dynamic";
+import { useAccount, useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { type Abi } from "viem";
+
+const LightweightChart = dynamic(() => import("@/components/LightweightChart"), { ssr: false });
+import { useIndexedPositions, useIndexedIntents } from "@/lib/useIndexedData";
 import {
   useAgentPerformanceHistory,
   type ChartPoint,
 } from "@/lib/useAgentPerformance";
-import { INFT_ADDRESS } from "@/lib/contracts";
+import { INFT_ADDRESS, SATELLITE_ADDRESS, SatelliteABI, useAgentInfo, useAgentTokenId, useINFTOwner, useCommissionsOwed } from "@/lib/contracts";
+import { sepolia } from "@/lib/chains";
 
 // Fallback chart data when no indexed snapshots are available yet
 const FALLBACK_CHART_POINTS: ChartPoint[] = [
@@ -36,19 +42,99 @@ function buildFillPath(points: ChartPoint[]): string {
 
 type TimeRange = "1D" | "1W" | "1M";
 
-interface AgentDetailProps {
-  agentId?: number;
+// ─── Ownership-aware wrapper ─────────────────────────────────────────────────
+
+export default function AgentDetail() {
+  const { address } = useAccount();
+  const [selectedAgent, setSelectedAgent] = useState<number | null>(null);
+
+  // Check iNFT ownership for agents 1-3
+  const { tokenId: tid1 } = useAgentTokenId(1);
+  const { tokenId: tid2 } = useAgentTokenId(2);
+  const { tokenId: tid3 } = useAgentTokenId(3);
+  const { owner: owner1 } = useINFTOwner(tid1 ?? 0);
+  const { owner: owner2 } = useINFTOwner(tid2 ?? 0);
+  const { owner: owner3 } = useINFTOwner(tid3 ?? 0);
+
+  const myAgents = [
+    { id: 1, owner: owner1 },
+    { id: 2, owner: owner2 },
+    { id: 3, owner: owner3 },
+  ].filter((a) => a.owner && address && a.owner.toLowerCase() === address.toLowerCase());
+
+  const agentId = selectedAgent ?? myAgents[0]?.id ?? null;
+
+  if (!address) {
+    return (
+      <div style={{ color: "#849396", padding: "4rem", textAlign: "center", fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p style={{ fontSize: "18px", color: "#e5e2e1", marginBottom: "8px" }}>Connect your wallet</p>
+        <p style={{ fontSize: "12px" }}>Connect a wallet that owns an iNFT to view your agent.</p>
+      </div>
+    );
+  }
+
+  if (myAgents.length === 0) {
+    return (
+      <div style={{ color: "#849396", padding: "4rem", textAlign: "center", fontFamily: "'Space Grotesk', sans-serif" }}>
+        <p style={{ fontSize: "18px", color: "#e5e2e1", marginBottom: "8px" }}>No agents found</p>
+        <p style={{ fontSize: "12px" }}>
+          Your wallet ({address.slice(0, 6)}...{address.slice(-4)}) does not own any iNFTs.
+        </p>
+        <p style={{ fontSize: "11px", marginTop: "12px", color: "#6b7a7d" }}>
+          iNFT owners: {[owner1, owner2, owner3].filter(Boolean).map(o => `${o!.slice(0, 6)}...${o!.slice(-4)}`).join(", ") || "loading..."}
+        </p>
+      </div>
+    );
+  }
+
+  return (
+    <div>
+      {/* Agent selector tabs (if multiple) */}
+      {myAgents.length > 1 && (
+        <div style={{ display: "flex", gap: "8px", marginBottom: "16px" }}>
+          {myAgents.map((a) => (
+            <button
+              key={a.id}
+              onClick={() => setSelectedAgent(a.id)}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "11px",
+                fontWeight: 700,
+                letterSpacing: "0.1em",
+                textTransform: "uppercase",
+                padding: "8px 16px",
+                background: agentId === a.id ? "#00e5ff" : "#201f1f",
+                color: agentId === a.id ? "#00363d" : "#849396",
+                border: agentId === a.id ? "none" : "1px solid rgba(59,73,76,0.3)",
+                cursor: "pointer",
+              }}
+            >
+              Agent {a.id}
+            </button>
+          ))}
+        </div>
+      )}
+      <AgentDetailInner agentId={agentId!} isOwner={true} />
+    </div>
+  );
 }
 
-export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
+// ─── Inner detail component ──────────────────────────────────────────────────
+
+interface AgentDetailInnerProps {
+  agentId: number;
+  isOwner: boolean;
+}
+
+function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
   const [activeRange, setActiveRange] = useState<TimeRange>("1W");
 
   const { chartPoints: indexedPoints, isLoading: perfLoading } =
     useAgentPerformanceHistory(agentId);
 
-  // Use indexed data when available, fall back to mock
+  // Use indexed data when at least 2 points exist (need 2+ to draw a line)
   const chartData = useMemo(
-    () => (indexedPoints.length > 0 ? indexedPoints : FALLBACK_CHART_POINTS),
+    () => (indexedPoints.length >= 2 ? indexedPoints : FALLBACK_CHART_POINTS),
     [indexedPoints],
   );
 
@@ -69,16 +155,47 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
   const latestReturnBps =
     chartData.length > 0 ? chartData[chartData.length - 1].returnBps : 0;
 
-  const agent = MOCK_AGENTS.find((a) => a.id === agentId) ?? MOCK_AGENTS[0];
-  const positions = MOCK_POSITIONS.filter((p) => p.agentId === agent.id);
-  const intents = MOCK_INTENTS.filter((i) => i.agentId === agent.id);
+  // Convert chart data to lightweight-charts format
+  const lwChartData = useMemo(
+    () =>
+      chartData
+        .filter((p) => p.timestamp > 0)
+        .map((p, i) => ({
+          time: `2026-01-${String(i + 1).padStart(2, "0")}` as string,
+          value: p.returnBps / 100,
+        })),
+    [chartData],
+  );
 
-  const creditsPercent = Math.round((agent.credits / agent.maxCredits) * 100);
+  const { agent, isLoading: agentLoading } = useAgentInfo(agentId);
+  const { commissionsOwed } = useCommissionsOwed(agentId);
+  const { positions: allPositions } = useIndexedPositions(agentId);
+  const { intents: allIntents } = useIndexedIntents(agentId);
+
+  // Claim commissions write hook
+  const { writeContract: writeClaim, data: claimHash, isPending: isClaiming, error: claimError } = useWriteContract();
+  const { isLoading: isConfirmingClaim, isSuccess: claimConfirmed } = useWaitForTransactionReceipt({ hash: claimHash });
+
+  const handleClaimCommissions = () => {
+    writeClaim({
+      address: SATELLITE_ADDRESS,
+      abi: SatelliteABI as Abi,
+      functionName: "claimCommissions",
+      args: [BigInt(agentId)],
+      chainId: sepolia.id,
+    });
+  };
+
+  if (agentLoading || !agent) {
+    return <div style={{ color: "#849396", padding: "2rem", textAlign: "center" }}>Loading agent data...</div>;
+  }
+
+  const creditsPercent = agent.maxCredits > 0 ? Math.round((agent.credits / agent.maxCredits) * 100) : 0;
   const sharpePercent = Math.min(
     100,
     Math.round((agent.sharpeScore / 4) * 100),
   );
-  const commissions = (agent.commissionYield * 1_000_000).toFixed(2);
+  const commissions = commissionsOwed ? (Number(commissionsOwed) / 1e6).toFixed(6) : "0.000000";
 
   return (
     <div className="space-y-8">
@@ -157,7 +274,9 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
           </button>
           <button
             type="button"
-            className="px-6 py-3 text-xs font-black tracking-widest rounded-md uppercase transition-all"
+            onClick={handleClaimCommissions}
+            disabled={!isOwner || isClaiming || isConfirmingClaim}
+            className="px-6 py-3 text-xs font-black tracking-widest rounded-md uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed hover:scale-[1.02] active:scale-95"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
               backgroundColor: "#00e5ff",
@@ -165,8 +284,13 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               boxShadow: "0 0 30px rgba(0,229,255,0.2)",
             }}
           >
-            Claim Commissions
+            {isClaiming ? "SIGN TX..." : isConfirmingClaim ? "CONFIRMING..." : claimConfirmed ? "CLAIMED" : "Claim Commissions"}
           </button>
+          {claimError && (
+            <p style={{ color: "#ffb5a0", fontSize: "10px", fontFamily: "'Space Grotesk', sans-serif" }}>
+              {claimError.message.slice(0, 80)}
+            </p>
+          )}
         </div>
       </section>
 
@@ -345,9 +469,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   color: "#e5e2e1",
                 }}
               >
-                {Number(commissions).toLocaleString("en-US", {
-                  minimumFractionDigits: 2,
-                })}{" "}
+                {commissions}{" "}
                 <span className="text-xl" style={{ color: "#00e5ff" }}>
                   USDC
                 </span>
@@ -361,7 +483,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   color: "#bac9cc",
                 }}
               >
-                Elite Multiplier
+                Epochs Completed
               </p>
               <span
                 className="text-lg font-bold"
@@ -370,15 +492,15 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   color: "#ffb5a0",
                 }}
               >
-                x1.25
+                {agent.epochsCompleted}
               </span>
             </div>
           </div>
           <div className="mt-8 flex gap-4 overflow-x-auto pb-2">
             {[
-              { label: "Last 24h", value: "+$412.00", color: "#00e5ff" },
-              { label: "Average Fee", value: "0.12%", color: "#e5e2e1" },
-              { label: "Network Load", value: "LOW", color: "#e5e2e1" },
+              { label: "Phase", value: agent.phase.toUpperCase(), color: "#00e5ff" },
+              { label: "Sharpe", value: agent.sharpeScore.toFixed(2), color: "#e5e2e1" },
+              { label: "Zero Streak", value: String(agent.zeroSharpeStreak), color: "#e5e2e1" },
             ].map((item) => (
               <div
                 key={item.label}
@@ -468,48 +590,21 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               </div>
             </div>
 
-            {/* SVG Chart */}
+            {/* Lightweight Chart */}
             <div className="flex-1 relative">
-              <svg
-                className="absolute inset-0 w-full h-full"
-                viewBox="0 0 100 100"
-                preserveAspectRatio="none"
-              >
-                <defs>
-                  <linearGradient
-                    id="agentChartGradient"
-                    x1="0%"
-                    y1="0%"
-                    x2="0%"
-                    y2="100%"
+              {lwChartData.length >= 2 ? (
+                <LightweightChart data={lwChartData} height={240} yAxisLabel="Return (%)" />
+              ) : (
+                <div className="h-[240px] flex items-center justify-center">
+                  <p
+                    className="text-xs uppercase tracking-widest"
+                    style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#6b7a7d" }}
                   >
-                    <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.3" />
-                    <stop offset="100%" stopColor="#00E5FF" stopOpacity="0" />
-                  </linearGradient>
-                </defs>
-                {/* Fill area */}
-                <path
-                  d={buildFillPath(chartData)}
-                  fill="url(#agentChartGradient)"
-                />
-                {/* Line */}
-                <path
-                  d={buildSvgPath(chartData)}
-                  fill="none"
-                  stroke="#00E5FF"
-                  strokeWidth="1.5"
-                />
-              </svg>
-
-              {/* Horizontal grid lines */}
-              <div className="absolute inset-0 flex flex-col justify-between pointer-events-none opacity-20">
-                {[0, 1, 2, 3].map((i) => (
-                  <div
-                    key={i}
-                    className="w-full border-t"
-                    style={{ borderColor: "rgba(59,73,76,0.3)" }}
-                  />
-                ))}
+                    Performance data will appear after 2+ value reports
+                  </p>
+                </div>
+              )}
+              <div className="hidden">
               </div>
             </div>
 
@@ -539,18 +634,6 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               </div>
             )}
 
-            {/* X-axis labels */}
-            <div
-              className="mt-4 flex justify-between text-[10px] uppercase tracking-widest"
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                color: "#bac9cc",
-              }}
-            >
-              {xLabels.map((label) => (
-                <span key={label}>{label}</span>
-              ))}
-            </div>
           </div>
         </div>
 
@@ -702,8 +785,8 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   msg: "HEARTBEAT: All systems operational",
                   type: "primary",
                 },
-                ...intents.map((intent) => ({
-                  time: new Date(intent.timestamp).toLocaleTimeString("en-US", {
+                ...allIntents.map((intent) => ({
+                  time: new Date(Number(intent.timestamp) * 1000).toLocaleTimeString("en-US", {
                     hour12: false,
                     hour: "2-digit",
                     minute: "2-digit",
@@ -739,7 +822,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
       </section>
 
       {/* Positions Table */}
-      {positions.length > 0 && (
+      {allPositions.length > 0 && (
         <section
           className="p-6 rounded-lg border"
           style={{
@@ -786,7 +869,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                 </tr>
               </thead>
               <tbody>
-                {positions.map((pos) => (
+                {allPositions.map((pos) => (
                   <tr
                     key={pos.tokenId}
                     className="border-b"

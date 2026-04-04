@@ -564,4 +564,29 @@ export function useAgentTokenId(agentId: number): {
   };
 }
 
+/**
+ * Reads commissionsOwed(agentId) from Vault on 0G Galileo.
+ * Returns the pending commission in USDC (6 decimals) as a string.
+ */
+export function useCommissionsOwed(agentId: number): {
+  commissionsOwed: string | undefined;
+  isLoading: boolean;
+} {
+  const enabled = !isZeroAddress(VAULT_ADDRESS) && agentId > 0;
+
+  const { data, isLoading } = useReadContract({
+    address: VAULT_ADDRESS,
+    abi: VaultABI as Abi,
+    functionName: "commissionsOwed",
+    args: [BigInt(agentId)],
+    chainId: ogGalileo.id,
+    query: { enabled },
+  });
+
+  return {
+    commissionsOwed: data !== undefined ? (data as bigint).toString() : undefined,
+    isLoading,
+  };
+}
+
 export { AgentManagerABI, VaultABI, SatelliteABI };

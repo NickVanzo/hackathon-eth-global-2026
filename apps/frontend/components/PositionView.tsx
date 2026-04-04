@@ -1,7 +1,12 @@
 "use client";
 
-import { useAllAgents, useVaultData, type AgentInfo } from "@/lib/contracts";
-import { MOCK_INTENTS, MOCK_POSITIONS } from "@/lib/mock-data";
+import { useMemo } from "react";
+import dynamic from "next/dynamic";
+import { useAllAgents, useVaultData, type AgentInfo, AGENT_NAMES } from "@/lib/contracts";
+import { useIndexedPositions, useIndexedIntents, useFeeEpochHistory } from "@/lib/useIndexedData";
+import type { IndexedPosition, IndexedIntent } from "@/lib/indexer";
+
+const LightweightChart = dynamic(() => import("@/components/LightweightChart"), { ssr: false });
 
 // ─── Design tokens (extracted from Stitch arena.html) ────────────────────────
 // Primary:              #00E5FF  (primary / primary-container)
@@ -31,8 +36,11 @@ function formatTvl(rawAmount: string): string {
 
 function formatCapital(rawAmount: string): string {
   const units = Number(rawAmount) / 1_000_000;
-  if (units >= 1_000) return `$${(units / 1_000).toFixed(1)}M`;
-  return `$${units.toFixed(1)}K`;
+  if (units >= 1_000_000) return `$${(units / 1_000_000).toFixed(1)}M`;
+  if (units >= 1_000) return `$${(units / 1_000).toFixed(1)}K`;
+  if (units >= 1) return `$${units.toFixed(2)}`;
+  if (units > 0) return `$${units.toFixed(6)}`;
+  return "$0";
 }
 
 function formatLiquidity(raw: string): string {
@@ -128,7 +136,7 @@ function getStatusDisplay(agent: AgentInfo) {
 
 // ─── VaultPerformanceChart ────────────────────────────────────────────────────
 
-function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVaultStats> }) {
+function VaultPerformanceChart({ stats, sharePriceData }: { stats: ReturnType<typeof deriveVaultStats>; sharePriceData: { time: string; value: number }[] }) {
   return (
     <div className="xl:col-span-8 space-y-6">
       {/* Header row */}
@@ -152,36 +160,22 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
       </div>
 
       {/* Chart panel */}
-      <div className="relative h-[400px] bg-[#201f1f] rounded-lg border border-[#3b494c]/10 overflow-hidden group">
-        <div className="absolute inset-0 p-8 flex flex-col justify-between">
-          {/* Top axis labels */}
-          <div className="font-[family-name:var(--font-space-grotesk)] flex justify-between text-[10px] font-bold text-[#bac9cc]/40 tracking-widest">
-            <span>MARKET INDEX V4</span>
-            <span>LIVE FEED STABLE</span>
-          </div>
+      <div className="relative bg-[#201f1f] rounded-lg border border-[#3b494c]/10 overflow-hidden group">
+        <div className="p-6">
+          {sharePriceData.length >= 2 ? (
+            <LightweightChart data={sharePriceData} height={320} yAxisLabel="Share Price (USDC)" />
+          ) : (
+            <div className="h-[320px] flex items-center justify-center">
+              <p className="font-[family-name:var(--font-space-grotesk)] text-[#6b7a7d] text-xs uppercase tracking-widest">
+                Share price history will appear after 2+ epochs
+              </p>
+            </div>
+          )}
+        </div>
 
-          {/* SVG sparkline — realistic upward-trending time series */}
-          <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true">
-            <defs>
-              <linearGradient id="vaultGrad" x1="0%" y1="0%" x2="0%" y2="100%">
-                <stop offset="0%"   style={{ stopColor: "#00E5FF", stopOpacity: 0.2 }} />
-                <stop offset="100%" style={{ stopColor: "#00E5FF", stopOpacity: 0 }} />
-              </linearGradient>
-            </defs>
-            <path
-              d="M0,340 L30,335 60,332 90,328 120,330 150,322 180,318 210,320 240,312 270,305 300,308 330,298 360,290 390,285 420,288 450,278 480,270 510,265 540,260 570,255 600,250 630,245 660,248 690,238 720,230 750,222 780,218 810,210 840,205 870,200 900,195 930,188 960,180 990,175 1020,168 1050,160 1080,155 1110,148 1140,142 1170,138 1200,130 L1200,400 L0,400 Z"
-              fill="url(#vaultGrad)"
-            />
-            <path
-              d="M0,340 L30,335 60,332 90,328 120,330 150,322 180,318 210,320 240,312 270,305 300,308 330,298 360,290 390,285 420,288 450,278 480,270 510,265 540,260 570,255 600,250 630,245 660,248 690,238 720,230 750,222 780,218 810,210 840,205 870,200 900,195 930,188 960,180 990,175 1020,168 1050,160 1080,155 1110,148 1140,142 1170,138 1200,130"
-              fill="none"
-              stroke="#00E5FF"
-              strokeWidth="2"
-            />
-          </svg>
-
-          {/* Stat chips pinned to chart bottom */}
-          <div className="relative z-10 grid grid-cols-4 gap-4 mt-auto">
+        {/* Stat chips pinned to chart bottom */}
+        <div className="px-6 pb-6">
+          <div className="grid grid-cols-4 gap-4">
             {[
               { label: "APY",      value: stats.apy,      color: "border-[#00E5FF]", valueColor: "text-[#00E5FF]" },
               { label: "DRAWDOWN", value: stats.drawdown,  color: "border-[#d73b00]", valueColor: "text-[#d73b00]" },
@@ -206,19 +200,19 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
 
 // ─── LiveBattleFeed ───────────────────────────────────────────────────────────
 
-function LiveBattleFeed({ agents }: { agents: AgentInfo[] }) {
-  const items = [...MOCK_INTENTS]
-    .sort((a, b) => b.timestamp - a.timestamp)
+function LiveBattleFeed({ agents, intents: indexedIntents }: { agents: AgentInfo[]; intents: IndexedIntent[] }) {
+  const items = [...indexedIntents]
     .map((intent, idx) => {
-      const agent = agents.find((a) => a.id === intent.agentId);
-      const agentName = (agent?.name ?? `AGENT_${intent.agentId}`)
+      const agentIdNum = Number(intent.agentId);
+      const agent = agents.find((a) => a.id === agentIdNum);
+      const agentName = (agent?.name ?? AGENT_NAMES[agentIdNum] ?? `AGENT_${intent.agentId}`)
         .toUpperCase()
         .replace(" ", "_");
-      const accent  = FEED_ACCENT[intent.actionType as ActionType];
-      const icon    = FEED_ICON[intent.actionType as ActionType];
-      const status  = STATUS_SUFFIX[intent.status as IntentStatus];
+      const accent  = FEED_ACCENT[intent.actionType as ActionType] ?? FEED_ACCENT.OPEN_POSITION;
+      const icon    = FEED_ICON[intent.actionType as ActionType] ?? "bolt";
+      const status  = STATUS_SUFFIX[intent.status as IntentStatus] ?? "PENDING";
       const txInfo  = intent.txHash ? `TX: ${truncateTxHash(intent.txHash)}` : status;
-      const relTime = formatRelativeTime(intent.timestamp);
+      const relTime = formatRelativeTime(Number(intent.timestamp) * 1000);
       const opacity = idx >= 3 ? "opacity-40" : idx >= 2 ? "opacity-60" : "";
       return { agentName, accent, icon, txInfo, relTime, intent, opacity };
     });
@@ -251,7 +245,20 @@ function LiveBattleFeed({ agents }: { agents: AgentInfo[] }) {
                 {intent.actionType === "CLOSE_POSITION"  && <> liquidated short position on <span className="font-bold">SOL</span></>}
               </p>
               <p className="font-[family-name:var(--font-space-grotesk)] text-[10px] text-[#bac9cc] mt-1">
-                {relTime} // {txInfo}
+                {relTime} //{" "}
+                {intent.txHash ? (
+                  <a
+                    href={`https://sepolia.etherscan.io/tx/${intent.txHash}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="hover:underline"
+                    style={{ color: "#00e5ff" }}
+                  >
+                    TX: {truncateTxHash(intent.txHash)}
+                  </a>
+                ) : (
+                  txInfo
+                )}
               </p>
             </div>
           </div>
@@ -263,7 +270,7 @@ function LiveBattleFeed({ agents }: { agents: AgentInfo[] }) {
 
 // ─── GladiatorCard ────────────────────────────────────────────────────────────
 
-function GladiatorCard({ agent }: { agent: AgentInfo }) {
+function GladiatorCard({ agent, positions }: { agent: AgentInfo; positions: IndexedPosition[] }) {
   const tier   = getTierLabel(agent.phase);
   const status = getStatusDisplay(agent);
   const isVault = agent.phase === "vault";
@@ -272,7 +279,7 @@ function GladiatorCard({ agent }: { agent: AgentInfo }) {
   const hoverAmbient = isVault ? "group-hover:bg-[#00E5FF]/10" : "group-hover:bg-[#d73b00]/10";
   const hoverName    = isVault ? "group-hover:text-[#00E5FF]"  : "group-hover:text-[#d73b00]";
 
-  const agentPositions = MOCK_POSITIONS.filter((p) => p.agentId === agent.id);
+  const agentPositions = positions.filter((p) => Number(p.agentId) === agent.id);
   const totalFees      = agentPositions.reduce((sum, p) => sum + Number(p.feesCollected), 0);
   const capitalLabel   = formatCapital(agent.provingDeployed);
   const returnStr      = `${agent.totalReturn >= 0 ? "+" : ""}${(agent.totalReturn * 100).toFixed(1)}%`;
@@ -337,7 +344,7 @@ function GladiatorCard({ agent }: { agent: AgentInfo }) {
       {agentPositions.length > 0 && (
         <div className="relative z-10 border-t border-[#3b494c]/10 pt-4 space-y-2">
           {agentPositions.map((pos) => {
-            const inRange = isTickInRange(pos.currentTick, pos.tickLower, pos.tickUpper);
+            const isActive = pos.status === "active";
             return (
               <div key={pos.tokenId} className="flex items-center justify-between text-[11px]">
                 <span className="font-mono text-[#bac9cc]">#{pos.tokenId}</span>
@@ -345,8 +352,8 @@ function GladiatorCard({ agent }: { agent: AgentInfo }) {
                   {pos.tickLower.toLocaleString()} → {pos.tickUpper.toLocaleString()}
                 </span>
                 <span className="text-[#00E5FF]">{formatLiquidity(pos.liquidity)}</span>
-                <span className={`font-[family-name:var(--font-space-grotesk)] px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase ${inRange ? "text-[#00E5FF] bg-[#00E5FF]/10" : "text-[#d73b00] bg-[#d73b00]/10"}`}>
-                  {inRange ? "IN RANGE" : "OUT"}
+                <span className={`font-[family-name:var(--font-space-grotesk)] px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase ${isActive ? "text-[#00E5FF] bg-[#00E5FF]/10" : "text-[#d73b00] bg-[#d73b00]/10"}`}>
+                  {isActive ? "ACTIVE" : "CLOSED"}
                 </span>
                 <span className="text-[#bac9cc]/60">{formatUsdc(pos.feesCollected)} USDC</span>
               </div>
@@ -442,15 +449,34 @@ function CtaBanner() {
 export default function PositionView() {
   const { agents } = useAllAgents();
   const { totalAssets } = useVaultData();
+  const { positions } = useIndexedPositions();
+  const { intents } = useIndexedIntents();
+  const { epochs } = useFeeEpochHistory(30);
 
   const stats = deriveVaultStats(agents, totalAssets);
+
+  // Build share price time series from fee epochs (sorted ascending by timestamp)
+  const sharePriceData = useMemo(() => {
+    const seen = new Set<string>();
+    return [...epochs]
+      .filter((e) => {
+        if (seen.has(e.blockTimestamp)) return false;
+        seen.add(e.blockTimestamp);
+        return true;
+      })
+      .sort((a, b) => Number(a.blockTimestamp) - Number(b.blockTimestamp))
+      .map((e, i) => ({
+        time: `2026-01-${String(i + 1).padStart(2, "0")}` as string,
+        value: Number(e.sharePrice) / 1_000_000,
+      }));
+  }, [epochs]);
 
   return (
     <div className="space-y-10 font-[family-name:var(--font-manrope)]">
       {/* ── Hero: vault chart + live feed ─────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        <VaultPerformanceChart stats={stats} />
-        <LiveBattleFeed agents={agents} />
+        <VaultPerformanceChart stats={stats} sharePriceData={sharePriceData} />
+        <LiveBattleFeed agents={agents} intents={intents} />
       </div>
 
       {/* ── Top Gladiators grid ────────────────────────────────────────────── */}
@@ -465,7 +491,7 @@ export default function PositionView() {
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
           {agents.map((agent) => (
-            <GladiatorCard key={agent.id} agent={agent} />
+            <GladiatorCard key={agent.id} agent={agent} positions={positions} />
           ))}
           <DeployCtaCard />
         </div>

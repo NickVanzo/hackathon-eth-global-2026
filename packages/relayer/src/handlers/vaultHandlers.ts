@@ -24,11 +24,12 @@ import {
   Vault_Transfer,
   Vault_WithdrawApproved,
   Vault_WithdrawReleased,
+  FeeEpochHistory,
 } from "generated";
 
-import { sepoliaPublicClient, sepoliaWalletClient } from "../relayer/clients";
-import { SATELLITE_ABI } from "../relayer/abis";
-import { SATELLITE_ADDRESS, ForceCloseSource } from "../relayer/env";
+import { sepoliaPublicClient, sepoliaWalletClient, zgPublicClient } from "../relayer/clients";
+import { SATELLITE_ABI, VAULT_ABI } from "../relayer/abis";
+import { SATELLITE_ADDRESS, VAULT_ADDRESS, ForceCloseSource } from "../relayer/env";
 import { getZapOutCalldata } from "../relayer/uniswap";
 
 // ---------------------------------------------------------------------------
@@ -49,10 +50,26 @@ async function relayToSepolia(
 }
 
 // ---------------------------------------------------------------------------
+// Fee epoch accumulator (in-memory, rebuilt on event replay).
+// CommissionAccrued and ProtocolFeeAccrued fire before EpochSettled in the
+// same block. We accumulate them here and flush into FeeEpochHistory when
+// EpochSettled fires.
+// ---------------------------------------------------------------------------
+
+let pendingProtocolFee = 0n;
+let pendingCommission = 0n;
+let epochCounter = 0;
+
+// ---------------------------------------------------------------------------
 // EpochSettled
 // vault._settleEpoch() completes on 0G — new share price is emitted.
 // Relay: satellite.updateSharePrice(sharePrice) on Sepolia
 //   → satellite caches the price for withdrawal share conversions.
+// Also creates FeeEpochHistory entity for the frontend fee waterfall table.
+//
+// epochCounter is rebuilt from event replay (starts at 0, increments per
+// EpochSettled event). The entity ID is "epoch_N" so that replays overwrite
+// previous entries rather than creating duplicates.
 // ---------------------------------------------------------------------------
 
 Vault.EpochSettled.handler(async ({ event, context }) => {
@@ -63,6 +80,28 @@ Vault.EpochSettled.handler(async ({ event, context }) => {
     totalAssets: event.params.totalAssets,
   };
   context.Vault_EpochSettled.set(entity);
+
+  // Flush accumulated fee data into FeeEpochHistory
+  epochCounter++;
+  const depositorYield = event.params.totalAssets - pendingProtocolFee - pendingCommission;
+  const sharePriceUsdc = event.params.sharePrice / (10n ** 12n); // WAD → 6 decimals
+  const feeHistory: FeeEpochHistory = {
+    id: `epoch_${epochCounter}`,
+    epoch: epochCounter,
+    protocolFee: pendingProtocolFee.toString(),
+    commission: pendingCommission.toString(),
+    depositorYield: (depositorYield > 0n ? depositorYield : 0n).toString(),
+    sharePrice: sharePriceUsdc.toString(),
+    totalAssets: event.params.totalAssets,
+    totalShares: event.params.totalShares,
+    blockNumber: BigInt(event.block.number),
+    blockTimestamp: BigInt(event.block.timestamp),
+  };
+  context.FeeEpochHistory.set(feeHistory);
+
+  // Reset accumulators for next epoch
+  pendingProtocolFee = 0n;
+  pendingCommission = 0n;
 
   await relayToSepolia(
     `EpochSettled→satellite.updateSharePrice(${event.params.sharePrice})`,
@@ -155,6 +194,9 @@ Vault.ProtocolFeeAccrued.handler(async ({ event, context }) => {
   };
   context.Vault_ProtocolFeeAccrued.set(entity);
 
+  // Accumulate for FeeEpochHistory (flushed in EpochSettled handler)
+  pendingProtocolFee += event.params.amount;
+
   await relayToSepolia(
     `ProtocolFeeAccrued→satellite.reserveProtocolFees(${event.params.amount})`,
     () =>
@@ -181,6 +223,9 @@ Vault.CommissionAccrued.handler(async ({ event, context }) => {
     amount: event.params.amount,
   };
   context.Vault_CommissionAccrued.set(entity);
+
+  // Accumulate for FeeEpochHistory (flushed in EpochSettled handler)
+  pendingCommission += event.params.amount;
 
   await relayToSepolia(
     `CommissionAccrued→satellite.reserveCommission(agentId=${event.params.agentId})`,

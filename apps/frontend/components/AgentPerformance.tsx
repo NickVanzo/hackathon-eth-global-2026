@@ -32,7 +32,7 @@ function truncateAddress(address: string): string {
 
 function formatPerf(value: number): string {
   const sign = value >= 0 ? "+" : "";
-  return `${sign}${(value * 100).toFixed(1)}%`;
+  return `${sign}${(value * 100).toFixed(2)}%`;
 }
 
 // ─── Tier badge derived from mock data ────────────────────────────────────────
@@ -671,7 +671,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
         </div>
       </div>
 
-      {/* 7D_PERF */}
+      {/* PER_EPOCH */}
       <div
         role="cell"
         style={{
@@ -683,7 +683,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
           color: perfPositive ? COLORS.primary : COLORS.secondary,
         }}
       >
-        {formatPerf(agent.emaReturn * 100)}
+        {formatPerf(agent.totalReturn)}
       </div>
 
       {/* CONTROLLER */}
@@ -1223,7 +1223,7 @@ export default function AgentPerformance() {
                   <ColHeader>TIER CLASS</ColHeader>
                   <ColHeader>SHARPE</ColHeader>
                   <ColHeader>CREDITS</ColHeader>
-                  <ColHeader>7D PERF</ColHeader>
+                  <ColHeader>PER EPOCH</ColHeader>
                   <ColHeader right>CONTROLLER</ColHeader>
                 </div>
 
