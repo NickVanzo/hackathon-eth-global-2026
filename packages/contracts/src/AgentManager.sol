@@ -47,6 +47,14 @@ contract AgentManager is IAgentManager {
     event ForceCloseRequested(uint256 indexed agentId, IShared.ForceCloseSource source);
 
     // -------------------------------------------------------------------------
+    // Constants
+    // -------------------------------------------------------------------------
+
+    uint256 private constant SCALE       = 1e18;
+    uint256 private constant BPS         = 10_000;
+    uint256 private constant MIN_VARIANCE = 1e12;
+
+    // -------------------------------------------------------------------------
     // Immutables
     // -------------------------------------------------------------------------
 
@@ -201,15 +209,16 @@ contract AgentManager is IAgentManager {
     }
 
     // -------------------------------------------------------------------------
-    // Messenger-only: reportValues (stub for Task 1)
+    // Messenger-only: reportValues
     // -------------------------------------------------------------------------
 
     function reportValues(uint256 agentId, uint256 positionValue, uint256 feesCollected)
         external
         onlyMessenger
     {
-        scores[agentId].positionValue  = positionValue;
-        scores[agentId].feesCollected  = feesCollected;
+        require(agents[agentId].registered, "AgentManager: not registered");
+        scores[agentId].positionValue     = positionValue;
+        scores[agentId].feesCollected     = feesCollected;
         scores[agentId].lastReportedBlock = block.number;
         emit ValuesReported(agentId, positionValue, feesCollected);
     }
@@ -335,16 +344,213 @@ contract AgentManager is IAgentManager {
     }
 
     // -------------------------------------------------------------------------
-    // Vault-only: settleAgents (stub for Task 1)
+    // Vault-only: settleAgents
     // -------------------------------------------------------------------------
 
-    function settleAgents(uint256 /* totalAssets */, uint256 /* maxExposureRatio */)
+    /// @dev Per-agent result from _settleOneAgent; avoids stack-too-deep in settleAgents.
+    struct _AgentResult {
+        uint256 aid;
+        uint256 sharpe;
+        uint256 positionValue;
+        uint256 feesCollected;
+        bool    evicted;
+        bool    promoted;
+        bool    isVaultAfter;   // true if agent is vault-phase after this epoch
+        bool    deregistered;
+    }
+
+    function settleAgents(uint256 _totalAssets, uint256 _maxExposureRatio)
         external
         onlyVault
         returns (IShared.AgentSettlementData[] memory agentData, uint256 aggregateVaultPositionValue)
     {
-        agentData = new IShared.AgentSettlementData[](0);
-        aggregateVaultPositionValue = 0;
+        uint256 n = activeAgentIds.length;
+        _AgentResult[] memory results = new _AgentResult[](n);
+
+        // Pass 1: iterate backwards (so swap-and-pop doesn't skip entries)
+        uint256 i = n;
+        uint256 outputIdx = 0;
+        while (i > 0) {
+            i--;
+            _AgentResult memory res = _settleOneAgent(
+                activeAgentIds[i], _totalAssets, _maxExposureRatio
+            );
+            if (res.deregistered) continue; // agent gone, skip
+            if (res.isVaultAfter && !res.evicted) {
+                aggregateVaultPositionValue += res.positionValue;
+            }
+            results[outputIdx] = res;
+            outputIdx++;
+        }
+
+        // Build return array
+        agentData = new IShared.AgentSettlementData[](outputIdx);
+        for (uint256 j = 0; j < outputIdx; j++) {
+            agentData[j] = IShared.AgentSettlementData({
+                agentId:       results[j].aid,
+                positionValue: results[j].positionValue,
+                feesCollected: results[j].feesCollected,
+                evicted:       results[j].evicted,
+                promoted:      results[j].promoted,
+                forceClose:    results[j].evicted
+            });
+        }
+
+        // Pass 2: rebalance vault bucket credits proportional to Sharpe
+        uint256 totalSharpe = 0;
+        for (uint256 j = 0; j < outputIdx; j++) {
+            if (results[j].isVaultAfter && !results[j].evicted) {
+                totalSharpe += results[j].sharpe;
+            }
+        }
+        if (totalSharpe > 0) {
+            uint256 maxCredit = (_totalAssets * _maxExposureRatio / BPS) * maxPromotionShare / BPS;
+            for (uint256 j = 0; j < outputIdx; j++) {
+                if (results[j].isVaultAfter && !results[j].evicted) {
+                    uint256 aid   = results[j].aid;
+                    uint256 share = (totalRefillBudget * results[j].sharpe) / totalSharpe;
+                    buckets[aid].refillRate = share / 100;
+                    buckets[aid].maxCredits = maxCredit;
+                }
+            }
+        }
+    }
+
+    /// @dev Settle a single agent: update EMAs, compute Sharpe, handle eviction/promotion.
+    ///      Returns a result struct (avoids stack-too-deep in settleAgents).
+    function _settleOneAgent(
+        uint256 aid,
+        uint256 _totalAssets,
+        uint256 _maxExposureRatio
+    ) internal returns (_AgentResult memory res) {
+        res.aid = aid;
+        Agent  storage agent  = agents[aid];
+        Scores storage sc     = scores[aid];
+
+        bool isVault = (agent.phase == IShared.AgentPhase.VAULT);
+
+        // 1. EpochReturn
+        uint256 allocated = isVault ? buckets[aid].maxCredits : agent.provingBalance;
+        if (allocated == 0) allocated = 1;
+        res.feesCollected = sc.feesCollected;
+        uint256 epochReturn = (res.feesCollected * SCALE) / allocated;
+
+        // 2. Update EMAs
+        {
+            int256 iER  = int256(epochReturn);
+            int256 iER2 = int256((epochReturn * epochReturn) / SCALE);
+            int256 ia   = int256(alpha);
+            int256 ib   = int256(BPS);
+            sc.emaReturn   = (ia * iER  + (ib - ia) * sc.emaReturn)   / ib;
+            sc.emaReturnSq = (ia * iER2 + (ib - ia) * sc.emaReturnSq) / ib;
+        }
+
+        // 3. Sharpe
+        res.sharpe = _computeSharpe(sc.emaReturn, sc.emaReturnSq);
+
+        // 4. Epochs completed
+        agent.epochsCompleted++;
+
+        // 5. Streak + eviction
+        if (res.sharpe == 0) {
+            agent.zeroSharpeStreak++;
+        } else {
+            agent.zeroSharpeStreak = 0;
+        }
+
+        if (agent.zeroSharpeStreak >= evictionEpochs) {
+            res.evicted = true;
+            if (isVault) {
+                agent.phase = IShared.AgentPhase.PROVING;
+                delete buckets[aid];
+                sc.emaReturn       = 0;
+                sc.emaReturnSq     = 0;
+                agent.zeroSharpeStreak = 0;
+                emit AgentEvicted(aid, false);
+                emit ForceCloseRequested(aid, IShared.ForceCloseSource.VAULT);
+            } else {
+                emit AgentEvicted(aid, true);
+                emit ForceCloseRequested(aid, IShared.ForceCloseSource.PROVING);
+                _deregisterAgent(aid);
+                res.deregistered = true;
+                return res;
+            }
+        }
+
+        // 6. Promotion
+        if (!res.evicted && !isVault &&
+            agent.epochsCompleted >= provingEpochsRequired &&
+            res.sharpe >= minPromotionSharpe)
+        {
+            agent.phase            = IShared.AgentPhase.VAULT;
+            agent.zeroSharpeStreak = 0;
+            uint256 maxCredit = (_totalAssets * _maxExposureRatio / BPS) * maxPromotionShare / BPS;
+            buckets[aid] = Bucket({
+                credits:         maxCredit,
+                maxCredits:      maxCredit,
+                refillRate:      maxCredit / 100,
+                lastActionBlock: block.number
+            });
+            res.promoted       = true;
+            isVault            = true;
+            // Reset EMAs on promotion so vault-phase scoring starts fresh
+            sc.emaReturn       = 0;
+            sc.emaReturnSq     = 0;
+            emit AgentPromoted(aid);
+        }
+
+        res.positionValue = sc.positionValue;
+        res.isVaultAfter  = isVault;
+
+        // 7. Reset fees for next epoch
+        sc.feesCollected = 0;
+    }
+
+    /// @dev Compute Sharpe ratio from EMA return values.
+    function _computeSharpe(int256 emaR, int256 emaR2) internal pure returns (uint256) {
+        if (emaR <= 0) return 0;
+        int256 emaRSq = (emaR * emaR) / int256(SCALE);
+        int256 varSigned = emaR2 - emaRSq;
+        uint256 variance = (varSigned > 0) ? uint256(varSigned) : 0;
+        if (variance < MIN_VARIANCE) variance = MIN_VARIANCE;
+        return (uint256(emaR) * SCALE) / _sqrt(variance * SCALE);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: _deregisterAgent
+    // -------------------------------------------------------------------------
+
+    function _deregisterAgent(uint256 agentId) internal {
+        delete agents[agentId];
+        delete buckets[agentId];
+        delete scores[agentId];
+
+        // Swap-and-pop from activeAgentIds
+        uint256 len = activeAgentIds.length;
+        for (uint256 k = 0; k < len; k++) {
+            if (activeAgentIds[k] == agentId) {
+                activeAgentIds[k] = activeAgentIds[len - 1];
+                activeAgentIds.pop();
+                break;
+            }
+        }
+
+        if (agentCount > 0) agentCount--;
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: _sqrt (Babylonian method)
+    // -------------------------------------------------------------------------
+
+    function _sqrt(uint256 x) internal pure returns (uint256) {
+        if (x == 0) return 0;
+        uint256 z = (x + 1) / 2;
+        uint256 y = x;
+        while (z < y) {
+            y = z;
+            z = (x / z + z) / 2;
+        }
+        return y;
     }
 
     // -------------------------------------------------------------------------
