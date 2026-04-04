@@ -220,7 +220,7 @@ AgentManager is done. Now build the strategies that use it.
 ### Dev B — Deploy all 0G contracts + verify relayer
 - [ ] Deploy iNFT contract to 0G testnet
 - [ ] Deploy AgentManager to 0G testnet (with constructor params: alpha, maxAgents, totalRefillBudget, provingEpochsRequired, minPromotionSharpe, minActionInterval, maxPromotionShare, rampEpochs, evictionEpochs, messenger)
-- [ ] Deploy Vault to 0G testnet (with constructor params: agentManager, epochLength, maxExposureRatio, protocolFeeRate, protocolTreasury, commissionRate, depositToken, pool, messenger). Verify deployment invariant: `maxExposureRatio + idleReserveRatio = 10000`
+- [x] Deploy Vault to 0G testnet (with constructor params: agentManager, epochLength, maxExposureRatio, protocolFeeRate, protocolTreasury, commissionRate, depositToken, pool, messenger). Verify deployment invariant: `maxExposureRatio + idleReserveRatio = 10000`
 - [ ] Call `AgentManager.setVault(vaultAddress)` to complete circular reference
 - [ ] Verify all contracts on 0G explorer
 - [ ] Record all addresses in `.env`, announce to team
