@@ -24,6 +24,32 @@ const WORKSPACE_BASE = join(STATE_DIR, "workspaces");
 
 const GATEWAY_URL = "http://127.0.0.1:3000";
 
+/**
+ * Polls the gateway /v1/models until it responds 200, then resolves.
+ * Retries every 30s for up to 15 minutes.
+ */
+async function waitForGateway(maxWaitMs = 900_000) {
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  const start = Date.now();
+  console.log("[cron] waiting for gateway...");
+  while (Date.now() - start < maxWaitMs) {
+    try {
+      const res = await fetch(`${GATEWAY_URL}/v1/models`, {
+        headers: { "Authorization": `Bearer ${token}` },
+        signal: AbortSignal.timeout(5_000),
+      });
+      if (res.ok) {
+        console.log(`[cron] gateway ready (${Math.round((Date.now() - start) / 1000)}s)`);
+        return;
+      }
+    } catch {
+      // not ready yet
+    }
+    await new Promise((r) => setTimeout(r, 30_000));
+  }
+  throw new Error("gateway did not start within 15 minutes");
+}
+
 // Tracks previous price per agent for beta's contrarian strategy
 const previousPrices = {};
 
@@ -170,10 +196,14 @@ async function runEpoch() {
   }
 }
 
-// Short startup delay
-setTimeout(async () => {
-  await runEpoch();
-  setInterval(runEpoch, EPOCH_INTERVAL_MS);
-}, 3_000);
-
 console.log(`[cron] started — epoch every ${EPOCH_INTERVAL_MS / 1000}s, agents: ${AGENTS.join(", ")}`);
+
+waitForGateway()
+  .then(() => {
+    runEpoch();
+    setInterval(runEpoch, EPOCH_INTERVAL_MS);
+  })
+  .catch((err) => {
+    console.error(`[cron] fatal: ${err.message}`);
+    process.exit(1);
+  });

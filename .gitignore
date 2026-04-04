@@ -142,3 +142,42 @@ dist
 .svelte-kit
 
 # End of https://www.toptal.com/developers/gitignore/api/node
+
+# =============================================================================
+# Agent Arena — project-specific additions
+# =============================================================================
+
+# Environment — .env.example is intentionally tracked
+.env.*.local
+# (base .env and .env.local already covered above)
+
+# TypeScript compiled output inside src trees
+src/**/*.js
+src/**/*.js.map
+# Keep generated declaration files in shared/types
+*.d.ts
+!packages/shared/types/**/*.d.ts
+
+# Foundry / Forge build artefacts
+# broadcast/dry-run/ is NOT ignored so dry-run outputs stay reviewable
+out/
+cache/
+broadcast/
+!broadcast/dry-run/
+
+# Fly.io
+.fly/
+
+# OpenClaw local state (contains hardcoded API keys and session data — never commit)
+local/
+
+# Dry-run intent files (ephemeral runtime output)
+data-seed/intents/
+
+# Editor artefacts
+.vscode/
+.idea/
+*.swp
+*.swo
+.DS_Store
+Thumbs.db
