@@ -5,10 +5,10 @@
  * see the API key. The key is read from `process.env.UNISWAP_API_KEY`
  * (a Firebase secret injected at runtime).
  *
- * Base URL: https://api.uniswap.org/v1
+ * Base URL: https://trade-api.gateway.uniswap.org/v1
  */
 
-const BASE_URL = "https://api.uniswap.org/v1";
+const BASE_URL = "https://trade-api.gateway.uniswap.org/v1";
 
 // ---------------------------------------------------------------------------
 // Response types
@@ -48,29 +48,27 @@ function getApiKey(): string {
 }
 
 /**
- * Generic GET request to the Uniswap Trading API.
+ * Generic POST request to the Uniswap Trading API.
  *
  * - Reads the API key from the environment.
- * - Builds the URL with query parameters.
+ * - Sends JSON body via POST (the Trading API uses POST, not GET).
  * - Enforces an 8-second timeout via `AbortSignal.timeout`.
- * - Throws on non-2xx responses or GraphQL-style `errors` payloads.
+ * - Throws on non-2xx responses or error payloads.
  */
 async function callTradingApi<T>(
   path: string,
-  params: Record<string, string>
+  body: Record<string, unknown>
 ): Promise<T> {
   const key = getApiKey();
 
-  const url = new URL(`${BASE_URL}${path}`);
-  const searchParams = new URLSearchParams(params);
-  url.search = searchParams.toString();
-
-  const response = await fetch(url.toString(), {
-    method: "GET",
+  const response = await fetch(`${BASE_URL}${path}`, {
+    method: "POST",
     headers: {
       "x-api-key": key,
+      "Content-Type": "application/json",
       Accept: "application/json",
     },
+    body: JSON.stringify(body),
     signal: AbortSignal.timeout(8000),
   });
 
@@ -99,74 +97,74 @@ async function callTradingApi<T>(
 export interface QuoteParams {
   tokenInChainId: string;
   tokenOutChainId: string;
-  tokenInAddress: string;
-  tokenOutAddress: string;
+  tokenIn: string;
+  tokenOut: string;
   amount: string;
   type: "EXACT_INPUT" | "EXACT_OUTPUT";
+  swapper: string;
   slippageTolerance?: string;
 }
 
 export async function fetchQuote(params: QuoteParams): Promise<QuoteResponse> {
-  const qs: Record<string, string> = {
-    tokenInChainId: params.tokenInChainId,
-    tokenOutChainId: params.tokenOutChainId,
-    tokenInAddress: params.tokenInAddress,
-    tokenOutAddress: params.tokenOutAddress,
+  const body: Record<string, unknown> = {
+    tokenInChainId: Number(params.tokenInChainId),
+    tokenOutChainId: Number(params.tokenOutChainId),
+    tokenIn: params.tokenIn,
+    tokenOut: params.tokenOut,
     amount: params.amount,
     type: params.type,
+    swapper: params.swapper,
+    configs: [{ routingType: "CLASSIC", protocols: ["V3"] }],
   };
   if (params.slippageTolerance !== undefined) {
-    qs.slippageTolerance = params.slippageTolerance;
+    body.slippageTolerance = params.slippageTolerance;
   }
-  return callTradingApi<QuoteResponse>("/quote", qs);
+  return callTradingApi<QuoteResponse>("/quote", body);
 }
 
 export interface RouteParams {
   tokenInChainId: string;
   tokenOutChainId: string;
-  tokenInAddress: string;
-  tokenOutAddress: string;
+  tokenIn: string;
+  tokenOut: string;
   amount: string;
   type: "EXACT_INPUT" | "EXACT_OUTPUT";
+  swapper: string;
   slippageTolerance?: string;
 }
 
 export async function fetchRoute(params: RouteParams): Promise<RouteResponse> {
-  const qs: Record<string, string> = {
-    tokenInChainId: params.tokenInChainId,
-    tokenOutChainId: params.tokenOutChainId,
-    tokenInAddress: params.tokenInAddress,
-    tokenOutAddress: params.tokenOutAddress,
+  const body: Record<string, unknown> = {
+    tokenInChainId: Number(params.tokenInChainId),
+    tokenOutChainId: Number(params.tokenOutChainId),
+    tokenIn: params.tokenIn,
+    tokenOut: params.tokenOut,
     amount: params.amount,
     type: params.type,
+    swapper: params.swapper,
+    configs: [{ routingType: "CLASSIC", protocols: ["V3"] }],
   };
   if (params.slippageTolerance !== undefined) {
-    qs.slippageTolerance = params.slippageTolerance;
+    body.slippageTolerance = params.slippageTolerance;
   }
-  return callTradingApi<RouteResponse>("/route", qs);
+  return callTradingApi<RouteResponse>("/route", body);
 }
 
 export interface PoolsParams {
   chainId: string;
-  token0Address?: string;
-  token1Address?: string;
+  tokenIn?: string;
+  tokenOut?: string;
   fee?: string;
 }
 
 export async function fetchPools(params: PoolsParams): Promise<PoolsResponse> {
-  const qs: Record<string, string> = {
-    chainId: params.chainId,
+  const body: Record<string, unknown> = {
+    chainId: Number(params.chainId),
   };
-  if (params.token0Address !== undefined) {
-    qs.token0Address = params.token0Address;
-  }
-  if (params.token1Address !== undefined) {
-    qs.token1Address = params.token1Address;
-  }
-  if (params.fee !== undefined) {
-    qs.fee = params.fee;
-  }
-  return callTradingApi<PoolsResponse>("/pools", qs);
+  if (params.tokenIn !== undefined) body.tokenIn = params.tokenIn;
+  if (params.tokenOut !== undefined) body.tokenOut = params.tokenOut;
+  if (params.fee !== undefined) body.fee = params.fee;
+  return callTradingApi<PoolsResponse>("/pools", body);
 }
 
 export interface PositionsParams {
@@ -178,7 +176,7 @@ export async function fetchPositions(
   params: PositionsParams
 ): Promise<PositionsResponse> {
   return callTradingApi<PositionsResponse>("/positions", {
-    chainId: params.chainId,
+    chainId: Number(params.chainId),
     address: params.address,
   });
 }
