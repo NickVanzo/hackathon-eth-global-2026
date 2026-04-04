@@ -294,7 +294,7 @@ contract AgentManager is IAgentManager {
                 require(bucket.credits >= ip.amountUSDC, "AgentManager: insufficient credits");
 
                 (bool ok, bytes memory data) = vault.staticcall(
-                    abi.encodeWithSignature("trackedTotalAssets()")
+                    abi.encodeWithSignature("totalAssets()")
                 );
                 require(ok, "AM: vault read failed");
                 uint256 vaultTotal = abi.decode(data, (uint256));
@@ -466,8 +466,10 @@ contract AgentManager is IAgentManager {
         // 4. Epochs completed
         agent.epochsCompleted++;
 
-        // 5. Streak + eviction
-        if (res.sharpe == 0) {
+        // 5. Streak + eviction (skip paused agents — they are deliberately idle)
+        if (agent.paused) {
+            // Paused agents don't accumulate eviction streak
+        } else if (res.sharpe == 0) {
             agent.zeroSharpeStreak++;
         } else {
             agent.zeroSharpeStreak = 0;
@@ -508,9 +510,7 @@ contract AgentManager is IAgentManager {
             });
             res.promoted       = true;
             isVault            = true;
-            // Reset EMAs on promotion so vault-phase scoring starts fresh
-            sc.emaReturn       = 0;
-            sc.emaReturnSq     = 0;
+            // EMAs carry over from proving phase — no cold start per spec
             emit AgentPromoted(aid);
         }
 
