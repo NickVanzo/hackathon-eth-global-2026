@@ -141,32 +141,32 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 **Hour 3:30 - 4:45: Relayer (1.25 hours)**
 
-- [ ] Set up ethers v6 providers for both 0G testnet and Sepolia
-- [ ] Load ABIs from `shared/abis/`
-- [ ] Maintain relayer position cache: `agentId → [{tokenId, source}]` mapping, updated by watching `executeBatch` mints and `PositionClosed` burns on satellite
-- [ ] Uniswap Trading API integration: call POST `/swap` and `/route` endpoints to generate optimized calldata before each `executeBatch` dispatch
-- [ ] Implement event routes — **Sepolia → 0G**:
-  - [ ] `Deposited` → `vault.recordDeposit()`
-  - [ ] `AgentRegistered` → `agentManager.recordRegistration()`
-  - [ ] `WithdrawRequested` → `vault.processWithdraw()`
-  - [ ] `ValuesReported` → `agentManager.reportValues()`
-  - [ ] `CommissionClaimRequested` → `agentManager.processCommissionClaim()`
-  - [ ] `PauseRequested` → `agentManager.processPause()`
-  - [ ] `WithdrawFromArenaRequested` → `agentManager.processWithdrawFromArena()`
-  - [ ] `ClaimWithdrawRequested` → `vault.claimWithdraw()` then `satellite.releaseQueuedWithdraw()`
-  - [ ] `PositionClosed` → `agentManager.recordClosure(agentId, recoveredAmount, source)` + `vault.recordRecovery(agentId, recoveredAmount)` (source from position cache)
-- [ ] Implement event routes — **0G → Sepolia**:
-  - [ ] `IntentQueued` → Uniswap Trading API POST → `satellite.executeBatch()` (with API calldata + source field)
-  - [ ] `EpochSettled` → `satellite.updateSharePrice()`
-  - [ ] `WithdrawApproved` → `satellite.release()`
-  - [ ] `ProtocolFeeAccrued` → `satellite.reserveProtocolFees(amount)` (once per epoch)
-  - [ ] `CommissionAccrued` → `satellite.reserveCommission(agentId, amount)` (once per agent)
-  - [ ] `CommissionApproved` → `satellite.releaseCommission(caller, amount)`
-  - [ ] `ForceCloseRequested(agentId, source)` → look up position cache → `satellite.forceClose(agentId, positionIds[], source)` (listen on BOTH Vault and AgentManager)
+- [x] Set up viem providers for both 0G testnet and Sepolia (clients.ts: sepoliaPublicClient, zgPublicClient, wallet clients)
+- [x] Load ABIs (abis.ts: inline minimal ABIs for relay surfaces — Vault, AgentManager, Satellite)
+- [x] Relayer position cache: uses satellite.getAgentPositions() on-chain reads (simpler than local cache for hackathon)
+- [x] Uniswap Trading API integration: POST `/quote` + `/swap` with retry logic, CLASSIC routing, calldata extraction (uniswap.ts)
+- [x] Implement event routes — **Sepolia → 0G**:
+  - [x] `Deposited` → `vault.recordDeposit()` (satelliteHandlers.ts)
+  - [x] `AgentRegistered` → `agentManager.recordRegistration()` (satelliteHandlers.ts)
+  - [x] `WithdrawRequested` → `vault.processWithdraw()` (with cachedSharePrice conversion, satelliteHandlers.ts)
+  - [x] `ValuesReported` → `agentManager.reportValues()` (satelliteHandlers.ts)
+  - [x] `CommissionClaimRequested` → `agentManager.processCommissionClaim()` (satelliteHandlers.ts)
+  - [x] `PauseRequested` → `agentManager.processPause()` (satelliteHandlers.ts)
+  - [x] `WithdrawFromArenaRequested` → `agentManager.processWithdrawFromArena()` (satelliteHandlers.ts)
+  - [x] `ClaimWithdrawRequested` → `vault.claimWithdraw()` then `satellite.releaseQueuedWithdraw()` (satelliteHandlers.ts)
+  - [x] `PositionClosed` → `agentManager.recordClosure(agentId, recoveredAmount, source)` + `vault.recordRecovery(agentId, recoveredAmount)` (satelliteHandlers.ts, source from agentPhase read)
+- [x] Implement event routes — **0G → Sepolia**:
+  - [x] `IntentQueued` → Uniswap Trading API POST → `satellite.executeBatch()` (agentManagerHandlers.ts, pending config.yaml uncomment + codegen)
+  - [x] `EpochSettled` → `satellite.updateSharePrice()` (vaultHandlers.ts)
+  - [x] `WithdrawApproved` → `satellite.release()` (vaultHandlers.ts)
+  - [x] `ProtocolFeeAccrued` → `satellite.reserveProtocolFees(amount)` (vaultHandlers.ts)
+  - [x] `CommissionAccrued` → `satellite.reserveCommission(agentId, amount)` (vaultHandlers.ts)
+  - [x] `CommissionApproved` → `satellite.releaseCommission(caller, amount)` (vaultHandlers.ts)
+  - [x] `ForceCloseRequested(agentId, source)` → `satellite.forceClose(agentId, positionIds[], source)` (vaultHandlers.ts for Vault, agentManagerHandlers.ts for AM — pending codegen)
 - [ ] Periodic `vault.triggerSettleEpoch()` call (once per epoch in main loop)
-- [ ] Event deduplication (don't process same event twice)
-- [ ] Retry logic + nonce management
-- [ ] Structured logging (timestamp, event type, tx hash, chain)
+- [x] Event deduplication (Envio handles natively via indexed entity IDs: chainId_block_logIndex)
+- [x] Retry logic + nonce management (uniswap.ts: fetchWithRetry with exponential backoff; relay helpers catch errors)
+- [x] Structured logging (all handlers: `[relay] label → tx: hash` with event params)
 - [ ] Health check endpoint (for monitoring during demo)
 - [ ] Start relayer as persistent process (pm2 or background node)
 

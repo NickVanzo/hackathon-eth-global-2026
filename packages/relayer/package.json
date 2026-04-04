@@ -17,7 +17,8 @@
     "fire:deposit": "npx tsx scripts/fire-intent.ts --deposit",
     "fire:open": "npx tsx scripts/fire-intent.ts --open",
     "fire:close": "npx tsx scripts/fire-intent.ts --close",
-    "fire:status": "npx tsx scripts/fire-intent.ts --status"
+    "fire:status": "npx tsx scripts/fire-intent.ts --status",
+    "test:relayer": "npx tsx scripts/test-relayer.ts"
   },
   "devDependencies": {
     "@types/chai": "^4.3.11",    
