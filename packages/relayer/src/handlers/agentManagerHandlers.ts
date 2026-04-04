@@ -20,9 +20,9 @@ import {
   AgentManager_AgentEvicted,
 } from "generated";
 
-import { sepoliaPublicClient, sepoliaWalletClient } from "../relayer/clients";
-import { SATELLITE_ABI } from "../relayer/abis";
-import { SATELLITE_ADDRESS, ActionType } from "../relayer/env";
+import { sepoliaPublicClient, sepoliaWalletClient, zgPublicClient } from "../relayer/clients";
+import { SATELLITE_ABI, AGENT_MANAGER_ABI } from "../relayer/abis";
+import { SATELLITE_ADDRESS, AGENT_MANAGER_ADDRESS, ActionType } from "../relayer/env";
 import {
   getZapInCalldata,
   getZapOutCalldata,
@@ -84,19 +84,32 @@ AgentManager.IntentQueued.handler(async ({ event, context }) => {
         // Decode the agent's intent: (amountUSDC, tickLower, tickUpper)
         const decoded = decodeOpenPositionParams(rawParams);
 
+        // Read agent phase to set the correct source tag on the position.
+        // Default to PROVING (conservative: over-attributing to proving is
+        // recoverable; under-attributing to vault would inflate exposure).
+        let source = 0;
+        try {
+          const phase = await zgPublicClient.readContract({
+            address: AGENT_MANAGER_ADDRESS,
+            abi: AGENT_MANAGER_ABI,
+            functionName: "agentPhase",
+            args: [agentId],
+          });
+          source = Number(phase); // 0=PROVING, 1=VAULT
+        } catch (err) {
+          console.warn(`[intent] agentPhase read failed for agent=${agentId}, defaulting to PROVING:`, err);
+        }
+
         // Call Uniswap Trading API: swap ~50% of USDC.e -> WETH for the LP's WETH leg
         const halfAmount = decoded.amountUSDC / 2n;
         const swapCalldata = await getZapInCalldata(halfAmount);
 
-        // Re-encode with swap calldata + source (source is set by AgentManager,
-        // but the satellite reads it from the params; default to 0 = PROVING here,
-        // the satellite overrides from its positionSource mapping)
         enrichedParams = encodeOpenPositionParams(
           decoded.amountUSDC,
           decoded.tickLower,
           decoded.tickUpper,
           swapCalldata,
-          0, // source placeholder — satellite sets the real value from agent phase
+          source,
         );
 
         console.log(

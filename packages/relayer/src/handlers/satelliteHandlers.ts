@@ -254,7 +254,12 @@ Satellite.PositionClosed.handler(async ({ event, context }) => {
   };
   context.Satellite_PositionClosed.set(entity);
 
-  // Determine source from agent phase (0=PROVING, 1=VAULT)
+  // Determine source from agent phase on 0G (0=PROVING, 1=VAULT).
+  // NOTE: We cannot read positionSource from Satellite here because
+  // _closeAndZapOut deletes it before PositionClosed is emitted.
+  // Reading agentPhase is correct for single-phase agents; for agents
+  // that were promoted mid-lifecycle, a relayer-side position cache
+  // (tracking source at open time) would be more accurate.
   let source: number = ForceCloseSource.VAULT;
   try {
     const phase = await zgPublicClient.readContract({
@@ -265,7 +270,8 @@ Satellite.PositionClosed.handler(async ({ event, context }) => {
     });
     source = Number(phase) === 0 ? ForceCloseSource.PROVING : ForceCloseSource.VAULT;
   } catch {
-    // AgentManager may not be deployed yet; default to VAULT
+    // Agent may be deregistered; default to VAULT (conservative — triggers
+    // totalDeployedVault decrement, which is safer than skipping it)
   }
 
   // recordClosure — spec-defined, may not be in deployed ABI yet
