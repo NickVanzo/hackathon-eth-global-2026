@@ -6,6 +6,7 @@ contract MockVault {
     uint256 private _totalAssets;
 
     uint256 public lastApprovedCommissionAgentId;
+    address public lastCommissionCaller;
     bool    public approveCommissionReleaseCalled;
 
     function setTotalAssets(uint256 amount) external {
@@ -20,8 +21,9 @@ contract MockVault {
         return _totalAssets;
     }
 
-    function approveCommissionRelease(uint256 agentId) external {
+    function approveCommissionRelease(uint256 agentId, address caller) external {
         approveCommissionReleaseCalled = true;
         lastApprovedCommissionAgentId = agentId;
+        lastCommissionCaller = caller;
     }
 }

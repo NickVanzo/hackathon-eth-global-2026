@@ -224,12 +224,27 @@ contract AgentManager is IAgentManager {
     }
 
     // -------------------------------------------------------------------------
-    // Messenger-only: processCommissionClaim (stub for Task 1)
+    // Messenger-only: processCommissionClaim
     // -------------------------------------------------------------------------
 
     function processCommissionClaim(uint256 agentId, address caller) external onlyMessenger {
+        require(agents[agentId].registered, "AgentManager: not registered");
         _requireOwner(agentId, caller);
-        // vault.approveCommissionRelease(agentId) — implemented in later task
+        (bool ok,) = vault.call(
+            abi.encodeWithSignature("approveCommissionRelease(uint256,address)", agentId, caller)
+        );
+        require(ok, "AgentManager: vault call failed");
+    }
+
+    // -------------------------------------------------------------------------
+    // Messenger-only: processWithdrawFromArena
+    // -------------------------------------------------------------------------
+
+    function processWithdrawFromArena(uint256 agentId, address caller) external onlyMessenger {
+        require(agents[agentId].registered, "AgentManager: not registered");
+        _requireOwner(agentId, caller);
+        emit ForceCloseRequested(agentId, IShared.ForceCloseSource.ALL);
+        _deregisterAgent(agentId);
     }
 
     // -------------------------------------------------------------------------
