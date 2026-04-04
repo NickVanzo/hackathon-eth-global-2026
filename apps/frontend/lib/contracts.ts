@@ -32,11 +32,13 @@ export function isZeroAddress(addr: string): boolean {
 }
 
 // ---------------------------------------------------------------------------
-// Minimal inline ABI for USDC.e (standard ERC-20 balanceOf)
+// Minimal inline ABI for USDC.e (standard ERC-20 balanceOf + approve + allowance)
 // ---------------------------------------------------------------------------
 
-const USDC_E_ABI = parseAbi([
+export const USDC_E_ABI = parseAbi([
   "function balanceOf(address) view returns (uint256)",
+  "function allowance(address owner, address spender) view returns (uint256)",
+  "function approve(address spender, uint256 amount) returns (bool)",
 ]);
 
 // ---------------------------------------------------------------------------
@@ -357,6 +359,39 @@ export function useUSDCBalance(userAddress: string | undefined): {
   return {
     balance: data !== undefined ? (data as bigint).toString() : undefined,
     isLoading,
+  };
+}
+
+/**
+ * Reads allowance(owner, spender) from USDC.e ERC-20 on Sepolia.
+ * Returns the current allowance as a bigint.
+ */
+export function useUSDCAllowance(
+  owner: string | undefined,
+  spender: string
+): {
+  allowance: bigint | undefined;
+  isLoading: boolean;
+  refetch: () => void;
+} {
+  const enabled =
+    !isZeroAddress(USDC_E_ADDRESS) &&
+    owner !== undefined &&
+    !isZeroAddress(owner);
+
+  const { data, isLoading, refetch } = useReadContract({
+    address: USDC_E_ADDRESS,
+    abi: USDC_E_ABI,
+    functionName: "allowance",
+    args: [owner as `0x${string}`, spender as `0x${string}`],
+    chainId: sepolia.id,
+    query: { enabled },
+  });
+
+  return {
+    allowance: data !== undefined ? (data as bigint) : undefined,
+    isLoading,
+    refetch,
   };
 }
 

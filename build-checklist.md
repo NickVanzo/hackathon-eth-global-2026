@@ -230,8 +230,8 @@ AgentManager is done. Now build the strategies that use it.
 
 ### PM — Wire dashboard to real contracts
 - [x] Replace all mock data with real contract reads using deployed addresses + ABIs
-- [ ] Verify deposit/withdraw forms call real satellite functions
-- [ ] Verify agent performance view reads real AgentManager state (Sharpe, EMAs, credits)
+- [x] Verify deposit/withdraw forms call real satellite functions
+- [x] Verify agent performance view reads real AgentManager state (Sharpe, EMAs, credits)
 - **Skills**: `frontend-dev`, `viem-integration`
 
 ---
