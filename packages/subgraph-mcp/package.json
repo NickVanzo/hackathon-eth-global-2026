@@ -1,26 +1,36 @@
 {
-  "name": "@agent-arena/subgraph-mcp",
-  "version": "0.1.0",
-  "private": true,
-  "type": "module",
-  "main": "dist/index.js",
+  "name": "subgraph-mcp-functions",
+  "version": "1.0.0",
+  "description": "MCP server exposing Uniswap V3 subgraph tools via Firebase Cloud Functions",
+  "engines": {
+    "node": "20"
+  },
+  "main": "lib/index.js",
   "scripts": {
     "build": "tsc",
-    "start": "node dist/index.js",
+    "build:watch": "tsc --watch",
+    "serve": "npm run build && firebase emulators:start --only functions",
+    "shell": "npm run build && firebase functions:shell",
+    "start": "npm run shell",
+    "deploy": "firebase deploy --only functions",
+    "logs": "firebase functions:log",
     "dev": "tsx watch src/index.ts"
   },
   "dependencies": {
     "@modelcontextprotocol/sdk": "^1.29.0",
     "cors": "^2.8.6",
-    "dotenv": "^16.0.0",
     "express": "^4.22.1",
-    "zod": "^3.23.0"
+    "firebase-admin": "^12.7.0",
+    "firebase-functions": "^5.1.1",
+    "ethers": "^6.13.0",
+    "dotenv": "^16.4.0",
+    "zod": "3.25.76"
   },
   "devDependencies": {
     "@types/cors": "^2.8.19",
     "@types/express": "^4.17.25",
-    "@types/node": "^20.0.0",
-    "tsx": "^4.0.0",
-    "typescript": "^5.0.0"
+    "@types/node": "^20.19.37",
+    "typescript": "^5.9.3",
+    "tsx": "^4.0.0"
   }
 }
