@@ -6,6 +6,13 @@ Two demos: a pre-recorded video (editable, can timelapse) and a live stage demo 
 
 ## Video Demo (pre-recorded, editable)
 
+### BEFORE RECORDING: Refill Wallets
+- [ ] Deployer wallet: Sepolia ETH (gas) + USDC.e (deposits, proving capital)
+- [ ] Relayer wallet: Sepolia ETH (gas for satellite txs) + 0G testnet tokens (gas for Vault/AM txs)
+- [ ] Agent wallets (x3): 0G testnet tokens (gas for submitIntent txs)
+- [ ] Demo user wallet (MetaMask): Sepolia ETH (gas) + USDC.e (for deposit/withdraw demo)
+- [ ] Verify all balances are sufficient for the full recording session (no mid-demo failures)
+
 ### Setup
 - Fresh contracts deployed with normal `epochLength`
 - Relayer, MCP server, 3 OpenClaw agents all running
@@ -81,6 +88,12 @@ Two demos: a pre-recorded video (editable, can timelapse) and a live stage demo 
 ## Live Stage Demo (~3 minutes)
 
 Everything pre-staged. Dashboard is the only thing on screen. Two live wallet transactions on stage.
+
+### BEFORE GOING ON STAGE: Refill Wallets
+- [ ] Relayer wallet: Sepolia ETH (gas) + 0G testnet tokens (gas) -- enough for ~20 txs each side
+- [ ] Agent wallets (x3): 0G testnet tokens (gas) -- agents may still submit intents during demo
+- [ ] Presenter wallet (MetaMask): Sepolia ETH (gas) -- only needed if triggering epoch manually
+- [ ] Verify ALL balances right before going on stage -- faucets can take minutes, do this early
 
 ### Pre-stage Setup (hours before pitch)
 - Fresh contracts with very short `epochLength` (few seconds of blocks)
