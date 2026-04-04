@@ -22,6 +22,14 @@ library IShared {
         VAULT     // 1 — managing vault funds via token bucket
     }
 
+    /// @notice Source of positions to close in a ForceClose operation.
+    ///         Carried from 0G intent → satellite positionSource mapping → recordClosure source param.
+    enum ForceCloseSource {
+        PROVING, // 0 — close only proving-phase positions (return capital to deployer)
+        VAULT,   // 1 — close only vault-phase positions (return capital to idle reserve)
+        ALL      // 2 — close all positions regardless of source (withdraw-from-arena)
+    }
+
     // -------------------------------------------------------------------------
     // Structs
     // -------------------------------------------------------------------------

@@ -24,6 +24,13 @@ contract SatelliteAccessTest is SatelliteTestBase {
         satellite.release(alice, 1_000e6);
     }
 
+    function test_releaseQueuedWithdraw_onlyMessenger() public {
+        _fundSatellite(1_000e6);
+        vm.prank(alice);
+        vm.expectRevert("Satellite: not messenger");
+        satellite.releaseQueuedWithdraw(alice, 1_000e6);
+    }
+
     function test_updateSharePrice_onlyMessenger() public {
         vm.prank(alice);
         vm.expectRevert("Satellite: not messenger");
@@ -51,9 +58,10 @@ contract SatelliteAccessTest is SatelliteTestBase {
     }
 
     function test_forceClose_onlyMessenger() public {
+        uint256[] memory posIds = new uint256[](0);
         vm.prank(alice);
         vm.expectRevert("Satellite: not messenger");
-        satellite.forceClose(1);
+        satellite.forceClose(1, posIds, IShared.ForceCloseSource.VAULT);
     }
 
     // =========================================================================
@@ -64,6 +72,12 @@ contract SatelliteAccessTest is SatelliteTestBase {
         _fundSatellite(1_000e6);
         vm.prank(messenger);
         satellite.release(alice, 1_000e6); // should not revert
+    }
+
+    function test_releaseQueuedWithdraw_messengerCanCall() public {
+        _fundSatellite(1_000e6);
+        vm.prank(messenger);
+        satellite.releaseQueuedWithdraw(alice, 1_000e6); // should not revert
     }
 
     function test_updateSharePrice_messengerCanCall() public {
@@ -95,9 +109,10 @@ contract SatelliteAccessTest is SatelliteTestBase {
     }
 
     function test_forceClose_messengerReachesImplementationRevert() public {
+        uint256[] memory posIds = new uint256[](0);
         vm.prank(messenger);
         vm.expectRevert("Satellite: forceClose not yet implemented");
-        satellite.forceClose(1);
+        satellite.forceClose(1, posIds, IShared.ForceCloseSource.VAULT);
     }
 
     // =========================================================================
@@ -109,40 +124,50 @@ contract SatelliteAccessTest is SatelliteTestBase {
         address _depositToken,
         address _posMgr,
         address _router,
-        address _messenger,
+        address _msngr,
         address _treasury
     ) internal returns (SatelliteHarness) {
-        return new SatelliteHarness(_pool, _depositToken, _posMgr, _router, _messenger, _treasury);
+        return new SatelliteHarness(
+            _pool, _depositToken, _posMgr, _router, _msngr, _treasury, IDLE_RESERVE_RATIO
+        );
     }
 
     function test_constructor_revertsOnZeroPool() public {
         vm.expectRevert("zero pool");
-        _deploy(address(0), address(usdc), positionMgr, swapRouter, messenger, treasury);
+        _deploy(address(0), address(usdc), positionMgr, universalRouter, messenger, treasury);
     }
 
     function test_constructor_revertsOnZeroDepositToken() public {
         vm.expectRevert("zero depositToken");
-        _deploy(address(pool), address(0), positionMgr, swapRouter, messenger, treasury);
+        _deploy(address(pool), address(0), positionMgr, universalRouter, messenger, treasury);
     }
 
     function test_constructor_revertsOnZeroPositionManager() public {
         vm.expectRevert("zero positionManager");
-        _deploy(address(pool), address(usdc), address(0), swapRouter, messenger, treasury);
+        _deploy(address(pool), address(usdc), address(0), universalRouter, messenger, treasury);
     }
 
-    function test_constructor_revertsOnZeroSwapRouter() public {
-        vm.expectRevert("zero swapRouter");
+    function test_constructor_revertsOnZeroUniversalRouter() public {
+        vm.expectRevert("zero universalRouter");
         _deploy(address(pool), address(usdc), positionMgr, address(0), messenger, treasury);
     }
 
     function test_constructor_revertsOnZeroMessenger() public {
         vm.expectRevert("zero messenger");
-        _deploy(address(pool), address(usdc), positionMgr, swapRouter, address(0), treasury);
+        _deploy(address(pool), address(usdc), positionMgr, universalRouter, address(0), treasury);
     }
 
     function test_constructor_revertsOnZeroTreasury() public {
         vm.expectRevert("zero treasury");
-        _deploy(address(pool), address(usdc), positionMgr, swapRouter, messenger, address(0));
+        _deploy(address(pool), address(usdc), positionMgr, universalRouter, messenger, address(0));
+    }
+
+    function test_constructor_revertsWhenIdleReserveRatioOver100Pct() public {
+        vm.expectRevert("idleReserveRatio > 100%");
+        new SatelliteHarness(
+            address(pool), address(usdc), positionMgr,
+            universalRouter, messenger, treasury, 10_001
+        );
     }
 
     // =========================================================================
@@ -161,8 +186,8 @@ contract SatelliteAccessTest is SatelliteTestBase {
         assertEq(satellite.positionManager(), positionMgr);
     }
 
-    function test_constructor_setsSwapRouterImmutable() public {
-        assertEq(satellite.swapRouter(), swapRouter);
+    function test_constructor_setsUniversalRouterImmutable() public {
+        assertEq(satellite.universalRouter(), universalRouter);
     }
 
     function test_constructor_setsMessengerImmutable() public {
@@ -171,6 +196,10 @@ contract SatelliteAccessTest is SatelliteTestBase {
 
     function test_constructor_setsTreasuryImmutable() public {
         assertEq(satellite.protocolTreasury(), treasury);
+    }
+
+    function test_constructor_setsIdleReserveRatioImmutable() public {
+        assertEq(satellite.idleReserveRatio(), IDLE_RESERVE_RATIO);
     }
 
     function test_constructor_setsToken0FromPool() public {

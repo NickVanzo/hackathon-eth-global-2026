@@ -80,7 +80,8 @@ contract VaultEpochTest is VaultTestBase {
     function test_triggerSettleEpoch_noopBeforeEpochElapsed() public {
         uint256 epochBefore = vault.currentEpoch();
 
-        vm.prank(address(agentMgr));
+        // Callable by anyone — messenger used here as the typical relayer caller
+        vm.prank(messenger);
         vault.triggerSettleEpoch();
 
         assertEq(vault.currentEpoch(), epochBefore, "epoch unchanged");
@@ -91,7 +92,7 @@ contract VaultEpochTest is VaultTestBase {
         agentMgr.setSettlementData(_emptySettlement());
 
         _rollPastEpoch();
-        vm.prank(address(agentMgr));
+        vm.prank(messenger);
         vault.triggerSettleEpoch();
 
         assertEq(vault.currentEpoch(), epochBefore + 1, "epoch advanced");
@@ -101,7 +102,7 @@ contract VaultEpochTest is VaultTestBase {
         agentMgr.setSettlementData(_emptySettlement());
         _rollPastEpoch();
 
-        vm.prank(address(agentMgr));
+        vm.prank(messenger);
         vault.triggerSettleEpoch();
 
         assertTrue(agentMgr.settleAgentsCalled(), "settleAgents called");

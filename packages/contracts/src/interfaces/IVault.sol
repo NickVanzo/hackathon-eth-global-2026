@@ -9,16 +9,23 @@ import {IShared} from "./IShared.sol";
 ///         and orchestrates epoch settlement. Never holds tokens.
 ///
 /// Callers:
-///   messenger (relayer) — recordDeposit, processWithdraw, approveCommissionRelease
-///   AgentManager        — idleBalance, triggerSettleEpoch (via epochCheck)
-///   Anyone              — view functions
+///   messenger (relayer) — recordDeposit, processWithdraw, claimWithdraw,
+///                         recordRecovery
+///   AgentManager        — approveCommissionRelease
+///   Anyone              — triggerSettleEpoch, view functions
 interface IVault {
     // -------------------------------------------------------------------------
     // Events
     // -------------------------------------------------------------------------
 
-    /// @notice Emitted after relayer confirms satellite released tokens to user.
+    /// @notice Emitted when a Tier-1 or Tier-2 withdrawal is approved.
+    ///         For Tier-1: relayer calls satellite.release(user, tokenAmount).
+    ///         For Tier-2 (epoch-approved): relayer calls satellite.release(user, tokenAmount).
     event WithdrawApproved(address indexed user, uint256 tokenAmount);
+
+    /// @notice Emitted when a Tier-2 withdrawal has been claimed and processed.
+    ///         Relayer calls this after satellite.claimWithdraw() emits ClaimWithdrawRequested.
+    event WithdrawReleased(address indexed user, uint256 tokenAmount);
 
     /// @notice Emitted once per epoch when settlement completes.
     ///         Relayer calls satellite.updateSharePrice(sharePrice) on Sepolia.
@@ -29,12 +36,22 @@ interface IVault {
     event CommissionApproved(uint256 indexed agentId, address indexed caller, uint256 amount);
 
     /// @notice Emitted at epoch settlement — protocol's cut of collected fees.
-    ///         Relayer calls satellite.reserveFees(protocolFeeAmount, agentId, 0) on Sepolia.
+    ///         Relayer calls satellite.reserveFees(protocolFeeAmount, 0, 0) on Sepolia.
     event ProtocolFeeAccrued(uint256 amount);
 
     /// @notice Emitted at epoch settlement — agent commission accrued.
     ///         Relayer calls satellite.reserveFees(0, agentId, commissionAmount) on Sepolia.
     event CommissionAccrued(uint256 indexed agentId, uint256 amount);
+
+    /// @notice Emitted after a force-close position recovery is recorded.
+    ///         Does not change totalAssets — next epoch reconciliation handles it.
+    event RecoveryRecorded(uint256 indexed agentId, uint256 recoveredAmount);
+
+    /// @notice Emitted when Vault requests a force-close of an agent's positions.
+    ///         Relayer looks up its positionIds cache and calls satellite.forceClose().
+    ///         Source = VAULT for withdrawal-driven closures (lowest-Sharpe agents first).
+    ///         Also emitted by AgentManager for eviction and withdraw-from-arena closures.
+    event ForceCloseRequested(uint256 indexed agentId, IShared.ForceCloseSource source);
 
     // -------------------------------------------------------------------------
     // Messenger-only functions (called by relayer)
@@ -48,6 +65,20 @@ interface IVault {
     ///         Triggered by satellite's WithdrawRequested event.
     function processWithdraw(address user, uint256 shares) external;
 
+    /// @notice Called by relayer after satellite emits ClaimWithdrawRequested.
+    ///         Marks the Tier-2 queued withdrawal as processed; emits WithdrawReleased.
+    ///         Relayer then calls satellite.releaseQueuedWithdraw(user, tokenAmount).
+    function claimWithdraw(address user, uint256 tokenAmount) external;
+
+    /// @notice Records a force-close recovery relayed from Satellite.
+    ///         Does NOT update totalAssets — next epoch's settleAgents() reconciliation handles it.
+    ///         Emits RecoveryRecorded for audit.
+    function recordRecovery(uint256 agentId, uint256 recoveredAmount) external;
+
+    // -------------------------------------------------------------------------
+    // AgentManager-only functions
+    // -------------------------------------------------------------------------
+
     /// @notice Called by AgentManager after verifying iNFT ownership.
     ///         Zeroes commissionsOwed and emits CommissionApproved.
     /// @param agentId  The agent whose commission is being released.
@@ -56,16 +87,13 @@ interface IVault {
     function approveCommissionRelease(uint256 agentId, address caller, uint256 amount) external;
 
     // -------------------------------------------------------------------------
-    // AgentManager-only functions
+    // Public functions (callable by anyone, including relayer)
     // -------------------------------------------------------------------------
 
-    /// @notice Returns vault's idle token balance (tracked via reported values).
-    ///         AgentManager calls this to validate vault-agent intents.
-    function idleBalance() external view returns (uint256);
-
-    /// @notice Called by AgentManager's epochCheck modifier to trigger settlement.
-    ///         Calls AgentManager.settleAgents(), applies fee waterfall,
-    ///         handles pending withdrawals, emits EpochSettled.
+    /// @notice Trigger epoch settlement when due.
+    ///         Called by the relayer once per epoch in its main loop.
+    ///         Also triggered lazily by epochCheck on recordDeposit / processWithdraw.
+    ///         No-op if called before the epoch boundary or while settling.
     function triggerSettleEpoch() external;
 
     // -------------------------------------------------------------------------
@@ -77,6 +105,9 @@ interface IVault {
 
     /// @notice Current share price = totalAssets * 1e18 / totalSupply.
     function sharePrice() external view returns (uint256);
+
+    /// @notice Vault's tracked idle balance (totalAssets minus deployed capital estimate).
+    function idleBalance() external view returns (uint256);
 
     /// @notice ERC20 share balance of a user.
     function balanceOf(address user) external view returns (uint256 shares);

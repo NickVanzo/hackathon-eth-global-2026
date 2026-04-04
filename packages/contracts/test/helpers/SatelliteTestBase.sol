@@ -22,21 +22,22 @@ abstract contract SatelliteTestBase is Test {
     // Named actors
     // -------------------------------------------------------------------------
 
-    address internal messenger   = makeAddr("messenger");
-    address internal treasury    = makeAddr("treasury");
-    address internal alice       = makeAddr("alice");
-    address internal bob         = makeAddr("bob");
-    address internal charlie     = makeAddr("charlie");
-    address internal agentEOA    = makeAddr("agentEOA");
-    address internal positionMgr = makeAddr("positionManager");
-    address internal swapRouter  = makeAddr("swapRouter");
+    address internal messenger       = makeAddr("messenger");
+    address internal treasury        = makeAddr("treasury");
+    address internal alice           = makeAddr("alice");
+    address internal bob             = makeAddr("bob");
+    address internal charlie         = makeAddr("charlie");
+    address internal agentEOA        = makeAddr("agentEOA");
+    address internal positionMgr     = makeAddr("positionManager");
+    address internal universalRouter = makeAddr("universalRouter");
 
     // -------------------------------------------------------------------------
     // Convenient amounts (USDC.e has 6 decimals)
     // -------------------------------------------------------------------------
 
-    uint256 internal constant ONE_USDC   = 1e6;
-    uint256 internal constant TEN_K_USDC = 10_000e6;
+    uint256 internal constant ONE_USDC         = 1e6;
+    uint256 internal constant TEN_K_USDC       = 10_000e6;
+    uint256 internal constant IDLE_RESERVE_RATIO = 2_000; // 20 %
 
     // -------------------------------------------------------------------------
     // setUp
@@ -53,9 +54,10 @@ abstract contract SatelliteTestBase is Test {
             address(pool),
             address(usdc),
             positionMgr,
-            swapRouter,
+            universalRouter,
             messenger,
-            treasury
+            treasury,
+            IDLE_RESERVE_RATIO
         );
 
         // Fund test users generously
