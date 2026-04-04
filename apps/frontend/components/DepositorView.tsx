@@ -1,10 +1,13 @@
 "use client";
 
-import { useState } from "react";
-import { formatUnits } from "viem";
+import { useState, useEffect } from "react";
+import { formatUnits, parseUnits, type Abi } from "viem";
 import { useAccount } from "wagmi";
-import { useVaultData, useUserVaultShares, useSatelliteBalance } from "@/lib/contracts";
+import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
+import { useVaultData, useUserVaultShares, useSatelliteBalance, SATELLITE_ADDRESS, USDC_E_ADDRESS, USDC_E_ABI, SatelliteABI, useUSDCAllowance } from "@/lib/contracts";
+import { sepolia } from "@/lib/chains";
 import { MOCK_VAULT } from "@/lib/mock-data";
+import { LoadingPulse, ErrorBanner } from "@/components/LoadingSkeleton";
 
 function formatSharePrice(raw: string): string {
   const value = Number(formatUnits(BigInt(raw), 6));
@@ -36,20 +39,88 @@ function formatShareValue(sharesRaw: string, priceRaw: string): string {
 
 export default function DepositorView() {
   const [depositAmount, setDepositAmount] = useState("");
+  const [withdrawAmount, setWithdrawAmount] = useState("");
   const [withdrawTier, setWithdrawTier] = useState<"tier1" | "tier2" | null>(null);
 
   const { address } = useAccount();
   const { sharePrice, totalAssets, totalShares, isLoading } = useVaultData();
   const { shares: liveUserShares } = useUserVaultShares(address);
-  const liveUsdcBalance = useSatelliteBalance(address);
+  const { balance: liveUsdcBalance } = useSatelliteBalance(address);
 
-  const vault = {
-    sharePrice: sharePrice ?? MOCK_VAULT.sharePrice,
-    totalAssets: totalAssets ?? MOCK_VAULT.totalAssets,
-    totalShares: totalShares ?? MOCK_VAULT.totalShares,
-    userShares: liveUserShares ?? MOCK_VAULT.userShares,
-    pendingWithdrawals: MOCK_VAULT.pendingWithdrawals,
+  // Deposit flow
+  const amountInUnits = (() => { try { return depositAmount ? parseUnits(depositAmount, 6) : 0n; } catch { return 0n; } })();
+
+  const { allowance, refetch: refetchAllowance } = useUSDCAllowance(address, SATELLITE_ADDRESS);
+  const needsApproval = allowance !== undefined && allowance < amountInUnits && amountInUnits > 0n;
+
+  const { writeContract: writeApprove, data: approveHash, isPending: isApproving, error: approveError } = useWriteContract();
+  const { isLoading: isConfirmingApprove, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveHash });
+
+  const { writeContract: writeDeposit, data: depositHash, isPending: isDepositing, error: depositError } = useWriteContract();
+  const { isLoading: isConfirmingDeposit, isSuccess: depositConfirmed } = useWaitForTransactionReceipt({ hash: depositHash });
+
+  useEffect(() => {
+    if (approveSuccess) refetchAllowance();
+  }, [approveSuccess, refetchAllowance]);
+
+  const handleDeposit = () => {
+    if (!depositAmount || amountInUnits === 0n) return;
+    if (needsApproval) {
+      writeApprove({
+        address: USDC_E_ADDRESS,
+        abi: USDC_E_ABI as Abi,
+        functionName: "approve",
+        args: [SATELLITE_ADDRESS, amountInUnits],
+        chainId: sepolia.id,
+      });
+    } else {
+      writeDeposit({
+        address: SATELLITE_ADDRESS,
+        abi: SatelliteABI as Abi,
+        functionName: "deposit",
+        args: [amountInUnits],
+        chainId: sepolia.id,
+      });
+    }
   };
+
+  const depositBusy = isApproving || isConfirmingApprove || isDepositing || isConfirmingDeposit;
+  const depositLabel = isApproving ? "SIGN APPROVE..." :
+    isConfirmingApprove ? "APPROVING..." :
+    needsApproval ? "APPROVE USDC.e" :
+    isDepositing ? "SIGN DEPOSIT..." :
+    isConfirmingDeposit ? "DEPOSITING..." :
+    depositConfirmed ? "DEPOSIT COMPLETE ✓" :
+    "EXECUTE DEPOSIT";
+
+  // Withdraw flow
+  const withdrawAmountInUnits = (() => { try { return withdrawAmount ? parseUnits(withdrawAmount, 6) : 0n; } catch { return 0n; } })();
+
+  const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawing, error: withdrawError } = useWriteContract();
+  const { isLoading: isConfirmingWithdraw, isSuccess: withdrawConfirmed } = useWaitForTransactionReceipt({ hash: withdrawHash });
+
+  const handleWithdraw = () => {
+    if (!withdrawAmount || withdrawAmountInUnits === 0n) return;
+    writeWithdraw({
+      address: SATELLITE_ADDRESS,
+      abi: SatelliteABI as Abi,
+      functionName: "requestWithdraw",
+      args: [withdrawAmountInUnits],
+      chainId: sepolia.id,
+    });
+  };
+
+  // Fall back to mock data when real data is zero/empty (no deposits yet)
+  const realVaultActive = totalAssets !== undefined && totalAssets !== "0" && BigInt(totalAssets) > 0n;
+  const vault = realVaultActive
+    ? {
+        sharePrice: sharePrice ?? MOCK_VAULT.sharePrice,
+        totalAssets: totalAssets ?? MOCK_VAULT.totalAssets,
+        totalShares: totalShares ?? MOCK_VAULT.totalShares,
+        userShares: liveUserShares ?? MOCK_VAULT.userShares,
+        pendingWithdrawals: MOCK_VAULT.pendingWithdrawals,
+      }
+    : MOCK_VAULT;
 
   return (
     <div className="space-y-8">
@@ -93,7 +164,7 @@ export default function DepositorView() {
                 borderColor: "rgba(0,229,255,0.2)",
               }}
             >
-              DEPOSITS_OPEN
+              DEPOSITS OPEN
             </span>
           </div>
         </div>
@@ -101,7 +172,7 @@ export default function DepositorView() {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         {/* Left Column */}
-        <div className="md:col-span-8 flex flex-col gap-8">
+        <div className="md:col-span-8 flex flex-col gap-8 min-w-0">
 
           {/* Stat Cards */}
           <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -117,16 +188,16 @@ export default function DepositorView() {
                 className="text-[10px] font-bold tracking-[0.2em] mb-4 uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                VAULT_SHARE_PRICE
+                VAULT SHARE PRICE
               </div>
               <div
                 className="text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#c3f5ff" }}
               >
-                {formatSharePrice(vault.sharePrice)}
+                {isLoading ? <LoadingPulse className="h-8 w-24" /> : formatSharePrice(vault.sharePrice)}
               </div>
               <div className="text-[10px] mt-1 font-mono" style={{ color: "#00E5FF" }}>
-                +4.2% ALL_TIME
+                +4.2% ALL TIME
               </div>
             </div>
 
@@ -142,13 +213,13 @@ export default function DepositorView() {
                 className="text-[10px] font-bold tracking-[0.2em] mb-4 uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                TOTAL_ASSETS
+                TOTAL ASSETS
               </div>
               <div
                 className="text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
               >
-                {formatTotalAssets(vault.totalAssets)}
+                {isLoading ? <LoadingPulse className="h-8 w-32" /> : formatTotalAssets(vault.totalAssets)}
               </div>
               <div className="text-[10px] mt-1 font-mono uppercase" style={{ color: "#bac9cc" }}>
                 USDC.e (SEPOLIA)
@@ -167,13 +238,13 @@ export default function DepositorView() {
                 className="text-[10px] font-bold tracking-[0.2em] mb-4 uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                IDLE_RESERVE
+                IDLE RESERVE
               </div>
               <div
                 className="text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
               >
-                {formatIdleReserve(vault.totalAssets)}
+                {isLoading ? <LoadingPulse className="h-8 w-28" /> : formatIdleReserve(vault.totalAssets)}
               </div>
               <div
                 className="text-[10px] mt-1 font-mono uppercase"
@@ -197,7 +268,7 @@ export default function DepositorView() {
                   style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#9cf0ff" }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>input</span>
-                  DEPOSIT_INTERFACE
+                  DEPOSIT INTERFACE
                 </h3>
                 <div className="space-y-6">
                   <div>
@@ -205,8 +276,8 @@ export default function DepositorView() {
                       className="flex justify-between text-[10px] font-bold tracking-widest uppercase mb-2"
                       style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
                     >
-                      <span>ASSET_INPUT</span>
-                      <span>BALANCE: 5,000.00 USDC.e</span>
+                      <span>ASSET INPUT</span>
+                      <span>BALANCE: {liveUsdcBalance ? `${(Number(liveUsdcBalance) / 1_000_000).toFixed(2)} USDC.e` : "—"}</span>
                     </div>
                     <div className="relative">
                       <input
@@ -231,8 +302,6 @@ export default function DepositorView() {
                             if (liveUsdcBalance) {
                               const balanceNum = Number(liveUsdcBalance) / 1_000_000;
                               setDepositAmount(balanceNum.toFixed(2));
-                            } else {
-                              setDepositAmount("5000");
                             }
                           }}
                           className="text-[10px] font-bold px-2 py-1 rounded uppercase transition-all"
@@ -253,9 +322,18 @@ export default function DepositorView() {
                       </div>
                     </div>
                   </div>
+                  {!address && (
+                    <p
+                      className="text-[10px] text-center"
+                      style={{ fontFamily: "'Space Grotesk', sans-serif", color: "rgba(186,201,204,0.6)" }}
+                    >
+                      Connect wallet to deposit
+                    </p>
+                  )}
                   <button
                     type="button"
-                    disabled={isLoading}
+                    onClick={handleDeposit}
+                    disabled={depositBusy || !depositAmount || !address}
                     className="w-full py-4 font-extrabold tracking-[0.2em] rounded uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       fontFamily: "'Space Grotesk', sans-serif",
@@ -264,14 +342,21 @@ export default function DepositorView() {
                       boxShadow: "0 0 20px rgba(0,229,255,0.2)",
                     }}
                     onMouseEnter={(e) => {
-                      if (!isLoading) e.currentTarget.style.boxShadow = "0 0 30px rgba(0,229,255,0.4)";
+                      if (!depositBusy) e.currentTarget.style.boxShadow = "0 0 30px rgba(0,229,255,0.4)";
                     }}
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.boxShadow = "0 0 20px rgba(0,229,255,0.2)")
                     }
                   >
-                    {isLoading ? "LOADING..." : "EXECUTE_DEPOSIT"}
+                    {depositLabel}
                   </button>
+                  {depositConfirmed && depositHash && (
+                    <p className="text-[10px] text-center font-mono" style={{ color: "#00e5ff" }}>
+                      TX: {depositHash.slice(0, 10)}...{depositHash.slice(-6)}
+                    </p>
+                  )}
+                  {approveError && <ErrorBanner message={approveError.message.slice(0, 60)} />}
+                  {depositError && <ErrorBanner message={depositError.message.slice(0, 60)} />}
                   <p
                     className="text-[10px] leading-relaxed text-center italic"
                     style={{ fontFamily: "'Manrope', sans-serif", color: "rgba(186,201,204,0.6)" }}
@@ -290,7 +375,7 @@ export default function DepositorView() {
                   style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>output</span>
-                  WITHDRAW_INTERFACE
+                  WITHDRAW INTERFACE
                 </h3>
                 <div className="space-y-6">
                   <div className="flex flex-col gap-4">
@@ -379,6 +464,30 @@ export default function DepositorView() {
                     </button>
                   </div>
 
+                  {/* Withdraw Amount Input */}
+                  <div>
+                    <div className="flex justify-between text-[10px] font-bold tracking-widest uppercase mb-2"
+                      style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}>
+                      <span>AMOUNT TO WITHDRAW</span>
+                      <span>USDC.e</span>
+                    </div>
+                    <input
+                      type="text"
+                      placeholder="0.00"
+                      value={withdrawAmount}
+                      onChange={(e) => setWithdrawAmount(e.target.value)}
+                      className="w-full border-b-2 text-xl font-bold py-3 px-4 outline-none transition-all placeholder:opacity-20"
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        backgroundColor: "#353534",
+                        borderBottomColor: "#3b494c",
+                        color: "#e5e2e1",
+                      }}
+                      onFocus={(e) => (e.currentTarget.style.borderBottomColor = "#ffb5a0")}
+                      onBlur={(e) => (e.currentTarget.style.borderBottomColor = "#3b494c")}
+                    />
+                  </div>
+
                   {/* Share Info */}
                   <div
                     className="pt-4 border-t"
@@ -388,19 +497,39 @@ export default function DepositorView() {
                       className="flex justify-between text-[10px] font-bold tracking-widest uppercase mb-2"
                       style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
                     >
-                      <span>USER_SHARES</span>
+                      <span>USER SHARES</span>
                       <span>{formatShares(vault.userShares)} SHARES</span>
                     </div>
                     <div
                       className="text-xs flex justify-between"
                       style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
                     >
-                      <span>EQUIVALENT_VALUE</span>
+                      <span>EQUIVALENT VALUE</span>
                       <span style={{ color: "#9cf0ff" }}>
                         ~ {formatShareValue(vault.userShares, vault.sharePrice)} USDC.e
                       </span>
                     </div>
                   </div>
+                  <button
+                    type="button"
+                    onClick={handleWithdraw}
+                    disabled={isWithdrawing || isConfirmingWithdraw || !withdrawAmount || !withdrawTier || !address}
+                    className="w-full py-4 font-extrabold tracking-[0.2em] rounded uppercase transition-all disabled:opacity-40 disabled:cursor-not-allowed"
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      backgroundColor: "transparent",
+                      color: "#ffb5a0",
+                      border: "1px solid rgba(215,59,0,0.4)",
+                    }}
+                  >
+                    {isWithdrawing ? "SIGN TX..." : isConfirmingWithdraw ? "PROCESSING..." : withdrawConfirmed ? "QUEUED ✓" : "EXECUTE WITHDRAW"}
+                  </button>
+                  {withdrawConfirmed && withdrawHash && (
+                    <p className="text-[10px] text-center font-mono" style={{ color: "#ffb5a0" }}>
+                      TX: {withdrawHash.slice(0, 10)}...{withdrawHash.slice(-6)}
+                    </p>
+                  )}
+                  {withdrawError && <ErrorBanner message={withdrawError.message.slice(0, 60)} />}
                 </div>
               </div>
             </div>
@@ -408,7 +537,7 @@ export default function DepositorView() {
         </div>
 
         {/* Right Column */}
-        <div className="md:col-span-4 flex flex-col gap-8">
+        <div className="md:col-span-4 flex flex-col gap-8 min-w-0">
 
           {/* System Arch */}
           <section
@@ -423,7 +552,7 @@ export default function DepositorView() {
                 borderColor: "rgba(59,73,76,0.2)",
               }}
             >
-              SYSTEM_ARCH
+              SYSTEM ARCH
             </h3>
             <div className="space-y-6">
               <div className="flex gap-4">
@@ -500,7 +629,7 @@ export default function DepositorView() {
                 borderColor: "rgba(59,73,76,0.2)",
               }}
             >
-              TIER_2_TECHNICAL_SPEC
+              TIER 2 TECHNICAL SPEC
             </h3>
             <div className="space-y-4 relative z-10">
               <p
@@ -551,7 +680,7 @@ export default function DepositorView() {
                 className="text-[10px] font-black tracking-widest uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                NETWORK_FEES
+                NETWORK FEES
               </h3>
               <span
                 className="material-symbols-outlined"
@@ -562,15 +691,15 @@ export default function DepositorView() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-mono">
-                <span style={{ color: "#bac9cc" }}>DEPOSIT_FEE:</span>
+                <span style={{ color: "#bac9cc" }}>DEPOSIT FEE:</span>
                 <span style={{ color: "#9cf0ff" }}>0.00%</span>
               </div>
               <div className="flex justify-between text-[10px] font-mono">
-                <span style={{ color: "#bac9cc" }}>PERFORMANCE_FEE:</span>
+                <span style={{ color: "#bac9cc" }}>PERFORMANCE FEE:</span>
                 <span style={{ color: "#9cf0ff" }}>15.00%</span>
               </div>
               <div className="flex justify-between text-[10px] font-mono">
-                <span style={{ color: "#bac9cc" }}>EXIT_FEE (TIER 1):</span>
+                <span style={{ color: "#bac9cc" }}>EXIT FEE (TIER 1):</span>
                 <span style={{ color: "#ffb5a0" }}>0.10%</span>
               </div>
             </div>
@@ -588,7 +717,7 @@ export default function DepositorView() {
             className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-40"
             style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
           >
-            © 2024 ARENA_OS_PROTOCOLS
+            © 2024 ARENA OS PROTOCOLS
           </span>
           <div className="flex gap-4">
             <span

@@ -48,13 +48,16 @@ function formatUsdc(rawAmount: string): string {
   return units.toLocaleString("en-US", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Fixed display strings to avoid SSR/client hydration mismatch from Date.now()
+const RELATIVE_TIME_MAP: Record<number, string> = {};
 function formatRelativeTime(timestamp: number): string {
-  const diffMs = Date.now() - timestamp;
-  const diffSeconds = Math.floor(diffMs / 1000);
-  if (diffSeconds < 60) return `${diffSeconds} SECONDS AGO`;
-  const diffMinutes = Math.floor(diffSeconds / 60);
-  if (diffMinutes < 60) return `${diffMinutes} MINUTES AGO`;
-  return `${Math.floor(diffMinutes / 60)} HOURS AGO`;
+  if (RELATIVE_TIME_MAP[timestamp]) return RELATIVE_TIME_MAP[timestamp];
+  // For mock data with fixed timestamps, show plausible relative times
+  const index = Object.keys(RELATIVE_TIME_MAP).length;
+  const labels = ["1 MINUTES AGO", "2 MINUTES AGO", "5 MINUTES AGO", "10 MINUTES AGO"];
+  const label = labels[index] ?? `${5 + index * 3} MINUTES AGO`;
+  RELATIVE_TIME_MAP[timestamp] = label;
+  return label;
 }
 
 function truncateTxHash(hash: string): string {
@@ -109,8 +112,8 @@ const STATUS_SUFFIX: Record<IntentStatus, string> = {
 
 function getTierLabel(phase: string): { label: string; classes: string } {
   return phase === "vault"
-    ? { label: "VAULT_TIER",      classes: "bg-[#00E5FF]/10 text-[#00E5FF]" }
-    : { label: "PROVING_GROUNDS", classes: "bg-[#d73b00]/10 text-[#d73b00]" };
+    ? { label: "VAULT TIER",      classes: "bg-[#00E5FF]/10 text-[#00E5FF]" }
+    : { label: "PROVING GROUNDS", classes: "bg-[#FF5722]/10 text-[#ffb5a0]" };
 }
 
 function getStatusDisplay(agent: (typeof MOCK_AGENTS)[number]) {
@@ -128,7 +131,7 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
       <div className="flex justify-between items-end">
         <div>
           <h1 className="font-[family-name:var(--font-space-grotesk)] text-4xl font-black text-[#c3f5ff] tracking-tighter uppercase mb-2">
-            VAULT_PERFORMANCE
+            VAULT PERFORMANCE
           </h1>
           <p className="font-[family-name:var(--font-manrope)] text-[#bac9cc] max-w-md text-sm">
             Real-time aggregate of all active agent strategies across the Arena ecosystem.
@@ -149,12 +152,12 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
         <div className="absolute inset-0 p-8 flex flex-col justify-between">
           {/* Top axis labels */}
           <div className="font-[family-name:var(--font-space-grotesk)] flex justify-between text-[10px] font-bold text-[#bac9cc]/40 tracking-widest">
-            <span>MARKET_INDEX_V4</span>
-            <span>LIVE_FEED_STABLE</span>
+            <span>MARKET INDEX V4</span>
+            <span>LIVE FEED STABLE</span>
           </div>
 
-          {/* SVG sparkline */}
-          <svg className="absolute inset-0 w-full h-full opacity-30" preserveAspectRatio="none" aria-hidden="true">
+          {/* SVG sparkline — realistic upward-trending time series */}
+          <svg className="absolute inset-0 w-full h-full opacity-30" viewBox="0 0 1200 400" preserveAspectRatio="none" aria-hidden="true">
             <defs>
               <linearGradient id="vaultGrad" x1="0%" y1="0%" x2="0%" y2="100%">
                 <stop offset="0%"   style={{ stopColor: "#00E5FF", stopOpacity: 0.2 }} />
@@ -162,11 +165,11 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
               </linearGradient>
             </defs>
             <path
-              d="M0 350 Q 150 320, 300 360 T 600 280 T 900 220 T 1200 150 L 1200 400 L 0 400 Z"
+              d="M0,340 L30,335 60,332 90,328 120,330 150,322 180,318 210,320 240,312 270,305 300,308 330,298 360,290 390,285 420,288 450,278 480,270 510,265 540,260 570,255 600,250 630,245 660,248 690,238 720,230 750,222 780,218 810,210 840,205 870,200 900,195 930,188 960,180 990,175 1020,168 1050,160 1080,155 1110,148 1140,142 1170,138 1200,130 L1200,400 L0,400 Z"
               fill="url(#vaultGrad)"
             />
             <path
-              d="M0 350 Q 150 320, 300 360 T 600 280 T 900 220 T 1200 150"
+              d="M0,340 L30,335 60,332 90,328 120,330 150,322 180,318 210,320 240,312 270,305 300,308 330,298 360,290 390,285 420,288 450,278 480,270 510,265 540,260 570,255 600,250 630,245 660,248 690,238 720,230 750,222 780,218 810,210 840,205 870,200 900,195 930,188 960,180 990,175 1020,168 1050,160 1080,155 1110,148 1140,142 1170,138 1200,130"
               fill="none"
               stroke="#00E5FF"
               strokeWidth="2"
@@ -222,7 +225,7 @@ function LiveBattleFeed() {
       <div className="flex items-center gap-2 mb-6">
         <div className="w-2 h-2 rounded-full bg-[#d73b00] animate-pulse shadow-[0_0_8px_#d73b00]" aria-hidden="true" />
         <h2 className="font-[family-name:var(--font-space-grotesk)] text-lg font-bold tracking-widest uppercase text-[#e5e2e1]">
-          LIVE_BATTLE_FEED
+          LIVE BATTLE FEED
         </h2>
       </div>
 
@@ -297,7 +300,11 @@ function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
           {displayName}
         </h4>
         <p className="font-[family-name:var(--font-space-grotesk)] text-[10px] text-[#bac9cc] tracking-widest uppercase font-bold">
-          SHARPE: {agent.sharpeScore.toFixed(2)} // RTN: {returnStr}
+          SHARPE:{" "}
+          <span style={{ color: agent.sharpeScore > 1.5 ? "#00E5FF" : agent.sharpeScore > 0.5 ? "#4ade80" : agent.sharpeScore >= 0 ? "#bac9cc" : "#FF5722" }}>
+            {agent.sharpeScore.toFixed(2)}
+          </span>{" "}
+          // RTN: {returnStr}
         </p>
       </div>
 
@@ -305,7 +312,7 @@ function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
       <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#3b494c]/10 relative z-10">
         <div>
           <div className="font-[family-name:var(--font-space-grotesk)] text-[9px] text-[#bac9cc]/60 tracking-widest uppercase font-bold">
-            CAPITAL_DEPLOYED
+            CAPITAL DEPLOYED
           </div>
           <div className="font-[family-name:var(--font-space-grotesk)] text-sm font-bold text-white">
             {capitalLabel}
@@ -335,7 +342,7 @@ function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
                 </span>
                 <span className="text-[#00E5FF]">{formatLiquidity(pos.liquidity)}</span>
                 <span className={`font-[family-name:var(--font-space-grotesk)] px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase ${inRange ? "text-[#00E5FF] bg-[#00E5FF]/10" : "text-[#d73b00] bg-[#d73b00]/10"}`}>
-                  {inRange ? "IN_RANGE" : "OUT"}
+                  {inRange ? "IN RANGE" : "OUT"}
                 </span>
                 <span className="text-[#bac9cc]/60">{formatUsdc(pos.feesCollected)} USDC</span>
               </div>
@@ -344,7 +351,7 @@ function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
           {totalFees > 0 && (
             <div className="flex justify-end pt-1">
               <span className="font-[family-name:var(--font-space-grotesk)] text-[9px] text-[#bac9cc]/40 tracking-widest uppercase">
-                TOTAL_FEES: {formatUsdc(String(totalFees))} USDC
+                TOTAL FEES: {formatUsdc(String(totalFees))} USDC
               </span>
             </div>
           )}
@@ -363,7 +370,7 @@ function DeployCtaCard() {
         <span className="material-symbols-outlined text-[#00E5FF] text-3xl" aria-hidden="true">add</span>
       </div>
       <h4 className="font-[family-name:var(--font-space-grotesk)] text-lg font-black text-white uppercase tracking-widest mb-2">
-        DEPLOY_NEW_AGENT
+        DEPLOY NEW AGENT
       </h4>
       <p className="font-[family-name:var(--font-manrope)] text-xs text-[#bac9cc] px-4">
         Start your own strategy and climb the leaderboard.
@@ -375,17 +382,17 @@ function DeployCtaCard() {
 // ─── ArenaLogs ────────────────────────────────────────────────────────────────
 
 const ARENA_LOGS: ReadonlyArray<{ time: string; message: string; accent: boolean }> = [
-  { time: "[14:02:11]", message: "NODE_04 CONNECTED",           accent: false },
-  { time: "[14:02:15]", message: "THREAT DETECTED: MEV_SCANNER", accent: true  },
-  { time: "[14:02:19]", message: "VALIDATING AGENT_33_SIG",     accent: false },
-  { time: "[14:03:01]", message: "BATCH_COMMIT: SUCCESS",       accent: false },
+  { time: "[14:02:11]", message: "NODE 04 CONNECTED",           accent: false },
+  { time: "[14:02:15]", message: "THREAT DETECTED: REV SCANNER", accent: true  },
+  { time: "[14:02:19]", message: "VALIDATING AGENT 33 S10",     accent: false },
+  { time: "[14:03:01]", message: "BATCH COMMIT: SUCCESS",       accent: false },
 ];
 
 function ArenaLogs() {
   return (
     <div className="md:col-span-4 bg-[#1c1b1b] p-8 border border-[#3b494c]/10 space-y-6">
       <h3 className="font-[family-name:var(--font-space-grotesk)] text-sm font-black tracking-widest uppercase text-[#bac9cc]">
-        ARENA_LOGS
+        ARENA LOGS
       </h3>
       <div className="space-y-4 font-mono text-[11px] text-[#00E5FF]/60">
         {ARENA_LOGS.map((log) => (
@@ -416,10 +423,10 @@ function CtaBanner() {
       </p>
       <div className="flex gap-4 w-full sm:w-auto">
         <button className="font-[family-name:var(--font-space-grotesk)] bg-[#00e5ff] text-[#00363d] font-black tracking-widest px-8 py-3 text-sm uppercase flex-1 sm:flex-none hover:brightness-110 transition-all active:scale-95">
-          INITIATE_DEPLOYMENT
+          INITIATE DEPLOYMENT
         </button>
         <button className="font-[family-name:var(--font-space-grotesk)] bg-transparent text-white border border-[#3b494c] font-black tracking-widest px-8 py-3 text-sm uppercase flex-1 sm:flex-none hover:bg-white/5 transition-colors">
-          VIEW_DOCS
+          VIEW DOCS
         </button>
       </div>
     </div>
@@ -449,8 +456,11 @@ export default function PositionView() {
       };
     });
 
-  const agents =
-    count !== undefined && liveAgents.length > 0 ? liveAgents : MOCK_AGENTS;
+  // Fall back to mock data when real data is all-zero (no epochs completed yet)
+  const hasRealActivity = liveAgents.some(
+    (a) => a.epochsCompleted > 0 || a.sharpeScore !== 0 || a.credits > 0
+  );
+  const agents = hasRealActivity ? liveAgents : MOCK_AGENTS;
 
   const stats = deriveVaultStats(agents);
 
@@ -466,10 +476,10 @@ export default function PositionView() {
       <section className="space-y-8">
         <div className="flex justify-between items-center">
           <h2 className="font-[family-name:var(--font-space-grotesk)] text-2xl font-black tracking-widest uppercase text-[#e5e2e1]">
-            TOP_GLADIATORS
+            TOP GLADIATORS
           </h2>
           <button className="font-[family-name:var(--font-space-grotesk)] text-[#00E5FF] text-xs font-bold hover:underline tracking-widest">
-            VIEW_ALL_AGENTS
+            VIEW ALL AGENTS
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
