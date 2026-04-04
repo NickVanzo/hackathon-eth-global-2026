@@ -536,7 +536,9 @@ contract Satellite is ISatellite, ReentrancyGuard {
         }
 
         // Mint LP position via NonfungiblePositionManager
-        (uint256 tokenId,,,) = INonfungiblePositionManager(positionManager).mint(
+        uint256 tokenId;
+        uint128 mintedLiquidity;
+        (tokenId, mintedLiquidity,,) = INonfungiblePositionManager(positionManager).mint(
             INonfungiblePositionManager.MintParams({
                 token0:          token0,
                 token1:          token1,
@@ -556,6 +558,8 @@ contract Satellite is ISatellite, ReentrancyGuard {
         positionSource[tokenId] = source;
         positionAgent[tokenId]  = agentId;
         _agentPositions[agentId].push(tokenId);
+
+        emit PositionOpened(agentId, tokenId, tickLower, tickUpper, mintedLiquidity, amountUSDC);
     }
 
     // -------------------------------------------------------------------------

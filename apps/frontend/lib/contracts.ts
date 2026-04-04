@@ -27,6 +27,10 @@ export const USDC_E_ADDRESS =
   (process.env.NEXT_PUBLIC_USDC_E_ADDRESS as `0x${string}` | undefined) ??
   ZERO_ADDRESS;
 
+export const INFT_ADDRESS =
+  (process.env.NEXT_PUBLIC_INFT_ADDRESS as `0x${string}` | undefined) ??
+  ZERO_ADDRESS;
+
 export function isZeroAddress(addr: string): boolean {
   return addr === ZERO_ADDRESS;
 }
@@ -69,11 +73,22 @@ export function computeSharpe(emaR: bigint, emaR2: bigint): number {
 }
 
 // ---------------------------------------------------------------------------
+// Static agent metadata (not available on-chain)
+// ---------------------------------------------------------------------------
+
+export const AGENT_NAMES: Record<number, string> = {
+  1: "Alpha Ranger",
+  2: "Beta Sentinel",
+  3: "Gamma Drifter",
+};
+
+// ---------------------------------------------------------------------------
 // Typed return shape for agent info
 // ---------------------------------------------------------------------------
 
 export type AgentInfo = {
   id: number;
+  name: string;
   address: string;
   phase: "vault" | "proving";
   sharpeScore: number;      // computed client-side
@@ -86,6 +101,8 @@ export type AgentInfo = {
   zeroSharpeStreak: number;
   provingBalance: string;   // raw bigint as string
   provingDeployed: string;  // raw bigint as string
+  totalReturn: number;      // derived from emaReturn
+  commissionYield: number;  // derived from sharpe × emaReturn
 };
 
 // ---------------------------------------------------------------------------
@@ -205,13 +222,17 @@ export function useAgentInfo(agentId: number): {
   // buckets(id) -> (uint256 credits, uint256 maxCredits, uint256 refillRate, uint256 lastActionBlock)
   const [credits, maxCredits, refillRate] = bucketsResult as [bigint, bigint, bigint, bigint];
 
+  const sharpe = computeSharpe(emaReturnRaw, emaReturnSqRaw);
+  const emaR = Number(emaReturnRaw) / 1e18;
+
   const agent: AgentInfo = {
     id: agentId,
+    name: AGENT_NAMES[agentId] ?? `Agent ${agentId}`,
     address: agentAddress,
     // phase: 0 = PROVING, 1 = VAULT
     phase: phaseRaw === 0 ? "proving" : "vault",
-    sharpeScore: computeSharpe(emaReturnRaw, emaReturnSqRaw),
-    emaReturn: Number(emaReturnRaw) / 1e18,
+    sharpeScore: sharpe,
+    emaReturn: emaR,
     emaReturnSq: Number(emaReturnSqRaw) / 1e18,
     credits: Number(credits),
     maxCredits: Number(maxCredits),
@@ -220,9 +241,30 @@ export function useAgentInfo(agentId: number): {
     zeroSharpeStreak: Number(zeroSharpeStreak),
     provingBalance: provingBalance.toString(),
     provingDeployed: provingDeployed.toString(),
+    totalReturn: emaR * Number(epochsCompleted),
+    commissionYield: sharpe > 0 ? emaR * 0.15 : 0,
   };
 
   return { agent, isLoading, error: error ?? null };
+}
+
+/**
+ * Fetches all registered agents (1–3) and returns them sorted by Sharpe score.
+ */
+export function useAllAgents(): {
+  agents: AgentInfo[];
+  isLoading: boolean;
+} {
+  const { ids: activeIds } = useActiveAgentIds();
+  const { agent: a1, isLoading: l1 } = useAgentInfo(1);
+  const { agent: a2, isLoading: l2 } = useAgentInfo(2);
+  const { agent: a3, isLoading: l3 } = useAgentInfo(3);
+
+  const agents = [a1, a2, a3]
+    .filter((a): a is AgentInfo => a != null)
+    .filter((a) => !activeIds || activeIds.includes(a.id));
+
+  return { agents, isLoading: l1 || l2 || l3 };
 }
 
 /**
@@ -465,5 +507,61 @@ export function useFeeData(): {
 // ---------------------------------------------------------------------------
 // Re-exported ABIs for use in write hooks (deposit, withdraw, etc.)
 // ---------------------------------------------------------------------------
+
+// ---------------------------------------------------------------------------
+// iNFT (ERC-721) ABI and hooks
+// ---------------------------------------------------------------------------
+
+const INFT_ABI = parseAbi([
+  "function ownerOf(uint256 tokenId) view returns (address)",
+]);
+
+/**
+ * Reads ownerOf(tokenId) from iNFT ERC-721 on 0G Galileo.
+ */
+export function useINFTOwner(tokenId: number): {
+  owner: string | undefined;
+  isLoading: boolean;
+} {
+  const enabled = !isZeroAddress(INFT_ADDRESS) && tokenId > 0;
+
+  const { data, isLoading } = useReadContract({
+    address: INFT_ADDRESS,
+    abi: INFT_ABI,
+    functionName: "ownerOf",
+    args: [BigInt(tokenId)],
+    chainId: ogGalileo.id,
+    query: { enabled },
+  });
+
+  return {
+    owner: data !== undefined ? (data as string) : undefined,
+    isLoading,
+  };
+}
+
+/**
+ * Reads agentToTokenId(agentId) from AgentManager on 0G Galileo.
+ */
+export function useAgentTokenId(agentId: number): {
+  tokenId: number | undefined;
+  isLoading: boolean;
+} {
+  const enabled = !isZeroAddress(AGENT_MANAGER_ADDRESS);
+
+  const { data, isLoading } = useReadContract({
+    address: AGENT_MANAGER_ADDRESS,
+    abi: AgentManagerABI as Abi,
+    functionName: "agentToTokenId",
+    args: [BigInt(agentId)],
+    chainId: ogGalileo.id,
+    query: { enabled },
+  });
+
+  return {
+    tokenId: data !== undefined ? Number(data as bigint) : undefined,
+    isLoading,
+  };
+}
 
 export { AgentManagerABI, VaultABI, SatelliteABI };

@@ -1,30 +1,33 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { MOCK_AGENTS, MOCK_POSITIONS, MOCK_INTENTS } from "@/lib/mock-data";
+import {
+  useAgentPerformanceHistory,
+  type ChartPoint,
+} from "@/lib/useAgentPerformance";
+import { INFT_ADDRESS } from "@/lib/contracts";
 
-// Chart data for the historical performance line chart (7 days)
-const CHART_POINTS = [
-  { x: 0, y: 80, label: "AUG 12" },
-  { x: 10, y: 75, label: "AUG 13" },
-  { x: 20, y: 85, label: "AUG 14" },
-  { x: 30, y: 60, label: "AUG 15" },
-  { x: 40, y: 65, label: "AUG 16" },
-  { x: 50, y: 45, label: "AUG 17" },
-  { x: 60, y: 55, label: "AUG 18" },
-  { x: 70, y: 30, label: "AUG 19" },
-  { x: 80, y: 35, label: "AUG 20" },
-  { x: 90, y: 20, label: "AUG 21" },
-  { x: 100, y: 25, label: "TODAY" },
+// Fallback chart data when no indexed snapshots are available yet
+const FALLBACK_CHART_POINTS: ChartPoint[] = [
+  { x: 0, y: 80, label: "AUG 12", returnBps: 0, timestamp: 0 },
+  { x: 10, y: 75, label: "AUG 13", returnBps: 50, timestamp: 0 },
+  { x: 20, y: 85, label: "AUG 14", returnBps: -20, timestamp: 0 },
+  { x: 30, y: 60, label: "AUG 15", returnBps: 120, timestamp: 0 },
+  { x: 40, y: 65, label: "AUG 16", returnBps: 100, timestamp: 0 },
+  { x: 50, y: 45, label: "AUG 17", returnBps: 200, timestamp: 0 },
+  { x: 60, y: 55, label: "AUG 18", returnBps: 160, timestamp: 0 },
+  { x: 70, y: 30, label: "AUG 19", returnBps: 310, timestamp: 0 },
+  { x: 80, y: 35, label: "AUG 20", returnBps: 290, timestamp: 0 },
+  { x: 90, y: 20, label: "AUG 21", returnBps: 370, timestamp: 0 },
+  { x: 100, y: 25, label: "TODAY", returnBps: 350, timestamp: 0 },
 ];
 
-function buildSvgPath(points: typeof CHART_POINTS): string {
-  return points
-    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`)
-    .join(" ");
+function buildSvgPath(points: ChartPoint[]): string {
+  return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
 }
 
-function buildFillPath(points: typeof CHART_POINTS): string {
+function buildFillPath(points: ChartPoint[]): string {
   const line = buildSvgPath(points);
   const last = points[points.length - 1];
   const first = points[0];
@@ -40,12 +43,41 @@ interface AgentDetailProps {
 export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
   const [activeRange, setActiveRange] = useState<TimeRange>("1W");
 
+  const { chartPoints: indexedPoints, isLoading: perfLoading } =
+    useAgentPerformanceHistory(agentId);
+
+  // Use indexed data when available, fall back to mock
+  const chartData = useMemo(
+    () => (indexedPoints.length > 0 ? indexedPoints : FALLBACK_CHART_POINTS),
+    [indexedPoints],
+  );
+
+  // Derive x-axis labels (evenly spaced, max 7)
+  const xLabels = useMemo(() => {
+    const step = Math.max(1, Math.floor(chartData.length / 6));
+    const labels: string[] = [];
+    for (let i = 0; i < chartData.length; i += step) {
+      labels.push(chartData[i].label);
+    }
+    if (labels[labels.length - 1] !== chartData[chartData.length - 1].label) {
+      labels.push(chartData[chartData.length - 1].label);
+    }
+    return labels;
+  }, [chartData]);
+
+  // Current return for display
+  const latestReturnBps =
+    chartData.length > 0 ? chartData[chartData.length - 1].returnBps : 0;
+
   const agent = MOCK_AGENTS.find((a) => a.id === agentId) ?? MOCK_AGENTS[0];
   const positions = MOCK_POSITIONS.filter((p) => p.agentId === agent.id);
   const intents = MOCK_INTENTS.filter((i) => i.agentId === agent.id);
 
   const creditsPercent = Math.round((agent.credits / agent.maxCredits) * 100);
-  const sharpePercent = Math.min(100, Math.round((agent.sharpeScore / 4) * 100));
+  const sharpePercent = Math.min(
+    100,
+    Math.round((agent.sharpeScore / 4) * 100),
+  );
   const commissions = (agent.commissionYield * 1_000_000).toFixed(2);
 
   return (
@@ -58,16 +90,24 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
         <div>
           <span
             className="text-xs uppercase tracking-[0.3em]"
-            style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              color: "#bac9cc",
+            }}
           >
             Tactical Overview
           </span>
           <h1
             className="text-5xl font-black tracking-tighter mt-1"
-            style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              color: "#e5e2e1",
+            }}
           >
             AGENT ID:{" "}
-            <span style={{ color: "#00e5ff" }}>X-{String(agent.id).padStart(2, "0")}</span>
+            <span style={{ color: "#00e5ff" }}>
+              X-{String(agent.id).padStart(2, "0")}
+            </span>
           </h1>
           <div className="flex items-center gap-4 mt-4">
             <span
@@ -81,19 +121,22 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
             >
               <span
                 className="w-1.5 h-1.5 rounded-full animate-pulse"
-                style={{ backgroundColor: "#00e5ff", boxShadow: "0 0 8px #00E5FF" }}
+                style={{
+                  backgroundColor: "#00e5ff",
+                  boxShadow: "0 0 8px #00E5FF",
+                }}
               />
               PHASE: {agent.phase.toUpperCase()}
             </span>
             <span
               className="text-xs"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: "#bac9cc",
+              }}
             >
               EMA SHARPE:{" "}
-              <span
-                className="font-black"
-                style={{ color: "#e5e2e1" }}
-              >
+              <span className="font-black" style={{ color: "#e5e2e1" }}>
                 {agent.sharpeScore.toFixed(2)}
               </span>
             </span>
@@ -144,14 +187,20 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
           </div>
           <p
             className="text-xs uppercase tracking-widest mb-4"
-            style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              color: "#bac9cc",
+            }}
           >
             Sharpe Ratio EMA
           </p>
           <div className="flex items-baseline gap-2">
             <span
               className="text-4xl font-bold"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: "#e5e2e1",
+              }}
             >
               {agent.sharpeScore.toFixed(2)}
             </span>
@@ -166,7 +215,10 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
           <div className="mt-6 space-y-2">
             <div
               className="flex justify-between text-[10px] uppercase"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: "#bac9cc",
+              }}
             >
               <span>Threshold</span>
               <span>Target</span>
@@ -190,11 +242,17 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
         {/* Token Buckets */}
         <div
           className="md:col-span-1 p-6 rounded-lg border"
-          style={{ backgroundColor: "#1c1b1b", borderColor: "rgba(59,73,76,0.1)" }}
+          style={{
+            backgroundColor: "#1c1b1b",
+            borderColor: "rgba(59,73,76,0.1)",
+          }}
         >
           <p
             className="text-xs uppercase tracking-widest mb-4"
-            style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              color: "#bac9cc",
+            }}
           >
             Token Buckets
           </p>
@@ -203,13 +261,19 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               <div className="flex justify-between mb-1.5">
                 <span
                   className="text-[10px]"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#e5e2e1",
+                  }}
                 >
                   CREDITS
                 </span>
                 <span
                   className="text-[10px]"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#00e5ff" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#00e5ff",
+                  }}
                 >
                   {agent.credits} / {agent.maxCredits}
                 </span>
@@ -234,13 +298,19 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               <div className="flex justify-between items-center">
                 <span
                   className="text-[10px] uppercase"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#bac9cc",
+                  }}
                 >
                   Refill Rate
                 </span>
                 <span
                   className="text-xs font-bold"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#e5e2e1",
+                  }}
                 >
                   {agent.refillRate} C/HR
                 </span>
@@ -261,15 +331,23 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
             <div>
               <p
                 className="text-xs uppercase tracking-widest mb-1"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: "#bac9cc",
+                }}
               >
                 Accrued Commissions
               </p>
               <h2
                 className="text-5xl font-black tracking-tighter"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: "#e5e2e1",
+                }}
               >
-                {Number(commissions).toLocaleString("en-US", { minimumFractionDigits: 2 })}{" "}
+                {Number(commissions).toLocaleString("en-US", {
+                  minimumFractionDigits: 2,
+                })}{" "}
                 <span className="text-xl" style={{ color: "#00e5ff" }}>
                   USDC
                 </span>
@@ -278,13 +356,19 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
             <div className="text-right">
               <p
                 className="text-xs uppercase tracking-widest mb-1"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: "#bac9cc",
+                }}
               >
                 Elite Multiplier
               </p>
               <span
                 className="text-lg font-bold"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: "#ffb5a0",
+                }}
               >
                 x1.25
               </span>
@@ -306,13 +390,19 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               >
                 <p
                   className="text-[10px] uppercase mb-1"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#bac9cc",
+                  }}
                 >
                   {item.label}
                 </p>
                 <p
                   className="text-sm font-bold"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: item.color }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: item.color,
+                  }}
                 >
                   {item.value}
                 </p>
@@ -328,19 +418,28 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
         <div className="lg:col-span-2 space-y-6">
           <div
             className="p-6 rounded-lg border h-[400px] flex flex-col relative overflow-hidden"
-            style={{ backgroundColor: "#201f1f", borderColor: "rgba(59,73,76,0.05)" }}
+            style={{
+              backgroundColor: "#201f1f",
+              borderColor: "rgba(59,73,76,0.05)",
+            }}
           >
             <div className="flex justify-between items-center mb-8 relative z-10">
               <div>
                 <h3
                   className="text-lg font-bold tracking-tight"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#e5e2e1",
+                  }}
                 >
                   HISTORICAL PERFORMANCE
                 </h3>
                 <p
                   className="text-xs uppercase tracking-widest"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    color: "#bac9cc",
+                  }}
                 >
                   Aggregate return on capital since deployment
                 </p>
@@ -358,7 +457,9 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                         activeRange === range ? "#00e5ff" : "#353534",
                       color: activeRange === range ? "#00363d" : "#e5e2e1",
                       borderColor:
-                        activeRange === range ? "#00e5ff" : "rgba(59,73,76,0.3)",
+                        activeRange === range
+                          ? "#00e5ff"
+                          : "rgba(59,73,76,0.3)",
                     }}
                   >
                     {range}
@@ -375,19 +476,25 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                 preserveAspectRatio="none"
               >
                 <defs>
-                  <linearGradient id="agentChartGradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                  <linearGradient
+                    id="agentChartGradient"
+                    x1="0%"
+                    y1="0%"
+                    x2="0%"
+                    y2="100%"
+                  >
                     <stop offset="0%" stopColor="#00E5FF" stopOpacity="0.3" />
                     <stop offset="100%" stopColor="#00E5FF" stopOpacity="0" />
                   </linearGradient>
                 </defs>
                 {/* Fill area */}
                 <path
-                  d={buildFillPath(CHART_POINTS)}
+                  d={buildFillPath(chartData)}
                   fill="url(#agentChartGradient)"
                 />
                 {/* Line */}
                 <path
-                  d={buildSvgPath(CHART_POINTS)}
+                  d={buildSvgPath(chartData)}
                   fill="none"
                   stroke="#00E5FF"
                   strokeWidth="1.5"
@@ -406,16 +513,43 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               </div>
             </div>
 
+            {/* Return indicator */}
+            {latestReturnBps !== 0 && (
+              <div
+                className="absolute top-16 left-6 text-xs font-bold"
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  color: latestReturnBps >= 0 ? "#4ade80" : "#f87171",
+                }}
+              >
+                {latestReturnBps >= 0 ? "+" : ""}
+                {(latestReturnBps / 100).toFixed(2)}%
+              </div>
+            )}
+
+            {perfLoading && chartData === FALLBACK_CHART_POINTS && (
+              <div
+                className="absolute inset-0 flex items-center justify-center text-xs"
+                style={{
+                  color: "#bac9cc",
+                  fontFamily: "'Space Grotesk', sans-serif",
+                }}
+              >
+                Loading indexed data...
+              </div>
+            )}
+
             {/* X-axis labels */}
             <div
               className="mt-4 flex justify-between text-[10px] uppercase tracking-widest"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: "#bac9cc",
+              }}
             >
-              {["AUG 12", "AUG 13", "AUG 14", "AUG 15", "AUG 16", "AUG 17", "TODAY"].map(
-                (label) => (
-                  <span key={label}>{label}</span>
-                )
-              )}
+              {xLabels.map((label) => (
+                <span key={label}>{label}</span>
+              ))}
             </div>
           </div>
         </div>
@@ -432,9 +566,15 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
           >
             <h4
               className="text-xs uppercase tracking-widest mb-6 flex items-center gap-2"
-              style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                color: "#bac9cc",
+              }}
             >
-              <span className="material-symbols-outlined" style={{ fontSize: 16 }}>
+              <span
+                className="material-symbols-outlined"
+                style={{ fontSize: 16 }}
+              >
                 database
               </span>
               iNFT Core Protocol
@@ -442,19 +582,32 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
             <div className="space-y-4">
               {[
                 { label: "TOKEN TYPE", value: "ERC-721i", color: "#e5e2e1" },
-                { label: "CONTRACT", value: "0x9a...f42c", color: "#00e5ff" },
+                {
+                  label: "CONTRACT",
+                  value: `${INFT_ADDRESS.slice(0, 6)}...${INFT_ADDRESS.slice(-4)}`,
+                  color: "#00e5ff",
+                },
                 { label: "RARITY", value: "LEGENDARY", color: "#ffb5a0" },
               ].map((row) => (
-                <div key={row.label} className="flex justify-between items-center">
+                <div
+                  key={row.label}
+                  className="flex justify-between items-center"
+                >
                   <span
                     className="text-[10px]"
-                    style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      color: "#bac9cc",
+                    }}
                   >
                     {row.label}
                   </span>
                   <span
                     className="text-xs font-bold"
-                    style={{ fontFamily: "'Space Grotesk', sans-serif", color: row.color }}
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      color: row.color,
+                    }}
                   >
                     {row.value}
                   </span>
@@ -483,13 +636,19 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                 <div>
                   <p
                     className="text-[10px] uppercase"
-                    style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      color: "#bac9cc",
+                    }}
                   >
                     Phase Transition
                   </p>
                   <p
                     className="text-xs font-bold"
-                    style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      color: "#e5e2e1",
+                    }}
                   >
                     VAULT LOCK in 42h
                   </p>
@@ -506,7 +665,10 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               borderColor: "rgba(59,73,76,0.1)",
             }}
           >
-            <div className="flex items-center gap-2 mb-4" style={{ color: "#bac9cc" }}>
+            <div
+              className="flex items-center gap-2 mb-4"
+              style={{ color: "#bac9cc" }}
+            >
               <span
                 className="w-2 h-2 rounded-full animate-pulse"
                 style={{ backgroundColor: "#d73b00" }}
@@ -540,7 +702,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   msg: "HEARTBEAT: All systems operational",
                   type: "primary",
                 },
-                ...(intents.map((intent) => ({
+                ...intents.map((intent) => ({
                   time: new Date(intent.timestamp).toLocaleTimeString("en-US", {
                     hour12: false,
                     hour: "2-digit",
@@ -549,7 +711,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   }),
                   msg: `${intent.actionType}: ${intent.status.toUpperCase()}`,
                   type: intent.status === "failed" ? "warning" : "primary",
-                }))),
+                })),
               ].map((entry, i) => (
                 <p
                   key={i}
@@ -580,7 +742,10 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
       {positions.length > 0 && (
         <section
           className="p-6 rounded-lg border"
-          style={{ backgroundColor: "#201f1f", borderColor: "rgba(59,73,76,0.1)" }}
+          style={{
+            backgroundColor: "#201f1f",
+            borderColor: "rgba(59,73,76,0.1)",
+          }}
         >
           <h3
             className="text-xs font-black mb-6 tracking-[0.25em] uppercase border-b pb-4"
@@ -599,20 +764,25 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   className="border-b"
                   style={{ borderColor: "rgba(59,73,76,0.2)" }}
                 >
-                  {["TOKEN ID", "TICK LOWER", "TICK UPPER", "LIQUIDITY", "FEES COLLECTED", "STATUS"].map(
-                    (h) => (
-                      <th
-                        key={h}
-                        className="text-left pb-3 pr-6 uppercase tracking-widest"
-                        style={{
-                          fontFamily: "'Space Grotesk', sans-serif",
-                          color: "#bac9cc",
-                        }}
-                      >
-                        {h}
-                      </th>
-                    )
-                  )}
+                  {[
+                    "TOKEN ID",
+                    "TICK LOWER",
+                    "TICK UPPER",
+                    "LIQUIDITY",
+                    "FEES COLLECTED",
+                    "STATUS",
+                  ].map((h) => (
+                    <th
+                      key={h}
+                      className="text-left pb-3 pr-6 uppercase tracking-widest"
+                      style={{
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        color: "#bac9cc",
+                      }}
+                    >
+                      {h}
+                    </th>
+                  ))}
                 </tr>
               </thead>
               <tbody>

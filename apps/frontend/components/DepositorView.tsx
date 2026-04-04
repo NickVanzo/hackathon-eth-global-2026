@@ -6,7 +6,6 @@ import { useAccount } from "wagmi";
 import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { useVaultData, useUserVaultShares, useSatelliteBalance, SATELLITE_ADDRESS, USDC_E_ADDRESS, USDC_E_ABI, SatelliteABI, useUSDCAllowance } from "@/lib/contracts";
 import { sepolia } from "@/lib/chains";
-import { MOCK_VAULT } from "@/lib/mock-data";
 import { LoadingPulse, ErrorBanner } from "@/components/LoadingSkeleton";
 
 function formatSharePrice(raw: string): string {
@@ -110,17 +109,13 @@ export default function DepositorView() {
     });
   };
 
-  // Fall back to mock data when real data is zero/empty (no deposits yet)
-  const realVaultActive = totalAssets !== undefined && totalAssets !== "0" && BigInt(totalAssets) > 0n;
-  const vault = realVaultActive
-    ? {
-        sharePrice: sharePrice ?? MOCK_VAULT.sharePrice,
-        totalAssets: totalAssets ?? MOCK_VAULT.totalAssets,
-        totalShares: totalShares ?? MOCK_VAULT.totalShares,
-        userShares: liveUserShares ?? MOCK_VAULT.userShares,
-        pendingWithdrawals: MOCK_VAULT.pendingWithdrawals,
-      }
-    : MOCK_VAULT;
+  const vault = {
+    sharePrice: sharePrice ?? "0",
+    totalAssets: totalAssets ?? "0",
+    totalShares: totalShares ?? "0",
+    userShares: liveUserShares ?? "0",
+    pendingWithdrawals: [] as { epoch: number; shares: string; status: "claimable" | "pending" }[],
+  };
 
   return (
     <div className="space-y-8">
@@ -750,7 +745,9 @@ export default function DepositorView() {
             }}
           >
             CONTRACT:{" "}
-            <span style={{ color: "#9cf0ff" }}>0x71C...4f2E</span>
+            <span style={{ color: "#9cf0ff" }}>
+              {SATELLITE_ADDRESS.slice(0, 6)}...{SATELLITE_ADDRESS.slice(-4)}
+            </span>
           </div>
           <div className="flex items-center gap-2">
             <div

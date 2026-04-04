@@ -88,6 +88,65 @@ type AgentManager_AgentEvicted {
   fullEviction: Boolean!
 }
 
+type Satellite_PositionOpened {
+  id: ID!
+  agentId: BigInt!
+  tokenId: BigInt!
+  tickLower: Int!
+  tickUpper: Int!
+  liquidity: BigInt!
+  amountUSDC: BigInt!
+}
+
+type IndexedPosition {
+  id: ID!
+  agentId: BigInt!
+  tokenId: BigInt!
+  tickLower: Int!
+  tickUpper: Int!
+  liquidity: String!
+  feesCollected: String!
+  status: String!
+  openBlockNumber: BigInt!
+  openTimestamp: BigInt!
+  closeBlockNumber: BigInt!
+  closeTimestamp: BigInt!
+}
+
+type IndexedIntent {
+  id: ID!
+  agentId: BigInt!
+  actionType: String!
+  status: String!
+  timestamp: BigInt!
+  txHash: String!
+  blockNumber: BigInt!
+}
+
+type FeeEpochHistory {
+  id: ID!
+  epoch: Int!
+  protocolFee: String!
+  commission: String!
+  depositorYield: String!
+  sharePrice: String!
+  totalAssets: BigInt!
+  totalShares: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+}
+
+type AgentPerformanceSnapshot {
+  id: ID!
+  agentId: BigInt!
+  positionValue: BigInt!
+  feesCollected: BigInt!
+  cumulativeFees: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  returnBps: Int!
+}
+
 type Vault_Approval {
   id: ID!
   owner: String!

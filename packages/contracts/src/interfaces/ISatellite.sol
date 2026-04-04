@@ -43,6 +43,13 @@ interface ISatellite {
     ///         Relayer calls agentManager.reportValues() on 0G.
     event ValuesReported(uint256 indexed agentId, uint256 positionValue, uint256 feesCollected);
 
+    /// @notice A new LP position was minted (open or modify-reopen).
+    ///         Indexed by the relayer for the frontend positions table.
+    event PositionOpened(
+        uint256 indexed agentId, uint256 indexed tokenId,
+        int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amountUSDC
+    );
+
     /// @notice A position was closed (agent-initiated, modify, or force-close).
     ///         Relayer calls agentManager.recordClosure() and vault.recordRecovery() on 0G.
     event PositionClosed(uint256 indexed agentId, uint256 indexed positionId, uint256 recoveredAmount);

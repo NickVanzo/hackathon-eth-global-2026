@@ -18,6 +18,7 @@ import {
   AgentManager_ForceCloseRequested,
   AgentManager_AgentPromoted,
   AgentManager_AgentEvicted,
+  IndexedIntent,
 } from "generated";
 
 import { sepoliaPublicClient, sepoliaWalletClient, zgPublicClient } from "../relayer/clients";
@@ -39,12 +40,14 @@ import {
 async function relayToSepolia(
   label: string,
   fn: () => Promise<`0x${string}`>
-): Promise<void> {
+): Promise<{ hash: string | null; error: boolean }> {
   try {
     const hash = await fn();
     console.log(`[relay] ${label} -> Sepolia tx: ${hash}`);
+    return { hash, error: false };
   } catch (err) {
     console.error(`[relay] ${label} failed:`, err);
+    return { hash: null, error: true };
   }
 }
 
@@ -71,11 +74,25 @@ AgentManager.IntentQueued.handler(async ({ event, context }) => {
   };
   context.AgentManager_IntentQueued.set(entity);
 
+  // Create IndexedIntent for frontend (status starts as "pending", updated below)
+  const actionNames = ["OPEN_POSITION", "CLOSE_POSITION", "MODIFY_POSITION"] as const;
+  const intentId = `intent_${event.chainId}_${event.block.number}_${event.logIndex}`;
+  const indexedIntent: IndexedIntent = {
+    id: intentId,
+    agentId: event.params.agentId,
+    actionType: actionNames[Number(event.params.actionType)] ?? "UNKNOWN",
+    status: "pending",
+    timestamp: BigInt(event.block.timestamp),
+    txHash: "",
+    blockNumber: BigInt(event.block.number),
+  };
+  context.IndexedIntent.set(indexedIntent);
+
   const agentId = event.params.agentId;
   const actionType = Number(event.params.actionType);
   const rawParams = event.params.params as `0x${string}`;
 
-  await relayToSepolia(
+  const relayResult = await relayToSepolia(
     `IntentQueued(agentId=${agentId}, action=${actionType})`,
     async () => {
       let enrichedParams: `0x${string}` = rawParams;
@@ -147,6 +164,13 @@ AgentManager.IntentQueued.handler(async ({ event, context }) => {
       });
     }
   );
+
+  // Update IndexedIntent status based on relay result
+  context.IndexedIntent.set({
+    ...indexedIntent,
+    status: relayResult.error ? "failed" : "executed",
+    txHash: relayResult.hash ?? "",
+  });
 });
 
 // ---------------------------------------------------------------------------

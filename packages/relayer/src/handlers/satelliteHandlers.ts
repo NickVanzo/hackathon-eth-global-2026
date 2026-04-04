@@ -14,11 +14,14 @@ import {
   Satellite_CommissionClaimRequested,
   Satellite_Deposited,
   Satellite_PauseRequested,
+  Satellite_PositionOpened,
   Satellite_PositionClosed,
   Satellite_ValuesReported,
   Satellite_WithdrawFromArenaRequested,
   Satellite_WithdrawRequested,
   Satellite_WithdrawalCompleted,
+  AgentPerformanceSnapshot,
+  IndexedPosition,
 } from "generated";
 
 import {
@@ -54,6 +57,14 @@ async function relay(
 
 // Alias for readability in this file (all relay targets are 0G unless noted)
 const relayTo0G = relay;
+
+// ---------------------------------------------------------------------------
+// Performance snapshot tracking (in-memory, rebuilt from event replay)
+// Used to compute per-agent historical return on capital for the frontend chart.
+// ---------------------------------------------------------------------------
+
+const agentCumulativeFees = new Map<string, bigint>();
+const agentInitialCapital = new Map<string, bigint>();
 
 // ---------------------------------------------------------------------------
 // Deposited
@@ -97,6 +108,20 @@ Satellite.AgentRegistered.handler(async ({ event, context }) => {
     provingAmount: event.params.provingAmount,
   };
   context.Satellite_AgentRegistered.set(entity);
+
+  // Performance snapshot: record initial capital and create baseline snapshot
+  const agentKey = event.params.agentId.toString();
+  agentInitialCapital.set(agentKey, event.params.provingAmount);
+  context.AgentPerformanceSnapshot.set({
+    id: `perf_${event.chainId}_${event.block.number}_${event.logIndex}_reg`,
+    agentId: event.params.agentId,
+    positionValue: 0n,
+    feesCollected: 0n,
+    cumulativeFees: 0n,
+    blockNumber: BigInt(event.block.number),
+    blockTimestamp: BigInt(event.block.timestamp),
+    returnBps: 0,
+  });
 
   await relayTo0G(
     `AgentRegistered(agentId=${event.params.agentId})`,
@@ -215,6 +240,32 @@ Satellite.ValuesReported.handler(async ({ event, context }) => {
   };
   context.Satellite_ValuesReported.set(entity);
 
+  // Performance snapshot: accumulate fees and compute return on capital
+  {
+    const agentKey = event.params.agentId.toString();
+    const prevCumFees = agentCumulativeFees.get(agentKey) ?? 0n;
+    const newCumFees = prevCumFees + event.params.feesCollected;
+    agentCumulativeFees.set(agentKey, newCumFees);
+
+    const initialCapital = agentInitialCapital.get(agentKey) ?? 0n;
+    let returnBps = 0;
+    if (initialCapital > 0n) {
+      const pnl = event.params.positionValue + newCumFees - initialCapital;
+      returnBps = Number((pnl * 10000n) / initialCapital);
+    }
+
+    context.AgentPerformanceSnapshot.set({
+      id: `perf_${event.chainId}_${event.block.number}_${event.logIndex}`,
+      agentId: event.params.agentId,
+      positionValue: event.params.positionValue,
+      feesCollected: event.params.feesCollected,
+      cumulativeFees: newCumFees,
+      blockNumber: BigInt(event.block.number),
+      blockTimestamp: BigInt(event.block.timestamp),
+      returnBps,
+    });
+  }
+
   await relayTo0G(
     `ValuesReported(agentId=${event.params.agentId})`,
     () =>
@@ -229,6 +280,42 @@ Satellite.ValuesReported.handler(async ({ event, context }) => {
         ],
       })
   );
+});
+
+// ---------------------------------------------------------------------------
+// PositionOpened
+// Emitted by satellite._mintPosition() when a new LP position is minted.
+// Creates an IndexedPosition entity for the frontend positions table.
+// ---------------------------------------------------------------------------
+
+Satellite.PositionOpened.handler(async ({ event, context }) => {
+  const entity: Satellite_PositionOpened = {
+    id: `${event.chainId}_${event.block.number}_${event.logIndex}`,
+    agentId: event.params.agentId,
+    tokenId: event.params.tokenId,
+    tickLower: Number(event.params.tickLower),
+    tickUpper: Number(event.params.tickUpper),
+    liquidity: event.params.liquidity,
+    amountUSDC: event.params.amountUSDC,
+  };
+  context.Satellite_PositionOpened.set(entity);
+
+  // Create IndexedPosition for frontend
+  const position: IndexedPosition = {
+    id: `pos_${event.params.tokenId}`,
+    agentId: event.params.agentId,
+    tokenId: event.params.tokenId,
+    tickLower: Number(event.params.tickLower),
+    tickUpper: Number(event.params.tickUpper),
+    liquidity: event.params.liquidity.toString(),
+    feesCollected: "0",
+    status: "active",
+    openBlockNumber: BigInt(event.block.number),
+    openTimestamp: BigInt(event.block.timestamp),
+    closeBlockNumber: 0n,
+    closeTimestamp: 0n,
+  };
+  context.IndexedPosition.set(position);
 });
 
 // ---------------------------------------------------------------------------
@@ -253,6 +340,19 @@ Satellite.PositionClosed.handler(async ({ event, context }) => {
     recoveredAmount: event.params.recoveredAmount,
   };
   context.Satellite_PositionClosed.set(entity);
+
+  // Update IndexedPosition → closed
+  const posId = `pos_${event.params.positionId}`;
+  const existing = await context.IndexedPosition.get(posId);
+  if (existing) {
+    context.IndexedPosition.set({
+      ...existing,
+      status: "closed",
+      feesCollected: event.params.recoveredAmount.toString(),
+      closeBlockNumber: BigInt(event.block.number),
+      closeTimestamp: BigInt(event.block.timestamp),
+    });
+  }
 
   // Determine source from agent phase on 0G (0=PROVING, 1=VAULT).
   // NOTE: We cannot read positionSource from Satellite here because

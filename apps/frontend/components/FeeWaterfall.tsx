@@ -1,7 +1,6 @@
 "use client";
 
 import { useFeeData } from "@/lib/contracts";
-import { MOCK_FEES } from "@/lib/mock-data";
 import { LoadingIndicator } from "@/components/LoadingSkeleton";
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
@@ -17,10 +16,6 @@ function formatUsdc(raw: string): string {
   }).format(units);
 }
 
-/** Format share-price string (6-decimal) as decimal ratio, e.g. "1052000" → "1.052000" */
-function formatSharePrice(raw: string): string {
-  return (Number(raw) / 1_000_000).toFixed(6);
-}
 
 // ─── Tier Breakdown Cards (vault-exit.html: Tier 1 + Tier 2 pattern) ─────────
 
@@ -402,38 +397,9 @@ function ColorLegend() {
   );
 }
 
-// ─── Share-price trend indicator ──────────────────────────────────────────────
-
-function SharePriceTrend({
-  current,
-  previous,
-}: {
-  current: string;
-  previous: string | undefined;
-}) {
-  if (previous === undefined) {
-    return <span style={{ color: "#849396" }}>—</span>;
-  }
-
-  const isUp = Number(current) >= Number(previous);
-
-  return (
-    <span
-      className="inline-flex items-center gap-1"
-      style={{ color: isUp ? "#00daf3" : "#ffb5a0" }}
-      aria-label={isUp ? "trending up" : "trending down"}
-    >
-      {isUp ? "↑" : "↓"}
-    </span>
-  );
-}
-
 // ─── Per-epoch table ──────────────────────────────────────────────────────────
 
 function EpochTable() {
-  const { epochs } = MOCK_FEES;
-  const currentEpoch = epochs[0].epoch;
-
   return (
     <div
       className="overflow-x-auto"
@@ -463,64 +429,15 @@ function EpochTable() {
           </tr>
         </thead>
         <tbody>
-          {epochs.map((row, index) => {
-            const previousEpoch = epochs[index + 1];
-            const isCurrent = row.epoch === currentEpoch;
-
-            return (
-              <tr
-                key={row.epoch}
-                style={{
-                  borderBottom: "1px solid #1c1b1b",
-                  background: "#131313",
-                  borderLeft: isCurrent ? "2px solid #00daf3" : "2px solid transparent",
-                  fontWeight: isCurrent ? 600 : 400,
-                  transition: "background 0.15s",
-                }}
-                className={isCurrent ? "" : "hover:bg-[#1c1b1b]"}
-              >
-                <td className="py-3 pr-4" style={{ color: "#e5e2e1" }}>
-                  <span className="flex items-center gap-2">
-                    {row.epoch}
-                    {isCurrent && (
-                      <span
-                        className="font-['Space_Grotesk'] font-bold px-2 py-0.5"
-                        style={{
-                          fontSize: "9px",
-                          color: "#00daf3",
-                          background: "rgba(0,218,243,0.1)",
-                          border: "1px solid rgba(0,218,243,0.4)",
-                        }}
-                      >
-                        current
-                      </span>
-                    )}
-                  </span>
-                </td>
-                <td className="py-3 pr-4" style={{ color: "#d1bcff" }}>
-                  {formatUsdc(row.protocolFee)}
-                </td>
-                <td className="py-3 pr-4" style={{ color: "#ffb5a0" }}>
-                  {formatUsdc(row.commission)}
-                </td>
-                <td className="py-3 pr-4" style={{ color: "#00daf3" }}>
-                  {formatUsdc(row.depositorYield)}
-                </td>
-                <td className="py-3">
-                  <span
-                    className="flex items-center gap-2"
-                    style={{ color: "#e5e2e1" }}
-                  >
-                    {formatSharePrice(row.sharePrice)}
-                    <SharePriceTrend
-                      current={row.sharePrice}
-                      previous={previousEpoch?.sharePrice}
-                    />
-                  </span>
-                </td>
-              </tr>
-            );
-          })}
+          <tr>
+            <td
+              colSpan={5}
+              className="py-8 text-center font-['Space_Grotesk'] uppercase tracking-wider"
+              style={{ fontSize: "12px", color: "#849396" }}
+            >
+              Epoch history available after indexer integration
+            </td>
+          </tr>
         </tbody>
       </table>
     </div>
@@ -586,18 +503,9 @@ function PayoutSummaryFooter({ protocolFeesAccrued, commissionPool, depositorYie
 export default function FeeWaterfall() {
   const { protocolFeesAccrued: liveProtocolFees, commissionPool: liveCommissionPool, totalAssets: liveTotalAssets, isLoading: isFeeLoading } = useFeeData();
 
-  // Use mock data unless fees are meaningful (> $1 USDC = 1_000_000 in 6 decimals)
-  const realFeesActive = liveProtocolFees !== undefined && BigInt(liveProtocolFees) > 1_000_000n;
-  const fees = realFeesActive
-    ? {
-        protocolFeesAccrued: liveProtocolFees ?? MOCK_FEES.protocolFeesAccrued,
-        commissionPool: liveCommissionPool ?? MOCK_FEES.commissionPool,
-        depositorYield: liveTotalAssets ?? MOCK_FEES.depositorYield,
-        epochs: MOCK_FEES.epochs,
-      }
-    : MOCK_FEES;
-
-  const { protocolFeesAccrued, commissionPool, depositorYield } = fees;
+  const protocolFeesAccrued = liveProtocolFees ?? "0";
+  const commissionPool = liveCommissionPool ?? "0";
+  const depositorYield = liveTotalAssets ?? "0";
 
   return (
     <div className="flex flex-col gap-6">

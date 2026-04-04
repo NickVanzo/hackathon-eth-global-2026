@@ -2,12 +2,12 @@
 name: envio-indexer
 networks:
 - id: 16602
-  start_block: 25711409
+  start_block: 25729241
   rpc: https://evmrpc-testnet.0g.ai
   contracts:
   - name: Vault
     address:
-    - 0x904588f5074f9c75325906ad3613a3f7a98a4d02
+    - 0x734daed39ae73cf1fe195d512c43d5819ce7ed18
     handler: src/EventHandlers.ts
     events:
     - event: Approval(address indexed owner, address indexed spender, uint256 value)
@@ -22,7 +22,7 @@ networks:
     - event: WithdrawReleased(address indexed user, uint256 tokenAmount)
   - name: AgentManager
     address:
-    - 0xc346168268af5f69d318c50661592370fdb0ba32
+    - 0x3dc17aa7ea09e1e359e0d12c1bff25b5b2133aad
     handler: src/EventHandlers.ts
     events:
     - event: IntentQueued(uint256 indexed agentId, uint8 actionType, bytes params, uint256 blockNumber)
@@ -30,12 +30,12 @@ networks:
     - event: AgentEvicted(uint256 indexed agentId, bool fullEviction)
     - event: ForceCloseRequested(uint256 indexed agentId, uint8 source)
 - id: 11155111
-  start_block: 10589862
+  start_block: 10590506
   rpc: https://ethereum-sepolia.publicnode.com
   contracts:
   - name: Satellite
     address:
-    - 0x03a1125a9746fa5fc70411a3235eb8b9d18bc24e
+    - 0x58eb63577f409bb638628abe8e55f0553032e8dc
     handler: src/EventHandlers.ts
     events:
     - event: AgentRegistered(uint256 indexed agentId, address agentAddress, address indexed deployer, uint256 provingAmount)
@@ -43,6 +43,7 @@ networks:
     - event: CommissionClaimRequested(uint256 indexed agentId, address indexed caller)
     - event: Deposited(address indexed user, uint256 amount)
     - event: PauseRequested(uint256 indexed agentId, address indexed caller, bool paused)
+    - event: PositionOpened(uint256 indexed agentId, uint256 indexed tokenId, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amountUSDC)
     - event: PositionClosed(uint256 indexed agentId, uint256 indexed positionId, uint256 recoveredAmount)
     - event: ValuesReported(uint256 indexed agentId, uint256 positionValue, uint256 feesCollected)
     - event: WithdrawFromArenaRequested(uint256 indexed agentId, address indexed caller)

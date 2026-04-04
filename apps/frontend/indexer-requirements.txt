@@ -1,0 +1,50 @@
+Indexer Requirements for Frontend
+==================================
+
+The frontend currently uses mock data for the following 3 entities.
+Each needs to be indexed from on-chain events and served via an API.
+
+Everything else (agents, vault stats, fee totals, iNFTs) already reads
+live from contracts.
+
+
+1. POSITIONS
+------------
+Used in: PositionView, AgentDetail
+Source event: PositionOpened / PositionClosed on Satellite
+
+Fields:
+  - agentId       number    Which agent owns it
+  - tokenId       number    Uniswap V3 NFT token ID
+  - tickLower     number    Lower tick bound
+  - tickUpper     number    Upper tick bound
+  - liquidity     string    Liquidity amount
+  - currentTick   number    Current pool tick (for in-range check)
+  - feesCollected string    Fees earned (6 decimals)
+  - status        string    "active" or "closed"
+
+
+2. INTENTS
+----------
+Used in: PositionView (live battle feed), AgentDetail
+Source event: IntentQueued on AgentManager
+
+Fields:
+  - agentId       number    Agent that submitted
+  - actionType    string    "OPEN_POSITION", "MODIFY_POSITION", "CLOSE_POSITION"
+  - status        string    "executed", "pending", "failed"
+  - timestamp     number    Block timestamp
+  - txHash        string    Execution tx hash (null if pending/failed)
+
+
+3. FEE EPOCH HISTORY
+--------------------
+Used in: FeeWaterfall (epoch table, currently shows placeholder)
+Source event: EpochSettled on Vault
+
+Fields:
+  - epoch          number   Epoch number
+  - protocolFee    string   Protocol fee that epoch (6 decimals)
+  - commission     string   Commission pool (6 decimals)
+  - depositorYield string   Depositor yield (6 decimals)
+  - sharePrice     string   Share price at settlement (6 decimals)
