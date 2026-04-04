@@ -1,8 +1,9 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useAgentCount, useAgentInfo } from "@/lib/contracts";
+import { useAgentCount, useAgentInfo, useActiveAgentIds } from "@/lib/contracts";
 import { MOCK_AGENTS } from "@/lib/mock-data";
+import { LoadingPulse, ErrorBanner } from "@/components/LoadingSkeleton";
 
 // ─── Design tokens extracted from Stitch leaderboard.html ────────────────────
 
@@ -37,7 +38,7 @@ function formatPerf(value: number): string {
 
 // ─── Tier badge derived from mock data ────────────────────────────────────────
 
-type TierClass = "S-TIER GLADIATOR" | "VAULT_ELITE" | "PROVING_GROUNDS";
+type TierClass = "S-TIER GLADIATOR" | "VAULT ELITE" | "PROVING GROUNDS";
 
 function resolveTierClass(
   phase: "vault" | "proving",
@@ -45,8 +46,8 @@ function resolveTierClass(
   rank: number
 ): TierClass {
   if (rank === 1 && sharpeScore > 2) return "S-TIER GLADIATOR";
-  if (phase === "vault") return "VAULT_ELITE";
-  return "PROVING_GROUNDS";
+  if (phase === "vault") return "VAULT ELITE";
+  return "PROVING GROUNDS";
 }
 
 interface TierBadgeProps {
@@ -190,7 +191,7 @@ function SideNav() {
                 textTransform: "uppercase",
               }}
             >
-              OPERATOR_01
+              OPERATOR 01
             </p>
             <p
               style={{
@@ -255,7 +256,7 @@ function SideNav() {
             (e.currentTarget as HTMLButtonElement).style.opacity = "1";
           }}
         >
-          DEPLOY_AGENT
+          DEPLOY AGENT
         </button>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <FooterLink icon="terminal" label="TERMINAL" />
@@ -485,7 +486,7 @@ function TopNav() {
             (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
           }}
         >
-          CONNECT_VOICE
+          CONNECT VOICE
         </button>
       </div>
     </header>
@@ -513,13 +514,13 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
 
   // Subtitle label derived from tier
   const subtitleMap: Record<TierClass, string> = {
-    "S-TIER GLADIATOR": "PROBABILITY_ENGINE_v4",
-    VAULT_ELITE: "QUANT_REACTION_NODE",
-    PROVING_GROUNDS: "HFT_ARBITRAGE_CORE",
+    "S-TIER GLADIATOR": "PROBABILITY ENGINE V4",
+    "VAULT ELITE": "QUANT REACTION NODE",
+    "PROVING GROUNDS": "HFT ARBITRAGE CORE",
   };
 
   // Controller org label
-  const orgLabels = ["VALOR_HOLDINGS", "ANONYMOUS", "ZENITH_LABS"];
+  const orgLabels = ["VALOR HOLDINGS", "ANONYMOUS", "ZENITH LABS"];
   const orgLabel = orgLabels[rank - 1] ?? "ANONYMOUS";
 
   return (
@@ -528,7 +529,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
       style={{
         display: "grid",
         gridTemplateColumns:
-          "1fr 4fr 2fr 1fr 2fr 2fr",
+          "50px 200px 140px 80px 80px 100px 150px",
         padding: "20px 24px",
         backgroundColor: rowBg,
         borderLeft: `4px solid ${borderColor}`,
@@ -582,7 +583,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
           gap: "12px",
         }}
       >
-        <StatusDot dimmed={!perfPositive} />
+        <StatusDot dimmed={!perfPositive || agent.sharpeScore < 0} />
         <div>
           <p
             style={{
@@ -629,10 +630,46 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
           fontSize: "14px",
-          color: isTopRank ? COLORS.primary : COLORS.onSurface,
+          color: agent.sharpeScore > 1.5 ? "#00E5FF" : agent.sharpeScore > 0.5 ? "#4ade80" : agent.sharpeScore >= 0 ? "#bac9cc" : "#FF5722",
         }}
       >
         {agent.sharpeScore.toFixed(2)}
+      </div>
+
+      {/* CREDITS */}
+      <div
+        role="cell"
+        style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: "4px" }}
+      >
+        <span
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: "13px",
+            color: agent.credits > 0 ? COLORS.primary : COLORS.secondary,
+          }}
+        >
+          {agent.credits}
+        </span>
+        {/* credit bar showing credits/maxCredits */}
+        <div
+          style={{
+            width: "40px",
+            height: "3px",
+            backgroundColor: "rgba(59,73,76,0.4)",
+            borderRadius: "2px",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${agent.maxCredits > 0 ? Math.min(100, (agent.credits / agent.maxCredits) * 100) : 0}%`,
+              height: "100%",
+              backgroundColor: agent.credits > agent.maxCredits * 0.5 ? COLORS.primaryContainer : COLORS.secondary,
+              transition: "width 500ms",
+            }}
+          />
+        </div>
       </div>
 
       {/* 7D_PERF */}
@@ -688,7 +725,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
 function RecentPromotions() {
   const promotions = [
     { name: "GLITCH_RUNNER_8", tier: "S-TIER", time: "2m ago" },
-    { name: "CYBER_HAWK", tier: "VAULT_ELITE", time: "14m ago" },
+    { name: "CYBER_HAWK", tier: "VAULT ELITE", time: "14m ago" },
   ];
 
   return (
@@ -721,7 +758,7 @@ function RecentPromotions() {
             textTransform: "uppercase",
           }}
         >
-          RECENT_PROMOTIONS
+          RECENT PROMOTIONS
         </span>
         <span
           className="material-symbols-outlined"
@@ -831,7 +868,7 @@ function RecentEvictions() {
             textTransform: "uppercase",
           }}
         >
-          RECENT_EVICTIONS
+          RECENT EVICTIONS
         </span>
         <span
           className="material-symbols-outlined"
@@ -972,7 +1009,7 @@ function PromoCard() {
             marginBottom: "4px",
           }}
         >
-          STAKE_AGENT_NFT
+          STAKE AGENT NFT
         </h3>
         <p
           style={{
@@ -983,7 +1020,7 @@ function PromoCard() {
             textTransform: "uppercase",
           }}
         >
-          EARN_PASSIVE_REWARDS
+          EARN PASSIVE REWARDS
         </p>
       </div>
     </div>
@@ -993,13 +1030,16 @@ function PromoCard() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AgentPerformance() {
-  const { count } = useAgentCount();
-  const { agent: rawAgent1 } = useAgentInfo(1);
-  const { agent: rawAgent2 } = useAgentInfo(2);
-  const { agent: rawAgent3 } = useAgentInfo(3);
+  const { count, error: agentCountError } = useAgentCount();
+  const { ids: activeIds } = useActiveAgentIds();
+  const { agent: rawAgent1, isLoading: loading1 } = useAgentInfo(1);
+  const { agent: rawAgent2, isLoading: loading2 } = useAgentInfo(2);
+  const { agent: rawAgent3, isLoading: loading3 } = useAgentInfo(3);
+  const isLoadingAgents = loading1 || loading2 || loading3;
 
   const liveAgents = [rawAgent1, rawAgent2, rawAgent3]
     .filter((a): a is NonNullable<typeof a> => a != null)
+    .filter((a) => !activeIds || activeIds.includes(a.id))
     .map((liveAgent) => {
       const mockAgent = MOCK_AGENTS.find((m) => m.id === liveAgent.id);
       return {
@@ -1013,8 +1053,11 @@ export default function AgentPerformance() {
       };
     });
 
-  const agents =
-    count !== undefined && liveAgents.length > 0 ? liveAgents : MOCK_AGENTS;
+  // Fall back to mock data when real data is all-zero (no epochs completed yet)
+  const hasRealActivity = liveAgents.some(
+    (a) => a.epochsCompleted > 0 || a.sharpeScore !== 0 || a.credits > 0
+  );
+  const agents = hasRealActivity ? liveAgents : MOCK_AGENTS;
 
   const sortedAgents = [...agents].sort(
     (a, b) => b.sharpeScore - a.sharpeScore
@@ -1022,6 +1065,21 @@ export default function AgentPerformance() {
 
   return (
     <>
+      {isLoadingAgents && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "2px",
+            backgroundColor: "#00e5ff",
+            opacity: 0.8,
+            zIndex: 100,
+            animation: "arena-pulse 1s infinite",
+          }}
+        />
+      )}
       {/* Google Fonts + global overrides */}
       {/* eslint-disable-next-line react/no-danger */}
       <style
@@ -1092,8 +1150,30 @@ export default function AgentPerformance() {
                       textTransform: "uppercase",
                     }}
                   >
-                    LIVE_SIMULATION_ACTIVE
+                    LIVE SIMULATION ACTIVE
                   </span>
+                  {count !== undefined && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "3px 8px",
+                        backgroundColor: "rgba(0,229,255,0.1)",
+                        border: "1px solid rgba(0,229,255,0.3)",
+                        borderRadius: "2px",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        color: "#00e5ff",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#00e5ff", display: "inline-block" }} />
+                      LIVE DATA
+                    </span>
+                  )}
                 </div>
                 <h1
                   id="leaderboard-heading"
@@ -1128,12 +1208,12 @@ export default function AgentPerformance() {
               {/* Stats cards */}
               <div style={{ display: "flex", gap: "16px" }}>
                 <StatCard
-                  label="TOTAL_REWARDS"
+                  label="TOTAL REWARDS"
                   value="842.05 ETH"
                   valueColor={COLORS.primary}
                 />
                 <StatCard
-                  label="ARENA_TIME"
+                  label="ARENA TIME"
                   value="14:02:55:09"
                   valueColor={COLORS.secondary}
                 />
@@ -1147,44 +1227,78 @@ export default function AgentPerformance() {
               display: "flex",
               gap: "48px",
               alignItems: "flex-start",
+              overflow: "hidden",
             }}
           >
             {/* Ranking table */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px" }}>
-              {/* Table header */}
-              <div
-                role="row"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 4fr 2fr 1fr 2fr 2fr",
-                  padding: "16px 24px",
-                  backgroundColor: COLORS.surfaceContainerLow,
-                  borderBottom: `1px solid rgba(59,73,76,0.2)`,
-                  alignItems: "center",
-                }}
-              >
-                <ColHeader>RK</ColHeader>
-                <ColHeader>AGENT_IDENTIFIER</ColHeader>
-                <ColHeader>TIER_CLASS</ColHeader>
-                <ColHeader>SHARPE</ColHeader>
-                <ColHeader>7D_PERF</ColHeader>
-                <ColHeader right>CONTROLLER</ColHeader>
-              </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
+              <div style={{ overflowX: "auto" }}>
+                {/* Table header */}
+                <div
+                  role="row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "50px 200px 140px 80px 80px 100px 150px",
+                    minWidth: "850px",
+                    padding: "16px 24px",
+                    backgroundColor: COLORS.surfaceContainerLow,
+                    borderBottom: `1px solid rgba(59,73,76,0.2)`,
+                    alignItems: "center",
+                  }}
+                >
+                  <ColHeader>RK</ColHeader>
+                  <ColHeader>AGENT IDENTIFIER</ColHeader>
+                  <ColHeader>TIER CLASS</ColHeader>
+                  <ColHeader>SHARPE</ColHeader>
+                  <ColHeader>CREDITS</ColHeader>
+                  <ColHeader>7D PERF</ColHeader>
+                  <ColHeader right>CONTROLLER</ColHeader>
+                </div>
 
-              {/* Rows */}
-              <div
-                role="table"
-                aria-labelledby="leaderboard-heading"
-                style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-              >
-                {sortedAgents.map((agent, index) => (
-                  <AgentRow
-                    key={agent.id}
-                    agent={agent}
-                    rank={index + 1}
-                    isAlt={index % 2 === 0}
-                  />
-                ))}
+                {agentCountError && (
+                  <ErrorBanner message={agentCountError.message.slice(0, 60)} />
+                )}
+
+                {/* Rows */}
+                <div
+                  role="table"
+                  aria-labelledby="leaderboard-heading"
+                  style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "850px", marginTop: "12px" }}
+                >
+                  {isLoadingAgents
+                    ? Array.from({ length: 3 }).map((_, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "50px 200px 140px 80px 80px 100px 150px",
+                            padding: "20px 24px",
+                            backgroundColor: i % 2 === 0 ? COLORS.surfaceContainer : COLORS.surfaceContainerLow,
+                            gap: "16px",
+                            alignItems: "center",
+                          }}
+                        >
+                          <LoadingPulse className="h-6 w-8" />
+                          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                            <LoadingPulse className="h-2 w-2 rounded-full" />
+                            <LoadingPulse className="h-5 w-32" />
+                          </div>
+                          <LoadingPulse className="h-5 w-24" />
+                          <LoadingPulse className="h-5 w-12" />
+                          <LoadingPulse className="h-5 w-10" />
+                          <LoadingPulse className="h-5 w-14" />
+                          <LoadingPulse className="h-5 w-20 ml-auto" />
+                        </div>
+                      ))
+                    : sortedAgents.map((agent, index) => (
+                        <AgentRow
+                          key={agent.id}
+                          agent={agent}
+                          rank={index + 1}
+                          isAlt={index % 2 === 0}
+                        />
+                      ))}
+                </div>
               </div>
             </div>
 

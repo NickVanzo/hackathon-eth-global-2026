@@ -2,6 +2,7 @@
 
 import { useFeeData } from "@/lib/contracts";
 import { MOCK_FEES } from "@/lib/mock-data";
+import { LoadingIndicator } from "@/components/LoadingSkeleton";
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
 
@@ -80,8 +81,8 @@ function TierCard({ tier, label, amount, subtitle }: TierCardProps) {
 
 const WITHDRAWAL_STEPS = [
   { icon: "rocket_launch", label: "REQUEST" },
-  { icon: "schedule", label: "EPOCH_SETTLE" },
-  { icon: "gavel", label: "FORCE_CLOSE" },
+  { icon: "schedule", label: "EPOCH SETTLE" },
+  { icon: "gavel", label: "FORCE CLOSE" },
   { icon: "payments", label: "PAYOUT" },
 ] as const;
 
@@ -563,7 +564,7 @@ function PayoutSummaryFooter({ protocolFeesAccrued, commissionPool, depositorYie
           className="px-6 py-3 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest transition-colors"
           style={{ color: "#849396" }}
         >
-          ABORT_CMD
+          ABORT CMD
         </button>
         <button
           className="px-8 py-3 font-['Space_Grotesk'] text-xs font-extrabold uppercase tracking-widest transition-all hover:brightness-125 active:scale-95"
@@ -573,7 +574,7 @@ function PayoutSummaryFooter({ protocolFeesAccrued, commissionPool, depositorYie
             boxShadow: "0 0 20px rgba(215,59,0,0.3)",
           }}
         >
-          CONFIRM_LIQUIDATION
+          CONFIRM LIQUIDATION
         </button>
       </div>
     </div>
@@ -583,19 +584,24 @@ function PayoutSummaryFooter({ protocolFeesAccrued, commissionPool, depositorYie
 // ─── Root component ───────────────────────────────────────────────────────────
 
 export default function FeeWaterfall() {
-  const { protocolFeesAccrued: liveProtocolFees, commissionPool: liveCommissionPool, totalAssets: liveTotalAssets } = useFeeData();
+  const { protocolFeesAccrued: liveProtocolFees, commissionPool: liveCommissionPool, totalAssets: liveTotalAssets, isLoading: isFeeLoading } = useFeeData();
 
-  const fees = {
-    protocolFeesAccrued: liveProtocolFees ?? MOCK_FEES.protocolFeesAccrued,
-    commissionPool: liveCommissionPool ?? MOCK_FEES.commissionPool,
-    depositorYield: liveTotalAssets ?? MOCK_FEES.depositorYield,
-    epochs: MOCK_FEES.epochs,
-  };
+  // Use mock data unless fees are meaningful (> $1 USDC = 1_000_000 in 6 decimals)
+  const realFeesActive = liveProtocolFees !== undefined && BigInt(liveProtocolFees) > 1_000_000n;
+  const fees = realFeesActive
+    ? {
+        protocolFeesAccrued: liveProtocolFees ?? MOCK_FEES.protocolFeesAccrued,
+        commissionPool: liveCommissionPool ?? MOCK_FEES.commissionPool,
+        depositorYield: liveTotalAssets ?? MOCK_FEES.depositorYield,
+        epochs: MOCK_FEES.epochs,
+      }
+    : MOCK_FEES;
 
   const { protocolFeesAccrued, commissionPool, depositorYield } = fees;
 
   return (
     <div className="flex flex-col gap-6">
+      {isFeeLoading && <LoadingIndicator label="LOADING FEE DATA" />}
       {/* ── Section heading ── */}
       <div>
         <h2

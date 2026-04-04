@@ -105,14 +105,19 @@ interface PerformanceChartProps {
 }
 
 function PerformanceChart({ totalReturn, epochs }: PerformanceChartProps) {
-  // Generate a plausible yield curve from the agent's stats
-  const points = Array.from({ length: 5 }, (_, i) => {
-    const progress = i / 4;
-    const noise = Math.sin(i * 2.5) * 10;
-    return `${progress * 480},${50 - totalReturn * 200 * progress + noise}`;
-  }).join(" T");
-
-  const pathD = `M0,48 Q60,${40 - totalReturn * 150} 120,${35 - totalReturn * 100} T${points}`;
+  // Generate a realistic yield curve — monotonic trend with small noise
+  const numPoints = 20;
+  const coords: string[] = [];
+  // Seeded noise based on totalReturn to be deterministic
+  const seed = Math.abs(totalReturn * 1000) + epochs;
+  for (let i = 0; i <= numPoints; i++) {
+    const x = (i / numPoints) * 500;
+    const trend = totalReturn * 300 * (i / numPoints); // main direction
+    const noise = Math.sin(seed + i * 1.7) * 5 + Math.cos(seed * 0.3 + i * 2.3) * 3;
+    const y = 50 - trend + noise; // 50 = baseline, subtract because SVG y-axis is inverted
+    coords.push(`${x.toFixed(0)},${Math.max(5, Math.min(75, y)).toFixed(1)}`);
+  }
+  const pathD = `M${coords.join(" L")}`;
 
   return (
     <div
@@ -182,9 +187,10 @@ interface MetricCardProps {
   value: string;
   sub: string;
   subColor?: string;
+  valueColor?: string;
 }
 
-function MetricCard({ icon, label, value, sub, subColor = "#00daf3" }: MetricCardProps) {
+function MetricCard({ icon, label, value, sub, subColor = "#00daf3", valueColor = "#e5e2e1" }: MetricCardProps) {
   return (
     <div
       className="p-5 flex flex-col gap-2"
@@ -210,7 +216,7 @@ function MetricCard({ icon, label, value, sub, subColor = "#00daf3" }: MetricCar
       </div>
       <div
         className="font-['Space_Grotesk'] font-bold"
-        style={{ fontSize: "24px", color: "#e5e2e1" }}
+        style={{ fontSize: "24px", color: valueColor }}
       >
         {value}
       </div>
@@ -286,7 +292,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
                 letterSpacing: "0.3em",
               }}
             >
-              STRATEGY_FILE // 0X-{String(tokenId).padStart(4, "0")}
+              STRATEGY FILE // 0X-{String(tokenId).padStart(4, "0")}
             </p>
             <h2
               id="deep-scan-title"
@@ -430,6 +436,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
               label="Sharpe EMA"
               value={sharpeScore.toFixed(2)}
               sub={`${sharpeScore > 0 ? "+" : ""}${Math.round(sharpeScore * 4)}% vs Epoch-${epochs - 1}`}
+              valueColor={sharpeScore > 1.5 ? "#00E5FF" : sharpeScore > 0.5 ? "#4ade80" : sharpeScore >= 0 ? "#bac9cc" : "#FF5722"}
             />
             <MetricCard
               icon="payments"
@@ -526,7 +533,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
                 fontSize: "12px",
               }}
             >
-              PURCHASE_iNFT_OWNERSHIP
+              PURCHASE iNFT OWNERSHIP
             </button>
           </div>
 
@@ -592,7 +599,7 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
             className="font-['Space_Grotesk'] uppercase tracking-widest"
             style={{ fontSize: "10px", color: accentColor }}
           >
-            STRATEGY_FILE // {String(tokenId).padStart(4, "0")}
+            STRATEGY FILE // {String(tokenId).padStart(4, "0")}
           </p>
           <h3
             className="font-['Space_Grotesk'] font-black uppercase leading-none tracking-tighter mt-1"
@@ -638,7 +645,7 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
           {
             label: "Sharpe EMA",
             value: sharpeScore.toFixed(2),
-            color: accentColor,
+            color: sharpeScore > 1.5 ? "#00E5FF" : sharpeScore > 0.5 ? "#4ade80" : sharpeScore >= 0 ? "#bac9cc" : "#FF5722",
             large: true,
           },
           {
@@ -689,7 +696,7 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
             color: isHighPerformer ? "#00daf3" : "#bac9cc",
           }}
         >
-          DEEP_SCAN →
+          DEEP SCAN →
         </button>
       </div>
     </div>
@@ -716,7 +723,7 @@ export default function INFTMarketplace() {
             className="mt-1 font-['Manrope']"
             style={{ fontSize: "14px", color: "#bac9cc" }}
           >
-            Each iNFT encodes an on-chain agent strategy. Click DEEP_SCAN to inspect the dossier.
+            Each iNFT encodes an on-chain agent strategy. Click DEEP SCAN to inspect the dossier.
           </p>
         </div>
         <div className="flex gap-4">
