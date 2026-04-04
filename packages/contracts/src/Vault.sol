@@ -208,12 +208,70 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         _mint(user, shares);
     }
 
-    function processWithdraw(address, uint256) external onlyMessenger nonReentrant epochCheck {
-        revert("Vault: processWithdraw not implemented");
+    // =========================================================================
+    // 3.3 — WITHDRAWAL SYSTEM
+    // =========================================================================
+
+    /// @notice Process a withdrawal request relayed from Satellite.
+    ///         The relayer converts tokenAmount → shares using cachedSharePrice
+    ///         before calling this function.
+    ///
+    ///   Tier-1 (instant): tokenAmount ≤ _trackedIdleBalance
+    ///     → burn shares, decrement idle, emit WithdrawApproved immediately.
+    ///       Relayer calls satellite.release(user, tokenAmount) on Sepolia.
+    ///
+    ///   Tier-2 (queued): tokenAmount > _trackedIdleBalance
+    ///     → burn shares, record tokenAmount in _pendingWithdrawals.
+    ///       WithdrawApproved fires at the next epoch once idle is freed.
+    ///
+    ///   Shares are burned immediately in both tiers so share supply stays
+    ///   consistent.  _trackedTotalAssets is only decremented when tokens
+    ///   actually leave (Tier-1 now, Tier-2 at epoch processing).
+    function processWithdraw(address user, uint256 shares)
+        external
+        onlyMessenger
+        nonReentrant
+        epochCheck
+    {
+        require(user   != address(0),      "Vault: zero user");
+        require(shares >  0,               "Vault: zero shares");
+        require(balanceOf(user) >= shares, "Vault: insufficient shares");
+
+        uint256 tokenAmount = _sharesToTokens(shares);
+        require(tokenAmount > 0, "Vault: zero tokenAmount");
+
+        _burn(user, shares);
+
+        if (tokenAmount <= _trackedIdleBalance) {
+            // ── Tier-1: instant release ──────────────────────────────────────
+            _trackedIdleBalance -= tokenAmount;
+            _trackedTotalAssets -= tokenAmount;
+            emit WithdrawApproved(user, tokenAmount);
+        } else {
+            // ── Tier-2: queue for next epoch ─────────────────────────────────
+            // _trackedTotalAssets stays unchanged — these tokens are still owed
+            // to the user; they will be decremented when WithdrawApproved fires.
+            _pendingWithdrawals[user] += tokenAmount;
+            if (!_inPendingQueue[user]) {
+                _pendingUsers.push(user);
+                _inPendingQueue[user] = true;
+            }
+        }
     }
 
-    function approveCommissionRelease(uint256, address, uint256) external onlyAgentManager {
-        revert("Vault: approveCommissionRelease not implemented");
+    /// @notice Called by AgentManager after verifying iNFT ownership on-chain.
+    ///         Decrements commissionsOwed and emits CommissionApproved so the
+    ///         relayer can call satellite.releaseCommission(caller, amount).
+    function approveCommissionRelease(uint256 agentId, address caller, uint256 amount)
+        external
+        onlyAgentManager
+    {
+        require(amount > 0,                         "Vault: zero amount");
+        require(caller != address(0),               "Vault: zero caller");
+        require(commissionsOwed[agentId] >= amount, "Vault: exceeds owed");
+
+        commissionsOwed[agentId] -= amount;
+        emit CommissionApproved(agentId, caller, amount);
     }
 
     function triggerSettleEpoch() external onlyAgentManager {
