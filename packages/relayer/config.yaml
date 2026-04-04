@@ -1,0 +1,43 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: envio-indexer
+networks:
+- id: 16602
+  start_block: 25660467
+  rpc: https://evmrpc-testnet.0g.ai
+  contracts:
+  - name: Vault
+    address:
+    - 0x8c7799b6E70b8Ef5Ba89eAA04cC4a82B944F839f
+    handler: src/EventHandlers.ts
+    events:
+    - event: Approval(address indexed owner, address indexed spender, uint256 value)
+    - event: CommissionAccrued(uint256 indexed agentId, uint256 amount)
+    - event: CommissionApproved(uint256 indexed agentId, address indexed caller, uint256 amount)
+    - event: EpochSettled(uint256 sharePrice, uint256 totalShares, uint256 totalAssets)
+    - event: ForceCloseRequested(uint256 indexed agentId, uint8 source)
+    - event: ProtocolFeeAccrued(uint256 amount)
+    - event: RecoveryRecorded(uint256 indexed agentId, uint256 recoveredAmount)
+    - event: Transfer(address indexed from, address indexed to, uint256 value)
+    - event: WithdrawApproved(address indexed user, uint256 tokenAmount)
+    - event: WithdrawReleased(address indexed user, uint256 tokenAmount)
+- id: 11155111
+  start_block: 10587000
+  rpc: https://ethereum-sepolia.publicnode.com
+  contracts:
+  - name: Satellite
+    address:
+    - 0xeFD9583eF616e9770ca98E4201e940315128C0BF
+    handler: src/EventHandlers.ts
+    events:
+    - event: AgentRegistered(uint256 indexed agentId, address agentAddress, address indexed deployer, uint256 provingAmount)
+    - event: ClaimWithdrawRequested(address indexed user, uint256 tokenAmount)
+    - event: CommissionClaimRequested(uint256 indexed agentId, address indexed caller)
+    - event: Deposited(address indexed user, uint256 amount)
+    - event: PauseRequested(uint256 indexed agentId, address indexed caller, bool paused)
+    - event: PositionClosed(uint256 indexed agentId, uint256 indexed positionId, uint256 recoveredAmount)
+    - event: ValuesReported(uint256 indexed agentId, uint256 positionValue, uint256 feesCollected)
+    - event: WithdrawFromArenaRequested(uint256 indexed agentId, address indexed caller)
+    - event: WithdrawRequested(address indexed user, uint256 tokenAmount)
+    - event: WithdrawalCompleted(address indexed user, uint256 tokenAmount)
+unordered_multichain_mode: true
+preload_handlers: true
