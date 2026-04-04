@@ -200,7 +200,7 @@ contract SatelliteFeesTest is SatelliteTestBase {
         uint256 aliceBefore = usdc.balanceOf(alice);
 
         vm.prank(messenger);
-        satellite.releaseCommission(alice, 500e6);
+        satellite.releaseCommission(1, alice, 500e6);
 
         assertEq(usdc.balanceOf(alice), aliceBefore + 500e6);
     }
@@ -212,9 +212,21 @@ contract SatelliteFeesTest is SatelliteTestBase {
         assertEq(satellite.totalCommissionReserves(), 800e6);
 
         vm.prank(messenger);
-        satellite.releaseCommission(alice, 300e6);
+        satellite.releaseCommission(0, alice, 300e6);
 
         assertEq(satellite.totalCommissionReserves(), 500e6);
+    }
+
+    function test_releaseCommission_decrementsPerAgentCommissionReserve() public {
+        _fundSatellite(1_000e6);
+        _reserveCommission(1, 800e6);
+
+        assertEq(satellite.commissionReserve(1), 800e6);
+
+        vm.prank(messenger);
+        satellite.releaseCommission(1, alice, 300e6);
+
+        assertEq(satellite.commissionReserve(1), 500e6);
     }
 
     function test_releaseCommission_fullAmountCanBeReleased() public {
@@ -222,9 +234,10 @@ contract SatelliteFeesTest is SatelliteTestBase {
         _reserveCommission(0, 1_000e6);
 
         vm.prank(messenger);
-        satellite.releaseCommission(alice, 1_000e6);
+        satellite.releaseCommission(0, alice, 1_000e6);
 
         assertEq(satellite.totalCommissionReserves(), 0);
+        assertEq(satellite.commissionReserve(0), 0);
     }
 
     function test_releaseCommission_revertsWhenNotMessenger() public {
@@ -233,37 +246,37 @@ contract SatelliteFeesTest is SatelliteTestBase {
 
         vm.prank(alice);
         vm.expectRevert("Satellite: not messenger");
-        satellite.releaseCommission(alice, 100e6);
+        satellite.releaseCommission(0, alice, 100e6);
     }
 
     function test_releaseCommission_revertsOnZeroAmount() public {
         vm.prank(messenger);
         vm.expectRevert("Satellite: zero amount");
-        satellite.releaseCommission(alice, 0);
+        satellite.releaseCommission(0, alice, 0);
     }
 
     function test_releaseCommission_revertsOnZeroCaller() public {
         vm.prank(messenger);
         vm.expectRevert("Satellite: zero caller");
-        satellite.releaseCommission(address(0), 100e6);
+        satellite.releaseCommission(0, address(0), 100e6);
     }
 
     function test_releaseCommission_revertsWhenOverRelease_underflows() public {
-        // _totalCommissionReserves = 0 → subtraction underflows in Solidity 0.8
+        // commissionReserve[0] = 0 → subtraction underflows in Solidity 0.8
         _fundSatellite(1_000e6);
 
         vm.prank(messenger);
         vm.expectRevert(); // arithmetic underflow
-        satellite.releaseCommission(alice, 1);
+        satellite.releaseCommission(0, alice, 1);
     }
 
-    function test_releaseCommission_revertsWhenAmountExceedsTotal() public {
+    function test_releaseCommission_revertsWhenAmountExceedsPerAgent() public {
         _fundSatellite(1_000e6);
         _reserveCommission(0, 500e6);
 
         vm.prank(messenger);
-        vm.expectRevert(); // underflow: 500 - 600
-        satellite.releaseCommission(alice, 600e6);
+        vm.expectRevert(); // underflow: 500 - 600 on per-agent reserve
+        satellite.releaseCommission(0, alice, 600e6);
     }
 
     // =========================================================================

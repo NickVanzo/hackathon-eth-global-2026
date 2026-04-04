@@ -86,6 +86,11 @@ interface INonfungiblePositionManager {
         );
 }
 
+/// @notice Minimal Permit2 AllowanceTransfer interface for setting spender allowances.
+interface IPermit2 {
+    function approve(address token, address spender, uint160 amount, uint48 expiration) external;
+}
+
 // ---------------------------------------------------------------------------
 // Satellite
 // ---------------------------------------------------------------------------
@@ -100,13 +105,28 @@ interface INonfungiblePositionManager {
 ///   releaseQueuedWithdraw (messenger — actual Tier-2 token transfer), release,
 ///   updateSharePrice, idle reserve tracking, onlyMessenger
 ///
-/// Section 2.2 — Uniswap execution: executeBatch (TODO)
+/// Section 2.2 — Uniswap execution: executeBatch
+///   Swap via Universal Router (relayer-provided calldata from Trading API).
+///   LP via NonfungiblePositionManager (mint / decreaseLiquidity / collect / burn).
+///   Position NFT tracking per agentId. Source tagging per position.
+///
 /// Section 2.3 — Fee reserves: reserveProtocolFees, reserveCommission, approveQueuedWithdraw,
 ///   claimProtocolFees, releaseCommission
+///
 /// Section 2.4 — Agent management: pauseAgent, unpauseAgent, withdrawFromArena
-/// Section 2.5 — Force-close: forceClose (TODO)
+///
+/// Section 2.5 — Force-close: forceClose (source-filtered zap-out + capital return)
+///
+/// Section 2.6 — Reporting: collectAndReport (epoch fee collection + valuation)
 contract Satellite is ISatellite, ReentrancyGuard {
     using SafeERC20 for IERC20;
+
+    // -------------------------------------------------------------------------
+    // Constants
+    // -------------------------------------------------------------------------
+
+    /// @notice Canonical Permit2 address (same on all EVM chains).
+    address public constant PERMIT2 = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
 
     // -------------------------------------------------------------------------
     // Immutables — set at construction, never change
@@ -177,6 +197,12 @@ contract Satellite is ISatellite, ReentrancyGuard {
     ///         Set at mint time in executeBatch using the intent's source field.
     ///         Used by forceClose to selectively close only the intended class.
     mapping(uint256 tokenId => IShared.ForceCloseSource source) public positionSource;
+
+    /// @notice Reverse lookup: which agent owns a given position NFT.
+    mapping(uint256 tokenId => uint256 agentId) public positionAgent;
+
+    /// @notice All position NFT IDs owned by a given agent.
+    mapping(uint256 agentId => uint256[]) internal _agentPositions;
 
     // -------------------------------------------------------------------------
     // State: agent registry
@@ -251,6 +277,24 @@ contract Satellite is ISatellite, ReentrancyGuard {
 
         _nextAgentId     = 1;
         cachedSharePrice = 1e18; // 1:1 initial share price
+
+        // --- One-time token approvals ---
+
+        // 1. Approve Permit2 to spend our tokens (for Universal Router swaps)
+        IERC20(IUniswapV3Pool(_pool).token0()).forceApprove(PERMIT2, type(uint256).max);
+        IERC20(IUniswapV3Pool(_pool).token1()).forceApprove(PERMIT2, type(uint256).max);
+
+        // 2. Set Permit2 allowances for Universal Router (max amount, max expiry)
+        IPermit2(PERMIT2).approve(
+            IUniswapV3Pool(_pool).token0(), _universalRouter, type(uint160).max, type(uint48).max
+        );
+        IPermit2(PERMIT2).approve(
+            IUniswapV3Pool(_pool).token1(), _universalRouter, type(uint160).max, type(uint48).max
+        );
+
+        // 3. Approve NonfungiblePositionManager to spend our tokens (for LP minting)
+        IERC20(IUniswapV3Pool(_pool).token0()).forceApprove(_positionManager, type(uint256).max);
+        IERC20(IUniswapV3Pool(_pool).token1()).forceApprove(_positionManager, type(uint256).max);
     }
 
     // =========================================================================
@@ -370,6 +414,236 @@ contract Satellite is ISatellite, ReentrancyGuard {
     }
 
     // =========================================================================
+    // 2.2 — UNISWAP EXECUTION
+    // =========================================================================
+
+    /// @notice Execute a batch of intents from the 0G intent queue.
+    ///         The relayer enriches each intent's params with swap calldata from the
+    ///         Uniswap Trading API before calling this function.
+    ///
+    ///         Intent.params encoding per actionType:
+    ///           OPEN_POSITION:   abi.encode(uint256 amountUSDC, int24 tickLower, int24 tickUpper,
+    ///                                       bytes swapCalldata, ForceCloseSource source)
+    ///           CLOSE_POSITION:  abi.encode(uint256 tokenId, bytes swapCalldata)
+    ///           MODIFY_POSITION: abi.encode(uint256 oldTokenId, int24 newTickLower, int24 newTickUpper,
+    ///                                       bytes closeSwapCalldata, bytes openSwapCalldata,
+    ///                                       ForceCloseSource source)
+    function executeBatch(IShared.Intent[] calldata intents) external onlyMessenger nonReentrant {
+        for (uint256 i = 0; i < intents.length; i++) {
+            IShared.Intent calldata intent = intents[i];
+
+            if (intent.actionType == IShared.ActionType.OPEN_POSITION) {
+                _executeOpen(intent);
+            } else if (intent.actionType == IShared.ActionType.CLOSE_POSITION) {
+                _executeCloseIntent(intent);
+            } else if (intent.actionType == IShared.ActionType.MODIFY_POSITION) {
+                _executeModify(intent);
+            }
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: OPEN_POSITION
+    // -------------------------------------------------------------------------
+
+    /// @dev Zap-in via Universal Router then mint LP position via NonfungiblePositionManager.
+    function _executeOpen(IShared.Intent calldata intent) internal {
+        (
+            uint256 amountUSDC,
+            int24 tickLower,
+            int24 tickUpper,
+            bytes memory swapCalldata,
+            IShared.ForceCloseSource source
+        ) = abi.decode(intent.params, (uint256, int24, int24, bytes, IShared.ForceCloseSource));
+
+        _mintPosition(intent.agentId, amountUSDC, tickLower, tickUpper, swapCalldata, source);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: CLOSE_POSITION
+    // -------------------------------------------------------------------------
+
+    /// @dev Decrease liquidity, collect, zap-out via Universal Router, emit PositionClosed.
+    function _executeCloseIntent(IShared.Intent calldata intent) internal {
+        (uint256 tokenId, bytes memory swapCalldata) = abi.decode(intent.params, (uint256, bytes));
+
+        uint256 recovered = _closeAndZapOut(intent.agentId, tokenId, swapCalldata);
+        emit PositionClosed(intent.agentId, tokenId, recovered);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: MODIFY_POSITION (close old + open new)
+    // -------------------------------------------------------------------------
+
+    function _executeModify(IShared.Intent calldata intent) internal {
+        (
+            uint256 oldTokenId,
+            int24 newTickLower,
+            int24 newTickUpper,
+            bytes memory closeSwapCalldata,
+            bytes memory openSwapCalldata,
+            IShared.ForceCloseSource source
+        ) = abi.decode(intent.params, (uint256, int24, int24, bytes, bytes, IShared.ForceCloseSource));
+
+        // Close old position
+        uint256 recovered = _closeAndZapOut(intent.agentId, oldTokenId, closeSwapCalldata);
+        emit PositionClosed(intent.agentId, oldTokenId, recovered);
+
+        // Open new position with recovered capital
+        _mintPosition(intent.agentId, recovered, newTickLower, newTickUpper, openSwapCalldata, source);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: mint LP position (shared by open + modify)
+    // -------------------------------------------------------------------------
+
+    function _mintPosition(
+        uint256 agentId,
+        uint256 amountUSDC,
+        int24 tickLower,
+        int24 tickUpper,
+        bytes memory swapCalldata,
+        IShared.ForceCloseSource source
+    ) internal {
+        // Compute LP amounts via swap + balance deltas (scoped to free stack slots)
+        uint256 amount0Desired;
+        uint256 amount1Desired;
+        {
+            address otherToken = depositToken == token0 ? token1 : token0;
+            uint256 depositBefore = IERC20(depositToken).balanceOf(address(this));
+            uint256 otherBefore   = IERC20(otherToken).balanceOf(address(this));
+
+            // Execute zap-in swap via Universal Router
+            if (swapCalldata.length > 0) {
+                // solhint-disable-next-line avoid-low-level-calls
+                (bool success,) = universalRouter.call(swapCalldata);
+                require(success, "Satellite: zap-in swap failed");
+            }
+
+            // Compute resulting amounts from balance deltas
+            uint256 depositUsed   = depositBefore - IERC20(depositToken).balanceOf(address(this));
+            uint256 otherReceived = IERC20(otherToken).balanceOf(address(this)) - otherBefore;
+            uint256 depositForLP  = amountUSDC > depositUsed ? amountUSDC - depositUsed : 0;
+
+            // Order amounts for the pool's token0/token1
+            if (depositToken == token0) {
+                amount0Desired = depositForLP;
+                amount1Desired = otherReceived;
+            } else {
+                amount0Desired = otherReceived;
+                amount1Desired = depositForLP;
+            }
+        }
+
+        // Mint LP position via NonfungiblePositionManager
+        (uint256 tokenId,,,) = INonfungiblePositionManager(positionManager).mint(
+            INonfungiblePositionManager.MintParams({
+                token0:          token0,
+                token1:          token1,
+                fee:             poolFee,
+                tickLower:       tickLower,
+                tickUpper:       tickUpper,
+                amount0Desired:  amount0Desired,
+                amount1Desired:  amount1Desired,
+                amount0Min:      0, // slippage handled by relayer's swap calldata
+                amount1Min:      0,
+                recipient:       address(this),
+                deadline:        block.timestamp
+            })
+        );
+
+        // Track the position
+        positionSource[tokenId] = source;
+        positionAgent[tokenId]  = agentId;
+        _agentPositions[agentId].push(tokenId);
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: close position + zap-out (shared by close, modify, forceClose)
+    // -------------------------------------------------------------------------
+
+    /// @dev Decreases liquidity to zero, collects all tokens + fees, swaps the
+    ///      non-deposit token back to depositToken, burns the NFT, cleans tracking.
+    /// @return recoveredUSDC Total depositToken amount recovered (collected + swap proceeds).
+    function _closeAndZapOut(
+        uint256 agentId,
+        uint256 tokenId,
+        bytes memory swapCalldata
+    ) internal returns (uint256 recoveredUSDC) {
+        require(positionAgent[tokenId] == agentId, "Satellite: not agent's position");
+
+        // 1. Get position liquidity
+        (,,,,,,, uint128 liquidity,,,,) =
+            INonfungiblePositionManager(positionManager).positions(tokenId);
+
+        // 2. Decrease liquidity to zero
+        if (liquidity > 0) {
+            INonfungiblePositionManager(positionManager).decreaseLiquidity(
+                INonfungiblePositionManager.DecreaseLiquidityParams({
+                    tokenId:    tokenId,
+                    liquidity:  liquidity,
+                    amount0Min: 0,
+                    amount1Min: 0,
+                    deadline:   block.timestamp
+                })
+            );
+        }
+
+        // 3. Collect all tokens + accrued fees
+        (uint256 collected0, uint256 collected1) =
+            INonfungiblePositionManager(positionManager).collect(
+                INonfungiblePositionManager.CollectParams({
+                    tokenId:    tokenId,
+                    recipient:  address(this),
+                    amount0Max: type(uint128).max,
+                    amount1Max: type(uint128).max
+                })
+            );
+
+        // 4. Burn the empty position NFT
+        INonfungiblePositionManager(positionManager).burn(tokenId);
+
+        // 5. Clean up tracking
+        _removePosition(agentId, tokenId);
+        delete positionSource[tokenId];
+        delete positionAgent[tokenId];
+
+        // 6. Zap out: swap non-deposit token back to depositToken via Universal Router
+        uint256 depositCollected = depositToken == token0 ? collected0 : collected1;
+        uint256 otherCollected   = depositToken == token0 ? collected1 : collected0;
+
+        if (otherCollected > 0 && swapCalldata.length > 0) {
+            uint256 depositBefore = IERC20(depositToken).balanceOf(address(this));
+
+            // solhint-disable-next-line avoid-low-level-calls
+            (bool success,) = universalRouter.call(swapCalldata);
+            require(success, "Satellite: zap-out swap failed");
+
+            uint256 depositAfter = IERC20(depositToken).balanceOf(address(this));
+            recoveredUSDC = depositCollected + (depositAfter - depositBefore);
+        } else {
+            // No swap needed (e.g. position was entirely in depositToken)
+            recoveredUSDC = depositCollected;
+        }
+    }
+
+    // -------------------------------------------------------------------------
+    // Internal: remove a position from the agent's tracking array
+    // -------------------------------------------------------------------------
+
+    function _removePosition(uint256 agentId, uint256 tokenId) internal {
+        uint256[] storage positions = _agentPositions[agentId];
+        uint256 len = positions.length;
+        for (uint256 i = 0; i < len; i++) {
+            if (positions[i] == tokenId) {
+                positions[i] = positions[len - 1];
+                positions.pop();
+                return;
+            }
+        }
+    }
+
+    // =========================================================================
     // 2.3 — Fee reserves
     // =========================================================================
 
@@ -412,10 +686,12 @@ contract Satellite is ISatellite, ReentrancyGuard {
     }
 
     /// @notice Pay commission to iNFT owner. Called by relayer after CommissionApproved.
-    function releaseCommission(address caller, uint256 amount) external onlyMessenger nonReentrant {
+    ///         agentId identifies whose commission reserve to decrement.
+    function releaseCommission(uint256 agentId, address caller, uint256 amount) external onlyMessenger nonReentrant {
         require(amount > 0, "Satellite: zero amount");
         require(caller != address(0), "Satellite: zero caller");
-        _totalCommissionReserves -= amount; // underflow → revert if over-releasing
+        commissionReserve[agentId] -= amount; // underflow → revert if over-releasing per agent
+        _totalCommissionReserves -= amount;
         IERC20(depositToken).safeTransfer(caller, amount);
     }
 
@@ -436,30 +712,101 @@ contract Satellite is ISatellite, ReentrancyGuard {
     }
 
     // =========================================================================
-    // 2.2 stub — Uniswap execution (full implementation in Section 2.2)
+    // 2.5 — FORCE-CLOSE
     // =========================================================================
 
-    /// @notice Execute a batch of intents from the 0G intent queue.
-    ///         TODO: implement zap-in via Universal Router, NonfungiblePositionManager.mint, close, modify
-    function executeBatch(IShared.Intent[] calldata /* intents */ ) external onlyMessenger {
-        revert("Satellite: executeBatch not yet implemented");
-    }
-
-    // =========================================================================
-    // 2.5 stub — force-close (full implementation in Section 2.5)
-    // =========================================================================
-
-    /// @notice Force-close positions for an agent filtered by source.
+    /// @notice Force-close positions for an agent, filtered by source tag.
+    ///         Called by relayer after ForceCloseRequested events on 0G (from
+    ///         AgentManager eviction/arena-exit or Vault withdrawal enforcement).
+    ///
     ///         positionIds: relayer-provided from its local agentId → tokenIds cache.
     ///         source: PROVING closes only proving positions, VAULT closes only vault
     ///                 positions, ALL closes everything (withdraw-from-arena).
-    ///         TODO: implement zap-out per position, PositionClosed events
+    ///         swapCalldata: one entry per positionId — relayer-built calldata for
+    ///                 zapping the non-deposit token back to depositToken. Pass empty
+    ///                 bytes for positions that are entirely in depositToken.
+    ///
+    ///         Vault-funded capital returns to idle. Proving capital returns to deployer.
     function forceClose(
-        uint256 /* agentId */,
-        uint256[] calldata /* positionIds */,
-        IShared.ForceCloseSource /* source */
-    ) external onlyMessenger {
-        revert("Satellite: forceClose not yet implemented");
+        uint256 agentId,
+        uint256[] calldata positionIds,
+        IShared.ForceCloseSource source,
+        bytes[] calldata swapCalldata
+    ) external onlyMessenger nonReentrant {
+        require(positionIds.length == swapCalldata.length, "Satellite: length mismatch");
+
+        uint256 totalRecoveredProving;
+
+        for (uint256 i = 0; i < positionIds.length; i++) {
+            uint256 tokenId = positionIds[i];
+            IShared.ForceCloseSource posSource = positionSource[tokenId];
+
+            // Filter by requested source (ALL matches everything)
+            if (source != IShared.ForceCloseSource.ALL && posSource != source) {
+                continue;
+            }
+
+            uint256 recovered = _closeAndZapOut(agentId, tokenId, swapCalldata[i]);
+
+            if (posSource == IShared.ForceCloseSource.PROVING) {
+                totalRecoveredProving += recovered;
+            }
+            // VAULT-sourced capital stays in satellite as idle — no transfer needed
+
+            emit PositionClosed(agentId, tokenId, recovered);
+        }
+
+        // Return proving capital to the agent's deployer
+        if (totalRecoveredProving > 0) {
+            address deployer = agentDeployer[agentId];
+            require(deployer != address(0), "Satellite: no deployer");
+
+            // Decrease proving capital tracking
+            uint256 currentProving = provingCapital[agentId];
+            uint256 decrease = totalRecoveredProving > currentProving
+                ? currentProving
+                : totalRecoveredProving;
+            provingCapital[agentId] -= decrease;
+            _totalProvingCapital    -= decrease;
+
+            IERC20(depositToken).safeTransfer(deployer, totalRecoveredProving);
+        }
+    }
+
+    // =========================================================================
+    // 2.6 — REPORTING (epoch fee collection + valuation)
+    // =========================================================================
+
+    /// @notice Collect accrued trading fees on all of an agent's positions and
+    ///         emit ValuesReported for the relayer to forward to 0G.
+    ///
+    ///         Called by relayer once per epoch per agent before settlement.
+    ///         `positionValue` is computed off-chain by the relayer using pool state
+    ///         (sqrtPriceX96, position liquidity, tick range).
+    ///
+    /// @param agentId       The agent whose positions to collect fees for.
+    /// @param positionValue Off-chain computed USDC.e-equivalent value of all LP positions.
+    function collectAndReport(uint256 agentId, uint256 positionValue) external onlyMessenger nonReentrant {
+        uint256[] storage positions = _agentPositions[agentId];
+        uint256 totalFeesInDeposit;
+
+        for (uint256 i = 0; i < positions.length; i++) {
+            (uint256 f0, uint256 f1) = INonfungiblePositionManager(positionManager).collect(
+                INonfungiblePositionManager.CollectParams({
+                    tokenId:    positions[i],
+                    recipient:  address(this),
+                    amount0Max: type(uint128).max,
+                    amount1Max: type(uint128).max
+                })
+            );
+
+            // Count only deposit-token-denominated fees.
+            // Non-deposit-token fees remain in the satellite and are captured
+            // in the position value at the next epoch.
+            totalFeesInDeposit += depositToken == token0 ? f0 : f1;
+        }
+
+        emit ValuesReported(agentId, positionValue, totalFeesInDeposit);
     }
 
     // =========================================================================
@@ -481,5 +828,15 @@ contract Satellite is ISatellite, ReentrancyGuard {
     /// @notice Pending Tier-2 withdrawal queued for a user.
     function pendingWithdrawal(address user) external view returns (uint256) {
         return _pendingWithdrawals[user];
+    }
+
+    /// @notice All position NFT IDs currently owned by an agent.
+    function getAgentPositions(uint256 agentId) external view returns (uint256[] memory) {
+        return _agentPositions[agentId];
+    }
+
+    /// @notice Number of active positions for an agent.
+    function agentPositionCount(uint256 agentId) external view returns (uint256) {
+        return _agentPositions[agentId].length;
     }
 }
