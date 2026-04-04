@@ -224,7 +224,7 @@ contract AgentManager is IAgentManager {
     }
 
     // -------------------------------------------------------------------------
-    // Agent-callable: submitIntent (stub for Task 1)
+    // Agent-callable: submitIntent
     // -------------------------------------------------------------------------
 
     function submitIntent(
@@ -235,7 +235,94 @@ contract AgentManager is IAgentManager {
         require(agents[agentId].registered, "AgentManager: not registered");
         require(agents[agentId].agentAddress == msg.sender, "AgentManager: not agent");
         require(!agents[agentId].paused, "AgentManager: paused");
+
+        Bucket storage bucket = buckets[agentId];
+        require(
+            block.number >= bucket.lastActionBlock + minActionInterval,
+            "AgentManager: cooldown"
+        );
+
+        Agent storage agent = agents[agentId];
+
+        if (agent.phase == IShared.AgentPhase.PROVING) {
+            // PROVING branch
+            if (actionType == IShared.ActionType.OPEN_POSITION ||
+                actionType == IShared.ActionType.MODIFY_POSITION) {
+                IShared.IntentParams memory ip = abi.decode(params, (IShared.IntentParams));
+                require(
+                    ip.amountUSDC <= agent.provingBalance - agent.provingDeployed,
+                    "AgentManager: exceeds proving balance"
+                );
+                agent.provingDeployed += ip.amountUSDC;
+            }
+            // CLOSE: skip amount check
+        } else {
+            // VAULT branch
+            uint256 elapsed = block.number - bucket.lastActionBlock;
+            uint256 refilled = elapsed * bucket.refillRate;
+            uint256 newCredits = bucket.credits + refilled;
+            if (newCredits > bucket.maxCredits) newCredits = bucket.maxCredits;
+            bucket.credits = newCredits;
+
+            if (actionType == IShared.ActionType.OPEN_POSITION ||
+                actionType == IShared.ActionType.MODIFY_POSITION) {
+                IShared.IntentParams memory ip = abi.decode(params, (IShared.IntentParams));
+                require(bucket.credits >= ip.amountUSDC, "AgentManager: insufficient credits");
+
+                (bool ok, bytes memory data) = vault.staticcall(
+                    abi.encodeWithSignature("trackedTotalAssets()")
+                );
+                require(ok, "AM: vault read failed");
+                uint256 vaultTotal = abi.decode(data, (uint256));
+                require(
+                    ip.amountUSDC <= vaultTotal - totalDeployedVault,
+                    "AgentManager: exceeds vault capacity"
+                );
+
+                bucket.credits -= ip.amountUSDC;
+                totalDeployedVault += ip.amountUSDC;
+            }
+            // CLOSE: skip amount check
+        }
+
+        bucket.lastActionBlock = block.number;
         emit IntentQueued(agentId, actionType, params, block.number);
+    }
+
+    // -------------------------------------------------------------------------
+    // Messenger-only: recordClosure
+    // -------------------------------------------------------------------------
+
+    function recordClosure(
+        uint256 agentId,
+        uint256 recoveredAmount,
+        uint8 source
+    ) external onlyMessenger {
+        if (source == 0) {
+            // VAULT source
+            if (recoveredAmount <= totalDeployedVault) {
+                totalDeployedVault -= recoveredAmount;
+            } else {
+                totalDeployedVault = 0;
+            }
+            if (agents[agentId].registered) {
+                Bucket storage bucket = buckets[agentId];
+                uint256 newCredits = bucket.credits + recoveredAmount;
+                if (newCredits > bucket.maxCredits) newCredits = bucket.maxCredits;
+                bucket.credits = newCredits;
+            }
+        } else if (source == 1) {
+            // PROVING source
+            if (agents[agentId].registered) {
+                Agent storage agent = agents[agentId];
+                if (recoveredAmount <= agent.provingDeployed) {
+                    agent.provingDeployed -= recoveredAmount;
+                } else {
+                    agent.provingDeployed = 0;
+                }
+            }
+        }
+        // If agent deregistered or unknown source: skip silently
     }
 
     // -------------------------------------------------------------------------
