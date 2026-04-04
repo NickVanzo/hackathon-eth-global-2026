@@ -30,7 +30,7 @@ networks:
     - event: AgentEvicted(uint256 indexed agentId, bool fullEviction)
     - event: ForceCloseRequested(uint256 indexed agentId, uint8 source)
 - id: 11155111
-  start_block: 10589116
+  start_block: 10589163
   rpc: https://ethereum-sepolia.publicnode.com
   contracts:
   - name: Satellite
