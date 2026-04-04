@@ -27,6 +27,7 @@ const epochCount = (() => {
   return idx !== -1 && args[idx + 1] ? parseInt(args[idx + 1], 10) : 4;
 })();
 const syntheticMode = args.includes("--synthetic");
+const externalRelayer = args.includes("--relayer");
 
 // ---------------------------------------------------------------------------
 // Config
@@ -35,9 +36,9 @@ const syntheticMode = args.includes("--synthetic");
 const ZG_RPC = "https://evmrpc-testnet.0g.ai";
 const SEPOLIA_RPC = "https://ethereum-sepolia.publicnode.com";
 
-const AGENT_MANAGER_ADDR = "0x2346Beaf07eed640166a2A921e9B650cBaD0530b"; // 0G
-const VAULT_ADDR = "0x0C7704A97CC88f9e068C1f7a99881666f1db675A"; // 0G
-const SATELLITE_ADDR = "0x2346Beaf07eed640166a2A921e9B650cBaD0530b"; // Sepolia
+const AGENT_MANAGER_ADDR = "0xBa6b9dB405D505739c13432f8079EBa64D1228dA"; // 0G
+const VAULT_ADDR = "0xb1F3e0685cF7b37ECd9AD2218D8EA70E2B983234"; // 0G
+const SATELLITE_ADDR = "0x6A41811dE41afd41BccDeD1c44995E35Fd353251"; // Sepolia
 
 const RELAYER_KEY = "0x03fd9c5a6a4d37e488f1c6806182d14a7d0c1cd90c405fee2b20002ee70e778a";
 
@@ -367,7 +368,11 @@ async function submitIntentOnChain(agent, decision, signerIdx) {
   // Encode params
   let params;
   if (actionType === 0 || actionType === 2) {
-    const amountUSDC = BigInt(decision.amountUSDC ?? 500000); // default 0.5 USDC.e
+    // Agent decides in human-readable USDC (e.g. 1000 = $1000).
+    // Convert to 6-decimal raw units. Cap at proving balance (1 USDC.e = 1000000).
+    const humanAmount = decision.amountUSDC ?? 1;
+    const rawAmount = BigInt(Math.round(humanAmount * 1e6));
+    const amountUSDC = rawAmount > 1_000_000n ? 500_000n : rawAmount; // cap at proving balance, default half
     const tickLower = decision.tickLower ?? -887220;
     const tickUpper = decision.tickUpper ?? 887220;
     params = ethers.AbiCoder.defaultAbiCoder().encode(
@@ -589,24 +594,42 @@ async function runOneEpoch(epochNum, token) {
     }
   }
 
-  // 4. Relay to Sepolia (or fall back to synthetic)
-  let relaySuccess = false;
-  if (!syntheticMode && intents.length > 0) {
-    relaySuccess = await relayIntentsToSepolia(intents);
-  }
+  if (externalRelayer) {
+    // External relayer handles: executeBatch + reportValues + epoch settlement
+    if (intents.length > 0) {
+      log("mode", "external relayer mode — waiting for relayer to process intents, report values, and settle epoch");
+      log("mode", `submitted ${intents.length} intent(s), relayer will pick up IntentQueued events`);
+    } else {
+      log("mode", "no intents this epoch — triggering settlement directly");
+    }
+    // Wait for relayer to process intents + report values before settling
+    // The relayer needs time to: pick up IntentQueued → call executeBatch → collectAndReport → reportValues
+    if (intents.length > 0) {
+      log("wait", "waiting 60s for relayer to execute intents and report values...");
+      await new Promise((r) => setTimeout(r, 60_000));
+    }
+    // We still trigger epoch settlement ourselves (relayer may not do it automatically)
+    await waitForEpochAndSettle();
+  } else {
+    // 4. Relay to Sepolia (or fall back to synthetic)
+    let relaySuccess = false;
+    if (!syntheticMode && intents.length > 0) {
+      relaySuccess = await relayIntentsToSepolia(intents);
+    }
 
-  const useSynthetic = syntheticMode || !relaySuccess;
-  if (useSynthetic) {
-    log("mode", "using synthetic values for reporting");
-  }
+    const useSynthetic = syntheticMode || !relaySuccess;
+    if (useSynthetic) {
+      log("mode", "using synthetic values for reporting");
+    }
 
-  // 5. Report values for each agent
-  for (const agent of AGENTS) {
-    await reportValues(agent, useSynthetic);
-  }
+    // 5. Report values for each agent
+    for (const agent of AGENTS) {
+      await reportValues(agent, useSynthetic);
+    }
 
-  // 6. Trigger epoch settlement
-  await waitForEpochAndSettle();
+    // 6. Trigger epoch settlement
+    await waitForEpochAndSettle();
+  }
 
   // 7. Report status
   await reportStatus();
@@ -614,7 +637,7 @@ async function runOneEpoch(epochNum, token) {
 
 async function main() {
   log("main", `Agent Arena E2E Orchestrator`);
-  log("main", `epochs=${epochCount} synthetic=${syntheticMode}`);
+  log("main", `epochs=${epochCount} synthetic=${syntheticMode} externalRelayer=${externalRelayer}`);
   log("main", `0G RPC: ${ZG_RPC}`);
   log("main", `Sepolia RPC: ${SEPOLIA_RPC}`);
   log("main", `AgentManager: ${AGENT_MANAGER_ADDR}`);

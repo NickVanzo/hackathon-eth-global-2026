@@ -10,11 +10,11 @@ export const SATELLITE_ADDRESS =
 
 export const VAULT_ADDRESS =
   (process.env.VAULT_ADDRESS as `0x${string}`) ||
-  "0xf8155a5f0a9660e28c8e13918414342eb8dbc263";
+  "0xb1f3e0685cf7b37ecd9ad2218d8ea70e2b983234";
 
 export const AGENT_MANAGER_ADDRESS =
   (process.env.AGENT_MANAGER_ADDRESS as `0x${string}`) ||
-  "0xd1c589e75bc949e31d590dffefed6bde96a89b90";
+  "0xba6b9db405d505739c13432f8079eba64d1228da";
 
 // ---------------------------------------------------------------------------
 // Token addresses (Sepolia)
