@@ -67,6 +67,8 @@ if [[ "${SKIP_0G:-}" != "1" ]]; then
         --rpc-url og_testnet \
         --broadcast \
         --skip-simulation \
+        --legacy \
+        --gas-price 3000000000 \
         2>&1 | tee /tmp/deploy-0g-output.log) || die "0G deployment failed"
     ok "0G deployment complete"
 else
