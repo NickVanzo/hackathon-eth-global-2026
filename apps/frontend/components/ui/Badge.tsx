@@ -9,9 +9,9 @@ interface BadgeProps {
 }
 
 const variantStyles: Record<BadgeVariant, string> = {
-  positive: "bg-emerald-900/50 text-emerald-400 border-emerald-800",
-  negative: "bg-red-900/50 text-red-400 border-red-800",
-  neutral: "bg-yellow-900/50 text-yellow-400 border-yellow-800",
+  positive: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
+  negative: "bg-orange-500/20 text-orange-400 border-orange-500/30",
+  neutral: "bg-purple-500/20 text-purple-400 border-purple-500/30",
 };
 
 export function Badge({

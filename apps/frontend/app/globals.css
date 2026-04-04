@@ -1,8 +1,18 @@
 @import "tailwindcss";
 
 :root {
-  --background: #030712;
-  --foreground: #f3f4f6;
+  --cyber-cyan: #00E5FF;
+  --cyber-orange: #FF5722;
+  --cyber-purple: #7000FF;
+  --surface-0: #0D0D0D;
+  --surface-1: #111111;
+  --surface-2: #1c1b1b;
+  --text-primary: #E5E2E1;
+  --text-secondary: #787776;
+
+  /* Legacy aliases kept for Tailwind compatibility */
+  --background: #0D0D0D;
+  --foreground: #E5E2E1;
 }
 
 @theme inline {
@@ -13,7 +23,22 @@
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
+  background: var(--surface-0);
+  color: var(--text-primary);
   font-family: var(--font-sans), system-ui, sans-serif;
+}
+
+/* ── Glow utilities ─────────────────────────────────────────────────────── */
+
+.glow-cyan {
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.15);
+}
+
+.glow-cyan-strong {
+  box-shadow: 0 0 32px rgba(0, 229, 255, 0.25), 0 0 8px rgba(0, 229, 255, 0.1);
+}
+
+.border-glow-cyan {
+  border-color: rgba(0, 229, 255, 0.4);
+  box-shadow: 0 0 12px rgba(0, 229, 255, 0.12);
 }
