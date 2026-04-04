@@ -16,7 +16,7 @@
  * these, executes the tool, and sends results back for a final decision.
  */
 
-import { mkdirSync, writeFileSync } from "fs";
+import { mkdirSync, readFileSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -32,6 +32,24 @@ const WORKSPACE_BASE = join(STATE_DIR, "workspaces");
 const GATEWAY_URL = "http://127.0.0.1:3000";
 const MCP_URL = process.env.MCP_SERVER_URL ?? "http://127.0.0.1:3001";
 const POOL_ADDRESS = process.env.POOL_ADDRESS;
+
+// ---------------------------------------------------------------------------
+// Agent wallet addresses — loaded from workspace .env files at startup
+// ---------------------------------------------------------------------------
+
+/** @type {Record<string, string>} */
+const agentWalletAddresses = {};
+
+for (const agentId of ["agent-alpha", "agent-beta", "agent-gamma"]) {
+  try {
+    const envPath = join(WORKSPACE_BASE, agentId, ".env");
+    const envContent = readFileSync(envPath, "utf8");
+    const match = envContent.match(/^AGENT_WALLET_ADDRESS=(.+)$/m);
+    if (match) agentWalletAddresses[agentId] = match[1].trim();
+  } catch {
+    // workspace .env not present — wallet address will be undefined
+  }
+}
 
 // ---------------------------------------------------------------------------
 // Position tracking — persists agent positions across epochs
@@ -61,10 +79,37 @@ function updatePosition(agentId, decision) {
 // Subgraph MCP client — minimal Streamable HTTP implementation
 // ---------------------------------------------------------------------------
 
+/**
+ * Parse an MCP response body. The Streamable HTTP transport may return either:
+ * - application/json: a raw JSON-RPC envelope
+ * - text/event-stream (SSE): one or more "data: {...}" lines
+ * This helper handles both formats transparently.
+ */
+async function parseMcpResponse(res) {
+  const raw = await res.text();
+  const contentType = res.headers.get("content-type") ?? "";
+
+  if (contentType.includes("text/event-stream")) {
+    // SSE: extract the last "data:" line containing a JSON-RPC response
+    const lines = raw.split("\n").filter((l) => l.startsWith("data:"));
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try {
+        return JSON.parse(lines[i].slice(5).trim());
+      } catch { /* try previous line */ }
+    }
+    throw new Error("SSE response contained no parseable JSON-RPC data");
+  }
+
+  return JSON.parse(raw);
+}
+
 async function mcpInitSession() {
   const res = await fetch(MCP_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream",
+    },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
@@ -79,7 +124,7 @@ async function mcpInitSession() {
   });
   const sessionId = res.headers.get("mcp-session-id");
   if (!sessionId) throw new Error("MCP did not return a session ID");
-  await res.text();
+  await parseMcpResponse(res); // drain body
   return sessionId;
 }
 
@@ -88,6 +133,7 @@ async function mcpCallTool(sessionId, toolName, args) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream",
       "mcp-session-id": sessionId,
     },
     body: JSON.stringify({
@@ -99,7 +145,7 @@ async function mcpCallTool(sessionId, toolName, args) {
     signal: AbortSignal.timeout(15_000),
   });
   if (!res.ok) throw new Error(`MCP HTTP ${res.status}`);
-  const envelope = await res.json();
+  const envelope = await parseMcpResponse(res);
   if (envelope.error) throw new Error(`MCP error: ${envelope.error.message}`);
   const text = envelope.result?.content?.[0]?.text;
   if (!text) throw new Error("MCP returned empty content");
@@ -238,6 +284,8 @@ const previousPrices = {};
 
 async function getPoolState(agentId) {
   let currentPrice, currentTick, source;
+  let nearbyTicks = [];
+  let mcpOpenPosition = null;
 
   if (POOL_ADDRESS && !POOL_ADDRESS.startsWith("TODO")) {
     try {
@@ -255,6 +303,61 @@ async function getPoolState(agentId) {
         const pool = priceResult.pool;
         currentPrice = parseFloat(pool.token1Price);
         currentTick = Math.floor(Math.log(currentPrice) / Math.log(1.0001));
+      }
+
+      // Supplementary: tick liquidity distribution
+      try {
+        const ticksResult = await mcpCallTool(sessionId, "get_pool_ticks", {
+          poolAddress: POOL_ADDRESS,
+          chain: "sepolia",
+        });
+        const ticks = Array.isArray(ticksResult) ? ticksResult : (ticksResult.ticks ?? []);
+        // Sort by distance from currentTick and take the 10 closest
+        nearbyTicks = ticks
+          .filter((t) => t.tickIdx != null)
+          .sort((a, b) => Math.abs(Number(a.tickIdx) - currentTick) - Math.abs(Number(b.tickIdx) - currentTick))
+          .slice(0, 10)
+          .map((t) => ({
+            tickIdx: String(t.tickIdx),
+            liquidityNet: String(t.liquidityNet ?? "0"),
+            liquidityGross: String(t.liquidityGross ?? "0"),
+          }));
+      } catch (tickErr) {
+        // tick data is supplementary — failure is non-fatal
+        console.warn(`[cron] get_pool_ticks failed (${tickErr.message}), continuing without tick data`);
+      }
+
+      // Supplementary: on-chain LP positions for this agent's wallet
+      const walletAddress = agentWalletAddresses[agentId];
+      if (!walletAddress) {
+        console.warn(`[cron] no wallet address for ${agentId} — skipping get_positions`);
+      }
+      if (walletAddress) {
+        try {
+          const positionsResult = await mcpCallTool(sessionId, "get_positions", {
+            chainId: 11155111,
+            address: walletAddress,
+          });
+          const positions = Array.isArray(positionsResult)
+            ? positionsResult
+            : (positionsResult.positions ?? []);
+          // Use the first in-range position (tickLower <= currentTick <= tickUpper)
+          const inRange = positions.find(
+            (p) => p.tickLower != null && p.tickUpper != null &&
+              Number(p.tickLower) <= currentTick && currentTick <= Number(p.tickUpper)
+          );
+          if (inRange) {
+            mcpOpenPosition = {
+              tickLower: Number(inRange.tickLower),
+              tickUpper: Number(inRange.tickUpper),
+              liquidity: String(inRange.liquidity ?? "0"),
+              uncollectedFees: inRange.uncollectedFees ?? inRange.feesOwed ?? null,
+            };
+          }
+        } catch (posErr) {
+          // positions are supplementary — failure is non-fatal
+          console.warn(`[cron] get_positions failed (${posErr.message}), falling back to tracked position`);
+        }
       }
     } catch (err) {
       console.warn(`[cron] MCP unavailable (${err.message}), falling back to mock`);
@@ -282,7 +385,8 @@ async function getPoolState(agentId) {
     currentPrice: parseFloat(currentPrice.toFixed(4)),
     previousPrice: parseFloat(previousPrice.toFixed(4)),
     currentTick,
-    openPosition: getTrackedPosition(agentId),
+    openPosition: mcpOpenPosition ?? getTrackedPosition(agentId),
+    nearbyTicks,
   };
 }
 

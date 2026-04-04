@@ -1,8 +1,9 @@
 /**
  * query-pool.mjs — fetch current pool state from the Subgraph MCP server.
  *
- * Reads POOL_ADDRESS from workspace .env and MCP_SERVER_URL from the process
- * environment. Prints a JSON pool state object to stdout.
+ * Reads POOL_ADDRESS and AGENT_WALLET_ADDRESS from workspace .env and
+ * MCP_SERVER_URL from the process environment. Prints a JSON pool state
+ * object to stdout.
  *
  * Called by OpenClaw when the agent invokes the query-pool skill.
  */
@@ -20,16 +21,37 @@ if (!POOL_ADDRESS || POOL_ADDRESS.startsWith("TODO")) {
   process.exit(1);
 }
 
+const AGENT_WALLET_ADDRESS = process.env.AGENT_WALLET_ADDRESS;
+
 const MCP_URL = process.env.MCP_SERVER_URL ?? "http://127.0.0.1:3001";
 
 // ---------------------------------------------------------------------------
 // Minimal Streamable HTTP MCP client
 // ---------------------------------------------------------------------------
 
+/**
+ * Parse an MCP response. Handles both JSON and SSE (text/event-stream) formats.
+ */
+async function parseMcpResponse(res) {
+  const raw = await res.text();
+  const ct = res.headers.get("content-type") ?? "";
+  if (ct.includes("text/event-stream")) {
+    const lines = raw.split("\n").filter((l) => l.startsWith("data:"));
+    for (let i = lines.length - 1; i >= 0; i--) {
+      try { return JSON.parse(lines[i].slice(5).trim()); } catch { /* next */ }
+    }
+    throw new Error("SSE contained no parseable JSON-RPC data");
+  }
+  return JSON.parse(raw);
+}
+
 async function initSession() {
   const res = await fetch(MCP_URL, {
     method: "POST",
-    headers: { "Content-Type": "application/json" },
+    headers: {
+      "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream",
+    },
     body: JSON.stringify({
       jsonrpc: "2.0",
       id: 1,
@@ -45,8 +67,7 @@ async function initSession() {
 
   const sessionId = res.headers.get("mcp-session-id");
   if (!sessionId) throw new Error("MCP server did not return a session ID");
-  // Drain body to avoid socket hang
-  await res.text();
+  await parseMcpResponse(res); // drain body
   return sessionId;
 }
 
@@ -55,6 +76,7 @@ async function callTool(sessionId, toolName, args) {
     method: "POST",
     headers: {
       "Content-Type": "application/json",
+      "Accept": "application/json, text/event-stream",
       "mcp-session-id": sessionId,
     },
     body: JSON.stringify({
@@ -67,7 +89,7 @@ async function callTool(sessionId, toolName, args) {
   });
 
   if (!res.ok) throw new Error(`MCP tool call failed: HTTP ${res.status}`);
-  const envelope = await res.json();
+  const envelope = await parseMcpResponse(res);
   if (envelope.error) throw new Error(`MCP error: ${envelope.error.message}`);
 
   const text = envelope.result?.content?.[0]?.text;
@@ -100,6 +122,41 @@ function extractPriceAndTick(priceResult) {
   };
 }
 
+/**
+ * Extract the 10 ticks closest to currentTick from the ticks result.
+ * Returns an empty array on any failure so this is non-fatal.
+ */
+function extractNearbyTicks(ticksResult, currentTick) {
+  const ticks = ticksResult?.ticks ?? ticksResult?.pool?.ticks ?? [];
+  if (!Array.isArray(ticks) || ticks.length === 0) return [];
+
+  return ticks
+    .map((t) => ({ tickIdx: parseInt(t.tickIdx ?? t.tick, 10), liquidityNet: t.liquidityNet, liquidityGross: t.liquidityGross }))
+    .filter((t) => !isNaN(t.tickIdx))
+    .sort((a, b) => Math.abs(a.tickIdx - currentTick) - Math.abs(b.tickIdx - currentTick))
+    .slice(0, 10);
+}
+
+/**
+ * Extract the agent's open position from the positions result.
+ * Returns a null-filled object on any failure so this is non-fatal.
+ */
+function extractPosition(positionsResult) {
+  const positions = positionsResult?.positions ?? positionsResult?.result ?? [];
+  if (!Array.isArray(positions) || positions.length === 0) {
+    return { tickLower: null, tickUpper: null, liquidity: null, uncollectedFees: null };
+  }
+
+  // Use the first active position (liquidity > 0) if available
+  const active = positions.find((p) => p.liquidity && p.liquidity !== "0") ?? positions[0];
+  return {
+    tickLower: active.tickLower ?? null,
+    tickUpper: active.tickUpper ?? null,
+    liquidity: active.liquidity ?? null,
+    uncollectedFees: active.uncollectedFees ?? null,
+  };
+}
+
 // ---------------------------------------------------------------------------
 // Main
 // ---------------------------------------------------------------------------
@@ -108,12 +165,41 @@ function extractPriceAndTick(priceResult) {
   try {
     const sessionId = await initSession();
 
+    // --- Required: price + current tick ---
     const priceResult = await callTool(sessionId, "get_pool_price", {
       poolAddress: POOL_ADDRESS,
       chain: "sepolia",
     });
 
-    const { currentPrice, currentTick } = extractPriceAndTick(priceResult);
+    const { currentPrice, currentTick: rawTick } = extractPriceAndTick(priceResult);
+    const currentTick = rawTick ?? Math.floor(Math.log(currentPrice) / Math.log(1.0001));
+
+    // --- Supplementary: nearby ticks (non-fatal) ---
+    let nearbyTicks = [];
+    try {
+      const ticksResult = await callTool(sessionId, "get_pool_ticks", {
+        poolAddress: POOL_ADDRESS,
+        chain: "sepolia",
+      });
+      nearbyTicks = extractNearbyTicks(ticksResult, currentTick);
+    } catch (err) {
+      // Non-fatal — strategy can proceed without tick depth data
+    }
+
+    // --- Supplementary: open position (non-fatal) ---
+    let openPosition = { tickLower: null, tickUpper: null, liquidity: null, uncollectedFees: null };
+    if (AGENT_WALLET_ADDRESS && !AGENT_WALLET_ADDRESS.startsWith("TODO")) {
+      try {
+        const positionsResult = await callTool(sessionId, "get_positions", {
+          ownerAddress: AGENT_WALLET_ADDRESS,
+          poolAddress: POOL_ADDRESS,
+          chain: "sepolia",
+        });
+        openPosition = extractPosition(positionsResult);
+      } catch (err) {
+        // Non-fatal — strategy can proceed assuming no open position
+      }
+    }
 
     // Pool state format expected by AGENTS.md strategy prompts
     const poolState = {
@@ -123,8 +209,9 @@ function extractPriceAndTick(priceResult) {
       // previousPrice is null — strategies that depend on price direction (contrarian)
       // cannot function correctly without it in that path.
       previousPrice: null,
-      currentTick: currentTick ?? Math.floor(Math.log(currentPrice) / Math.log(1.0001)),
-      openPosition: { tickLower: null, tickUpper: null, liquidity: null },
+      currentTick,
+      nearbyTicks,
+      openPosition,
     };
 
     console.log(JSON.stringify(poolState));

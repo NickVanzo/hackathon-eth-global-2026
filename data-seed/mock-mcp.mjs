@@ -106,6 +106,145 @@ function handleGetWhaleMovements() {
   return handleGetRecentSwaps();
 }
 
+// Mock addresses
+const MOCK_USDC  = "0xa0b86991c6218b36c1d19d4a2e9eb0ce3606eb48";
+const MOCK_WETH  = "0xc02aaa39b223fe8d0a0e5c4f27ead9083c756cc2";
+const MOCK_POOL  = "0x88e6a0c2ddd26feeb64f039a2c41296fcb3f5640";
+
+function handleGetQuote(args) {
+  const { amount = "1000000000000000000", type = "EXACT_INPUT" } = args ?? {};
+  // Simulate a USDC→WETH or WETH→USDC quote using the current mock price
+  const amountNum = BigInt(amount);
+  // quote output: if EXACT_INPUT 1 WETH (~1800 USDC), scale by price
+  const quoteAmount = String(amountNum);
+  return {
+    status: "ok",
+    routing: "CLASSIC",
+    quote: {
+      chainId: 1,
+      swapper: "0x0000000000000000000000000000000000000000",
+      input: {
+        token: args?.tokenInAddress ?? MOCK_WETH,
+        amount: quoteAmount,
+        amountDecimals: (Number(amountNum) / 1e18).toFixed(6),
+      },
+      output: {
+        token: args?.tokenOutAddress ?? MOCK_USDC,
+        amount: String(Math.round(currentPrice * 1e6)),
+        amountDecimals: currentPrice.toFixed(6),
+        minimumAmount: String(Math.round(currentPrice * 0.995 * 1e6)),
+      },
+      slippage: 0.5,
+      tradeType: type,
+      gasFeeUSD: (Math.random() * 5 + 1).toFixed(2),
+      priceImpact: (Math.random() * 0.3).toFixed(4),
+    },
+    permitData: null,
+  };
+}
+
+function handleGetRoute(args) {
+  const quote = handleGetQuote(args);
+  // Augment with route detail
+  quote.quote.route = [
+    [
+      {
+        type: "v3-pool",
+        address: MOCK_POOL,
+        tokenIn:  { address: args?.tokenInAddress  ?? MOCK_WETH, symbol: "WETH", decimals: 18 },
+        tokenOut: { address: args?.tokenOutAddress ?? MOCK_USDC, symbol: "USDC", decimals: 6 },
+        fee: "3000",
+        sqrtRatioX96: "0",
+        liquidity: "12345678901234567890",
+        tickCurrent: String(currentTick),
+        amountIn:  quote.quote.input.amount,
+        amountOut: quote.quote.output.amount,
+      },
+    ],
+  ];
+  return quote;
+}
+
+function handleGetPools(args) {
+  const { chainId = 1 } = args ?? {};
+  return {
+    status: "ok",
+    pools: [
+      {
+        address: MOCK_POOL,
+        chainId,
+        token0: { address: MOCK_USDC, symbol: "USDC", decimals: 6 },
+        token1: { address: MOCK_WETH, symbol: "WETH", decimals: 18 },
+        fee: 3000,
+        tickSpacing: TICK_SPACING,
+        sqrtPriceX96: "0",
+        tick: currentTick,
+        liquidity: "12345678901234567890",
+        totalValueLockedUSD: (Math.random() * 50_000_000 + 10_000_000).toFixed(2),
+        volumeUSD24h: (Math.random() * 5_000_000 + 1_000_000).toFixed(2),
+        feeTier: "0.3%",
+      },
+    ],
+  };
+}
+
+function handleGetPositions(args) {
+  const { address = "0x0000000000000000000000000000000000000000" } = args ?? {};
+
+  // Two mock LP positions bracketing the current tick
+  const snap = Math.round(currentTick / TICK_SPACING) * TICK_SPACING;
+
+  // Position 1: in-range — straddles currentTick
+  const pos1TickLower = snap - TICK_SPACING * 10;  // ~600 ticks below
+  const pos1TickUpper = snap + TICK_SPACING * 10;  // ~600 ticks above
+
+  // Position 2: out-of-range — entirely below current tick (single-sided USDC)
+  const pos2TickUpper = snap - TICK_SPACING * 20;
+  const pos2TickLower = snap - TICK_SPACING * 40;
+
+  return {
+    status: "ok",
+    positions: [
+      {
+        tokenId: "12345",
+        owner: address,
+        pool: MOCK_POOL,
+        token0: { address: MOCK_USDC, symbol: "USDC", decimals: 6 },
+        token1: { address: MOCK_WETH, symbol: "WETH", decimals: 18 },
+        fee: 3000,
+        tickLower: pos1TickLower,
+        tickUpper: pos1TickUpper,
+        liquidity: "5000000000000000000",
+        amount0: "4820123456",          // USDC (6 dec)
+        amount1: "2678901234567890123", // WETH (18 dec)
+        inRange: true,
+        uncollectedFees: {
+          amount0: "12345678",          // USDC
+          amount1: "6789012345678",     // WETH
+        },
+      },
+      {
+        tokenId: "12346",
+        owner: address,
+        pool: MOCK_POOL,
+        token0: { address: MOCK_USDC, symbol: "USDC", decimals: 6 },
+        token1: { address: MOCK_WETH, symbol: "WETH", decimals: 18 },
+        fee: 3000,
+        tickLower: pos2TickLower,
+        tickUpper: pos2TickUpper,
+        liquidity: "2000000000000000000",
+        amount0: "9640246912",          // USDC only (out-of-range below)
+        amount1: "0",
+        inRange: false,
+        uncollectedFees: {
+          amount0: "987654",
+          amount1: "0",
+        },
+      },
+    ],
+  };
+}
+
 const TOOL_HANDLERS = {
   get_pool_price: handleGetPoolPrice,
   get_pool_ticks: handleGetPoolTicks,
@@ -114,6 +253,10 @@ const TOOL_HANDLERS = {
   get_pool_fees: handleGetPoolFees,
   get_recent_swaps: handleGetRecentSwaps,
   get_whale_movements: handleGetWhaleMovements,
+  get_quote: handleGetQuote,
+  get_route: handleGetRoute,
+  get_pools: handleGetPools,
+  get_positions: handleGetPositions,
 };
 
 // ---------------------------------------------------------------------------
