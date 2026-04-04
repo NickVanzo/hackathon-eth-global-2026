@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useAgentCount, useAgentInfo } from "@/lib/contracts";
+import { useAgentCount, useAgentInfo, useActiveAgentIds } from "@/lib/contracts";
 import { MOCK_AGENTS } from "@/lib/mock-data";
 
 // ─── Design tokens extracted from Stitch leaderboard.html ────────────────────
@@ -528,7 +528,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
       style={{
         display: "grid",
         gridTemplateColumns:
-          "1fr 4fr 2fr 1fr 2fr 2fr",
+          "1fr 4fr 2fr 1fr 1fr 2fr 2fr",
         padding: "20px 24px",
         backgroundColor: rowBg,
         borderLeft: `4px solid ${borderColor}`,
@@ -633,6 +633,42 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
         }}
       >
         {agent.sharpeScore.toFixed(2)}
+      </div>
+
+      {/* CREDITS */}
+      <div
+        role="cell"
+        style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: "4px" }}
+      >
+        <span
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: "13px",
+            color: agent.credits > 0 ? COLORS.primary : COLORS.secondary,
+          }}
+        >
+          {agent.credits}
+        </span>
+        {/* credit bar showing credits/maxCredits */}
+        <div
+          style={{
+            width: "40px",
+            height: "3px",
+            backgroundColor: "rgba(59,73,76,0.4)",
+            borderRadius: "2px",
+            overflow: "hidden",
+          }}
+        >
+          <div
+            style={{
+              width: `${agent.maxCredits > 0 ? Math.min(100, (agent.credits / agent.maxCredits) * 100) : 0}%`,
+              height: "100%",
+              backgroundColor: agent.credits > agent.maxCredits * 0.5 ? COLORS.primaryContainer : COLORS.secondary,
+              transition: "width 500ms",
+            }}
+          />
+        </div>
       </div>
 
       {/* 7D_PERF */}
@@ -994,12 +1030,15 @@ function PromoCard() {
 
 export default function AgentPerformance() {
   const { count } = useAgentCount();
-  const { agent: rawAgent1 } = useAgentInfo(1);
-  const { agent: rawAgent2 } = useAgentInfo(2);
-  const { agent: rawAgent3 } = useAgentInfo(3);
+  const { ids: activeIds } = useActiveAgentIds();
+  const { agent: rawAgent1, isLoading: loading1 } = useAgentInfo(1);
+  const { agent: rawAgent2, isLoading: loading2 } = useAgentInfo(2);
+  const { agent: rawAgent3, isLoading: loading3 } = useAgentInfo(3);
+  const isLoadingAgents = loading1 || loading2 || loading3;
 
   const liveAgents = [rawAgent1, rawAgent2, rawAgent3]
     .filter((a): a is NonNullable<typeof a> => a != null)
+    .filter((a) => !activeIds || activeIds.includes(a.id))
     .map((liveAgent) => {
       const mockAgent = MOCK_AGENTS.find((m) => m.id === liveAgent.id);
       return {
@@ -1022,6 +1061,21 @@ export default function AgentPerformance() {
 
   return (
     <>
+      {isLoadingAgents && (
+        <div
+          style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            height: "2px",
+            backgroundColor: "#00e5ff",
+            opacity: 0.8,
+            zIndex: 100,
+            animation: "arena-pulse 1s infinite",
+          }}
+        />
+      )}
       {/* Google Fonts + global overrides */}
       {/* eslint-disable-next-line react/no-danger */}
       <style
@@ -1094,6 +1148,28 @@ export default function AgentPerformance() {
                   >
                     LIVE_SIMULATION_ACTIVE
                   </span>
+                  {count !== undefined && (
+                    <span
+                      style={{
+                        display: "inline-flex",
+                        alignItems: "center",
+                        gap: "6px",
+                        padding: "3px 8px",
+                        backgroundColor: "rgba(0,229,255,0.1)",
+                        border: "1px solid rgba(0,229,255,0.3)",
+                        borderRadius: "2px",
+                        fontFamily: "'Space Grotesk', sans-serif",
+                        fontSize: "9px",
+                        fontWeight: 700,
+                        letterSpacing: "0.15em",
+                        color: "#00e5ff",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#00e5ff", display: "inline-block" }} />
+                      LIVE_DATA
+                    </span>
+                  )}
                 </div>
                 <h1
                   id="leaderboard-heading"
@@ -1156,7 +1232,7 @@ export default function AgentPerformance() {
                 role="row"
                 style={{
                   display: "grid",
-                  gridTemplateColumns: "1fr 4fr 2fr 1fr 2fr 2fr",
+                  gridTemplateColumns: "1fr 4fr 2fr 1fr 1fr 2fr 2fr",
                   padding: "16px 24px",
                   backgroundColor: COLORS.surfaceContainerLow,
                   borderBottom: `1px solid rgba(59,73,76,0.2)`,
@@ -1167,6 +1243,7 @@ export default function AgentPerformance() {
                 <ColHeader>AGENT_IDENTIFIER</ColHeader>
                 <ColHeader>TIER_CLASS</ColHeader>
                 <ColHeader>SHARPE</ColHeader>
+                <ColHeader>CREDITS</ColHeader>
                 <ColHeader>7D_PERF</ColHeader>
                 <ColHeader right>CONTROLLER</ColHeader>
               </div>
