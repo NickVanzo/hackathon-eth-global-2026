@@ -164,7 +164,7 @@ async function runAgentEpoch(agentId) {
       submitIntent(agentId, "open", {
         tickLower: decision.tickLower,
         tickUpper: decision.tickUpper,
-        liquidity: "1000000000000000000",
+        amountUSDC: decision.amountUSDC ?? 1000,
       });
       return;
     }
@@ -173,7 +173,7 @@ async function runAgentEpoch(agentId) {
       submitIntent(agentId, "open", {
         tickLower: decision.tickLower,
         tickUpper: decision.tickUpper,
-        liquidity: "1000000000000000000",
+        amountUSDC: decision.amountUSDC ?? 1000,
       });
       return;
     }
