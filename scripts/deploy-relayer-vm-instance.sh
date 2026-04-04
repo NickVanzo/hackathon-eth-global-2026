@@ -218,7 +218,7 @@ result = subprocess.run(
 )
 resp = json.loads(result.stdout)
 tracked = sum(1 for r in resp if isinstance(r, dict) and r.get('message') == 'success')
-already = sum(1 for r in resp if isinstance(r, dict) and 'already tracked' in r.get('message', '') or 'already-tracked' in str(r.get('code', '')))
+already = len(resp) - tracked
 print(f'  Tracked {tracked} new tables ({already} already tracked)')
 
 # Step 2: Set custom root fields (strip envio_ prefix)
@@ -248,7 +248,7 @@ result = subprocess.run(
     capture_output=True, text=True
 )
 resp = json.loads(result.stdout)
-customized = sum(1 for r in resp if isinstance(r, dict) and r.get('message') == 'success')
+customized = sum(1 for r in resp if isinstance(r, dict) and r.get('message') == 'success') if isinstance(resp, list) else 0
 print(f'  Customized root fields for {customized} tables')
 
 # Step 3: Reload metadata
