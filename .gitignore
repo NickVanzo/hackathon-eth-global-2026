@@ -168,6 +168,12 @@ broadcast/
 # Fly.io
 .fly/
 
+# OpenClaw local state (contains hardcoded API keys and session data — never commit)
+local/
+
+# Dry-run intent files (ephemeral runtime output)
+data-seed/intents/
+
 # Editor artefacts
 .vscode/
 .idea/

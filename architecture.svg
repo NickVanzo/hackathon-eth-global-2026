@@ -36,128 +36,150 @@
   <text x="290" y="112" text-anchor="middle" font-size="14" font-weight="600" fill="#1e40af">0G Testnet (accounting only -- no tokens)</text>
 
   <!-- Vault -->
-  <rect x="50" y="130" width="230" height="210" rx="12" fill="white" stroke="#93c5fd" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="50" y="130" width="230" height="230" rx="12" fill="white" stroke="#93c5fd" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="165" y="155" text-anchor="middle" font-size="15" font-weight="700" fill="#1e40af">Vault</text>
   <text x="165" y="171" text-anchor="middle" font-size="10" fill="#64748b">Pure Accounting</text>
 
   <text x="65" y="193" font-size="10" fill="#334155">Share token (ERC20)</text>
-  <text x="65" y="208" font-size="10" fill="#334155">totalAssets, sharePrice</text>
-  <text x="65" y="223" font-size="10" fill="#334155">recordDeposit (messenger)</text>
-  <text x="65" y="238" font-size="10" fill="#334155">processWithdraw (messenger)</text>
-  <text x="65" y="253" font-size="10" fill="#334155">Withdrawal queue (T1+T2)</text>
-  <text x="65" y="268" font-size="10" fill="#334155">Fee waterfall computation</text>
-  <text x="65" y="283" font-size="10" fill="#334155">Commission ledger</text>
-  <text x="65" y="298" font-size="10" fill="#334155">epochCheck + _settleEpoch</text>
-  <text x="65" y="313" font-size="10" fill="#334155">triggerSettleEpoch (public)</text>
-  <text x="65" y="328" font-size="10" fill="#334155">approveCommissionRelease</text>
+  <text x="65" y="208" font-size="10" fill="#334155">totalAssets (state var), sharePrice</text>
+  <text x="65" y="223" font-size="10" fill="#334155">recordDeposit (onlyMessenger)</text>
+  <text x="65" y="238" font-size="10" fill="#334155">processWithdraw (T1/T2, idle est.)</text>
+  <text x="65" y="253" font-size="10" fill="#334155">claimWithdraw, recordRecovery</text>
+  <text x="65" y="268" font-size="10" fill="#334155">Fee waterfall + commission ledger</text>
+  <text x="65" y="283" font-size="10" fill="#334155">epochCheck + _settleEpoch</text>
+  <text x="65" y="298" font-size="10" fill="#334155">triggerSettleEpoch (public)</text>
+  <text x="65" y="313" font-size="10" fill="#334155">approveCommissionRelease (onlyAM)</text>
+  <text x="65" y="328" font-size="10" fill="#334155">ForceCloseRequested (withdrawals)</text>
+  <text x="65" y="343" font-size="10" fill="#334155">onlyMessenger, onlyAgentManager</text>
 
   <!-- AgentManager -->
-  <rect x="300" y="130" width="235" height="260" rx="12" fill="white" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="300" y="130" width="235" height="290" rx="12" fill="white" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="417" y="155" text-anchor="middle" font-size="15" font-weight="700" fill="#7c3aed">AgentManager</text>
   <text x="417" y="171" text-anchor="middle" font-size="10" fill="#64748b">Agent Lifecycle</text>
 
-  <text x="315" y="193" font-size="10" fill="#334155">Agent registry (state, phase)</text>
+  <text x="315" y="193" font-size="10" fill="#334155">Agent registry (phase, balances)</text>
   <text x="315" y="208" font-size="10" fill="#334155">iNFT contract (ERC-721)</text>
-  <text x="315" y="223" font-size="10" fill="#334155">submitIntent (agent entry)</text>
-  <text x="315" y="238" font-size="10" fill="#334155">Token bucket (credits)</text>
-  <text x="315" y="253" font-size="10" fill="#334155">reportValues (messenger)</text>
-  <text x="315" y="268" font-size="10" fill="#334155">Sharpe scoring / EMAs</text>
-  <text x="315" y="283" font-size="10" fill="#334155">settleAgents (called by Vault)</text>
-  <text x="315" y="298" font-size="10" fill="#334155">Promotion / Eviction</text>
-  <text x="315" y="313" font-size="10" fill="#334155">processPause (iNFT auth)</text>
-  <text x="315" y="328" font-size="10" fill="#334155">processCommissionClaim</text>
-  <text x="315" y="343" font-size="10" fill="#334155">Withdraw-from-arena</text>
-  <text x="315" y="358" font-size="10" fill="#334155">recordRegistration + mint</text>
-  <text x="315" y="373" font-size="10" fill="#334155">setVault (one-time init)</text>
+  <text x="315" y="223" font-size="10" fill="#334155">totalDeployedVault (counter)</text>
+  <text x="315" y="238" font-size="10" fill="#334155">submitIntent (source auto-tag)</text>
+  <text x="315" y="253" font-size="10" fill="#334155">Token bucket (credits)</text>
+  <text x="315" y="268" font-size="10" fill="#334155">recordClosure(agentId, amt, src)</text>
+  <text x="315" y="283" font-size="10" fill="#334155">reportValues (onlyMessenger)</text>
+  <text x="315" y="298" font-size="10" fill="#334155">settleAgents(tA, maxExp) onlyVault</text>
+  <text x="315" y="313" font-size="10" fill="#334155">Sharpe scoring / EMAs</text>
+  <text x="315" y="328" font-size="10" fill="#334155">Promotion / Eviction</text>
+  <text x="315" y="343" font-size="10" fill="#334155">processPause, processCommClaim</text>
+  <text x="315" y="358" font-size="10" fill="#334155">processWithdrawFromArena</text>
+  <text x="315" y="373" font-size="10" fill="#334155">recordRegistration + mint iNFT</text>
+  <text x="315" y="388" font-size="10" fill="#334155">setVault (one-time init)</text>
+  <text x="315" y="403" font-size="10" fill="#334155">onlyMessenger, onlyVault</text>
 
   <!-- Cross-contract arrow: Vault -> AgentManager -->
-  <line x1="280" y1="280" x2="298" y2="280" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)"/>
-  <text x="289" y="275" text-anchor="middle" font-size="7" fill="#ef4444">settleAgents()</text>
+  <line x1="280" y1="290" x2="298" y2="290" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="289" y="284" text-anchor="middle" font-size="7" fill="#ef4444">settleAgents(tA, maxExp)</text>
 
-  <!-- Cross-contract arrow: AgentManager -> Vault -->
+  <!-- Cross-contract arrow: AgentManager -> Vault (submitIntent reads totalAssets) -->
   <line x1="300" y1="240" x2="282" y2="240" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)"/>
-  <text x="289" y="235" text-anchor="middle" font-size="7" fill="#ef4444">idleBalance()</text>
+  <text x="289" y="234" text-anchor="middle" font-size="7" fill="#ef4444">vault.totalAssets()</text>
+
+  <!-- Cross-contract arrow: Vault reads totalDeployedVault from AM -->
+  <line x1="280" y1="260" x2="298" y2="260" stroke="#ef4444" stroke-width="1.5" stroke-dasharray="3 2" marker-end="url(#arrow-red)"/>
+  <text x="289" y="254" text-anchor="middle" font-size="6" fill="#ef4444">AM.totalDeployedVault()</text>
 
   <!-- Cross-contract label -->
-  <rect x="100" y="350" width="200" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
-  <text x="200" y="367" text-anchor="middle" font-size="9" font-weight="600" fill="#dc2626">Cross-contract calls</text>
-  <text x="200" y="381" text-anchor="middle" font-size="8" fill="#64748b">settleAgents, idleBalance, approveCommission, triggerSettle</text>
+  <rect x="70" y="375" width="215" height="45" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="177" y="392" text-anchor="middle" font-size="9" font-weight="600" fill="#dc2626">Cross-contract calls</text>
+  <text x="177" y="404" text-anchor="middle" font-size="7" fill="#64748b">settleAgents(tA,maxExp), totalAssets(),</text>
+  <text x="177" y="414" text-anchor="middle" font-size="7" fill="#64748b">totalDeployedVault(), approveCommRelease</text>
 
   <!-- iNFT badge -->
-  <rect x="320" y="400" width="200" height="50" rx="10" fill="white" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="420" y="422" text-anchor="middle" font-size="12" font-weight="600" fill="#7c3aed">iNFT Contract (ERC-721)</text>
-  <text x="420" y="437" text-anchor="middle" font-size="9" fill="#64748b">Ownership deeds, minted by AgentManager</text>
+  <rect x="310" y="430" width="210" height="50" rx="10" fill="white" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="415" y="452" text-anchor="middle" font-size="12" font-weight="600" fill="#7c3aed">iNFT Contract (ERC-721)</text>
+  <text x="415" y="467" text-anchor="middle" font-size="9" fill="#64748b">Ownership deeds, minted by AgentManager</text>
 
-  <!-- Constructor params badge -->
-  <rect x="50" y="400" width="250" height="50" rx="10" fill="white" stroke="#94a3b8" stroke-width="1" filter="url(#shadow)"/>
-  <text x="175" y="418" text-anchor="middle" font-size="10" font-weight="600" fill="#334155">Deploy: AgentManager -> Vault -> setVault()</text>
-  <text x="175" y="433" text-anchor="middle" font-size="8" fill="#64748b">Vault params: epochLength, fees, exposure | AM params: alpha, maxAgents, Sharpe</text>
+  <!-- Deploy order badge -->
+  <rect x="50" y="430" width="250" height="50" rx="10" fill="white" stroke="#94a3b8" stroke-width="1" filter="url(#shadow)"/>
+  <text x="175" y="448" text-anchor="middle" font-size="10" font-weight="600" fill="#334155">Deploy: AgentManager -> Vault -> setVault()</text>
+  <text x="175" y="463" text-anchor="middle" font-size="8" fill="#64748b">Invariant: maxExposureRatio + idleReserveRatio = 10000</text>
 
   <!-- ==================== SEPOLIA ZONE ==================== -->
   <rect x="830" y="85" width="440" height="480" rx="16" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="1050" y="112" text-anchor="middle" font-size="14" font-weight="600" fill="#166534">Ethereum Sepolia (all tokens)</text>
 
   <!-- Satellite -->
-  <rect x="860" y="130" width="380" height="230" rx="12" fill="white" stroke="#86efac" stroke-width="1.5" filter="url(#shadow)"/>
+  <rect x="860" y="130" width="380" height="240" rx="12" fill="white" stroke="#86efac" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="1050" y="155" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">Satellite</text>
   <text x="1050" y="173" text-anchor="middle" font-size="11" fill="#64748b">Fund Custodian + Uniswap Executor</text>
 
   <text x="880" y="198" font-size="10" fill="#334155">Holds ALL tokens (USDC.e)</text>
   <text x="880" y="213" font-size="10" fill="#334155">Owns all LP positions (NFTs)</text>
-  <text x="880" y="228" font-size="10" fill="#334155">Zap-in/out (SwapRouter)</text>
+  <text x="880" y="228" font-size="10" fill="#334155">positionSource[tokenId] mapping</text>
   <text x="880" y="243" font-size="10" fill="#334155">deposit, registerAgent</text>
   <text x="880" y="258" font-size="10" fill="#334155">requestWithdraw, claimWithdraw</text>
+  <text x="880" y="273" font-size="10" fill="#334155">releaseQueuedWithdraw (Tier 2)</text>
 
   <text x="1060" y="198" font-size="10" fill="#334155">Idle reserve (20%)</text>
-  <text x="1060" y="213" font-size="10" fill="#334155">Commission reserve</text>
-  <text x="1060" y="228" font-size="10" fill="#334155">Protocol reserve</text>
-  <text x="1060" y="243" font-size="10" fill="#334155">executeBatch (messenger)</text>
-  <text x="1060" y="258" font-size="10" fill="#334155">forceClose (messenger)</text>
+  <text x="1060" y="213" font-size="10" fill="#334155">reserveProtocolFees(amt)</text>
+  <text x="1060" y="228" font-size="10" fill="#334155">reserveCommission(agentId, amt)</text>
+  <text x="1060" y="243" font-size="10" fill="#334155">executeBatch (+ source field)</text>
+  <text x="1060" y="258" font-size="10" fill="#334155">forceClose(id, posIds[], source)</text>
+  <text x="1060" y="273" font-size="10" fill="#334155">PositionClosed event</text>
 
   <!-- Uniswap integration detail -->
-  <rect x="870" y="275" width="360" height="70" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
-  <text x="1050" y="292" text-anchor="middle" font-size="10" font-weight="600" fill="#166534">Uniswap v3 Integration</text>
-  <text x="880" y="307" font-size="9" fill="#475569">NonfungiblePositionManager - open/close/modify LP</text>
-  <text x="880" y="320" font-size="9" fill="#475569">SwapRouter - zap-in (USDC->ETH) / zap-out (ETH->USDC)</text>
-  <text x="880" y="333" font-size="9" fill="#475569">collect() - realize fees | slot0() - position valuation</text>
+  <rect x="870" y="285" width="360" height="70" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="1050" y="302" text-anchor="middle" font-size="10" font-weight="600" fill="#166534">Uniswap v3 Integration</text>
+  <text x="880" y="317" font-size="9" fill="#475569">NonfungiblePositionManager - open/close/modify LP</text>
+  <text x="880" y="330" font-size="9" fill="#475569">Universal Router - receives API-generated swap calldata</text>
+  <text x="880" y="343" font-size="9" fill="#475569">collect() - realize fees | slot0() - position valuation</text>
 
   <!-- Uniswap Pool -->
-  <rect x="860" y="370" width="170" height="55" rx="10" fill="#ff007a" fill-opacity="0.08" stroke="#ff007a" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="945" y="393" text-anchor="middle" font-size="12" font-weight="600" fill="#ff007a">Uniswap Pool</text>
-  <text x="945" y="410" text-anchor="middle" font-size="9" fill="#64748b">e.g., ETH/USDC on Sepolia</text>
+  <rect x="860" y="380" width="170" height="55" rx="10" fill="#ff007a" fill-opacity="0.08" stroke="#ff007a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="945" y="403" text-anchor="middle" font-size="12" font-weight="600" fill="#ff007a">Uniswap Pool</text>
+  <text x="945" y="420" text-anchor="middle" font-size="9" fill="#64748b">e.g., ETH/USDC on Sepolia</text>
 
   <!-- User interaction badge -->
-  <rect x="1050" y="370" width="190" height="55" rx="10" fill="white" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" filter="url(#shadow)"/>
-  <text x="1145" y="392" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Users interact HERE</text>
-  <text x="1145" y="407" text-anchor="middle" font-size="9" fill="#64748b">deposit, withdraw, register,</text>
-  <text x="1145" y="420" text-anchor="middle" font-size="9" fill="#64748b">claim, pause (all on Sepolia)</text>
+  <rect x="1050" y="380" width="190" height="55" rx="10" fill="white" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" filter="url(#shadow)"/>
+  <text x="1145" y="402" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Users interact HERE</text>
+  <text x="1145" y="417" text-anchor="middle" font-size="9" fill="#64748b">deposit, withdraw, register,</text>
+  <text x="1145" y="430" text-anchor="middle" font-size="9" fill="#64748b">claim, pause (all on Sepolia)</text>
 
   <!-- ==================== RELAYER ==================== -->
-  <rect x="580" y="130" width="220" height="145" rx="14" fill="white" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
+  <rect x="575" y="130" width="230" height="170" rx="14" fill="white" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
   <text x="690" y="158" text-anchor="middle" font-size="15" font-weight="700" fill="#ea580c">Relayer</text>
-  <text x="690" y="176" text-anchor="middle" font-size="10" fill="#64748b">Node.js (hackathon)</text>
-  <text x="690" y="190" text-anchor="middle" font-size="10" fill="#64748b">Permissionless network (prod)</text>
-  <text x="600" y="212" font-size="9" fill="#475569">Routes to correct 0G contract:</text>
-  <text x="600" y="226" font-size="9" fill="#1e40af">Vault: deposits, withdrawals</text>
-  <text x="600" y="240" font-size="9" fill="#7c3aed">AgentMgr: intents, values, reg</text>
-  <text x="600" y="254" font-size="9" fill="#166534">Satellite: execute, release, fees</text>
-  <text x="600" y="268" font-size="9" fill="#475569">12 event routes total</text>
+  <text x="690" y="176" text-anchor="middle" font-size="10" fill="#64748b">Node.js (hackathon) | Permissionless (prod)</text>
+
+  <text x="590" y="196" font-size="9" fill="#475569">Position cache: agentId -> tokenIds</text>
+  <text x="590" y="210" font-size="9" fill="#475569">Uniswap Trading API POST (calldata)</text>
+  <text x="590" y="224" font-size="9" fill="#475569">Periodic triggerSettleEpoch()</text>
+  <text x="590" y="242" font-size="9" fill="#1e40af">Vault: deposits, withdrawals, claims</text>
+  <text x="590" y="256" font-size="9" fill="#7c3aed">AM: intents, values, reg, pause, close</text>
+  <text x="590" y="270" font-size="9" fill="#166534">Satellite: execute, release, fees, force</text>
+  <text x="590" y="284" font-size="9" fill="#ef4444">Listens ForceCloseRequested (both)</text>
 
   <!-- Relayer arrows to Vault -->
-  <line x1="580" y1="170" x2="282" y2="170" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="430" y="164" text-anchor="middle" font-size="8" fill="#f97316">recordDeposit, processWithdraw</text>
+  <line x1="575" y1="170" x2="282" y2="170" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="430" y="164" text-anchor="middle" font-size="8" fill="#f97316">recordDeposit, processWithdraw, claimWithdraw</text>
 
   <!-- Relayer arrows to AgentManager -->
-  <line x1="580" y1="200" x2="537" y2="200" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="555" y="194" text-anchor="middle" font-size="8" fill="#f97316">intents, values</text>
+  <line x1="575" y1="200" x2="537" y2="200" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="553" y="194" text-anchor="middle" font-size="8" fill="#f97316">intents, values, recordClosure(src)</text>
 
   <!-- Relayer arrows to Satellite -->
-  <line x1="800" y1="170" x2="858" y2="170" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="830" y="164" text-anchor="middle" font-size="8" fill="#f97316">executeBatch</text>
+  <line x1="805" y1="170" x2="858" y2="170" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="832" y="164" text-anchor="middle" font-size="8" fill="#f97316">executeBatch(+API calldata)</text>
 
   <!-- Satellite to Relayer -->
-  <line x1="858" y1="200" x2="800" y2="200" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="830" y="214" text-anchor="middle" font-size="8" fill="#f97316">ValuesReported</text>
+  <line x1="858" y1="200" x2="805" y2="200" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="832" y="214" text-anchor="middle" font-size="8" fill="#f97316">ValuesReported, PositionClosed</text>
+
+  <!-- ==================== UNISWAP TRADING API ==================== -->
+  <rect x="600" y="320" width="185" height="55" rx="10" fill="#ff007a" fill-opacity="0.06" stroke="#ff007a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="692" y="342" text-anchor="middle" font-size="11" font-weight="600" fill="#ff007a">Uniswap Trading API</text>
+  <text x="692" y="357" text-anchor="middle" font-size="9" fill="#64748b">POST /swap, /route (relayer)</text>
+  <text x="692" y="369" text-anchor="middle" font-size="9" fill="#64748b">GET /quote, /pools (MCP proxy)</text>
+
+  <!-- Relayer to Uniswap API -->
+  <line x1="690" y1="300" x2="690" y2="318" stroke="#ff007a" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="710" y="312" font-size="7" fill="#ff007a">POST</text>
 
   <!-- ==================== AGENTS ==================== -->
   <rect x="150" y="580" width="370" height="160" rx="14" fill="white" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)"/>
@@ -187,24 +209,29 @@
   <text x="437" y="715" text-anchor="middle" font-size="8" fill="#ef4444">gets evicted</text>
 
   <!-- Agent to AgentManager arrow -->
-  <line x1="400" y1="578" x2="417" y2="455" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
-  <text x="425" y="520" font-size="9" fill="#7c3aed" transform="rotate(-78, 425, 520)">submitIntent()</text>
+  <line x1="400" y1="578" x2="417" y2="485" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <text x="425" y="535" font-size="9" fill="#7c3aed" transform="rotate(-78, 425, 535)">submitIntent()</text>
 
   <!-- ==================== SUBGRAPH MCP ==================== -->
-  <rect x="580" y="620" width="210" height="100" rx="12" fill="white" stroke="#0ea5e9" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="685" y="648" text-anchor="middle" font-size="14" font-weight="700" fill="#0369a1">Subgraph MCP</text>
-  <text x="685" y="665" text-anchor="middle" font-size="10" fill="#64748b">TheGraph + MCP interface</text>
-  <text x="685" y="685" text-anchor="middle" font-size="9" fill="#475569">Pool prices, volume, ticks</text>
-  <text x="685" y="699" text-anchor="middle" font-size="9" fill="#475569">Liquidity distribution, fees</text>
-  <text x="685" y="713" text-anchor="middle" font-size="9" fill="#475569">Agent's "eyes" into the market</text>
+  <rect x="580" y="610" width="210" height="115" rx="12" fill="white" stroke="#0ea5e9" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="685" y="635" text-anchor="middle" font-size="14" font-weight="700" fill="#0369a1">Data Layer MCP</text>
+  <text x="685" y="652" text-anchor="middle" font-size="10" fill="#64748b">TheGraph + Uniswap API GET</text>
+  <text x="685" y="672" text-anchor="middle" font-size="9" fill="#475569">Subgraph: prices, volume, ticks, TVL</text>
+  <text x="685" y="687" text-anchor="middle" font-size="9" fill="#475569">API proxy: /quote, /route, /pools</text>
+  <text x="685" y="702" text-anchor="middle" font-size="9" fill="#475569">/positions (API key hidden)</text>
+  <text x="685" y="717" text-anchor="middle" font-size="9" fill="#475569">Agent's "eyes" into the market</text>
 
-  <!-- Agent to Subgraph arrow -->
+  <!-- Agent to MCP arrow -->
   <line x1="522" y1="680" x2="578" y2="670" stroke="#0ea5e9" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
-  <text x="550" y="665" text-anchor="middle" font-size="8" fill="#0ea5e9">query</text>
+  <text x="550" y="665" text-anchor="middle" font-size="8" fill="#0ea5e9">MCP tools</text>
 
-  <!-- Subgraph reads Sepolia -->
-  <line x1="790" y1="660" x2="1050" y2="450" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-blue)"/>
-  <text x="940" y="545" font-size="8" fill="#0ea5e9" transform="rotate(-40, 940, 545)">reads Sepolia chain data</text>
+  <!-- MCP to Uniswap API -->
+  <line x1="692" y1="610" x2="692" y2="377" stroke="#ff007a" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-red)"/>
+  <text x="710" y="490" font-size="7" fill="#ff007a">GET proxy</text>
+
+  <!-- MCP reads Sepolia via subgraph -->
+  <line x1="790" y1="660" x2="1050" y2="460" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-blue)"/>
+  <text x="940" y="555" font-size="8" fill="#0ea5e9" transform="rotate(-40, 940, 555)">reads Sepolia via TheGraph</text>
 
   <!-- ==================== DASHBOARD ==================== -->
   <rect x="870" y="580" width="200" height="100" rx="12" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
@@ -217,7 +244,7 @@
   <!-- ==================== FEE WATERFALL ==================== -->
   <rect x="30" y="790" width="580" height="130" rx="14" fill="white" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)"/>
   <text x="320" y="815" text-anchor="middle" font-size="14" font-weight="700" fill="#b45309">Fee Waterfall (per epoch, from collected Uniswap fees)</text>
-  <text x="320" y="833" text-anchor="middle" font-size="10" fill="#64748b">Vault computes using feesCollected returned by AgentManager.settleAgents()</text>
+  <text x="320" y="833" text-anchor="middle" font-size="10" fill="#64748b">Vault reconciles: totalAssets = positionValue + idle + depositorReturn</text>
 
   <rect x="50" y="848" width="155" height="35" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
   <text x="127" y="870" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Protocol Fee (5%)</text>
@@ -232,8 +259,8 @@
   <rect x="420" y="848" width="155" height="35" rx="6" fill="#ecfdf5" stroke="#22c55e" stroke-width="1"/>
   <text x="497" y="870" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Depositor Yield</text>
 
-  <text x="127" y="903" text-anchor="middle" font-size="9" fill="#64748b">Protocol treasury</text>
-  <text x="312" y="903" text-anchor="middle" font-size="9" fill="#64748b">iNFT owner (via AgentMgr)</text>
+  <text x="127" y="903" text-anchor="middle" font-size="9" fill="#64748b">reserveProtocolFees()</text>
+  <text x="312" y="903" text-anchor="middle" font-size="9" fill="#64748b">reserveCommission(agentId)</text>
   <text x="497" y="903" text-anchor="middle" font-size="9" fill="#64748b">Share value increase</text>
 
   <!-- ==================== AGENT LIFECYCLE ==================== -->
@@ -263,11 +290,11 @@
   <rect x="1110" y="840" width="90" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1"/>
   <text x="1155" y="862" text-anchor="middle" font-size="10" font-weight="600" fill="#dc2626">Evict</text>
 
-  <text x="715" y="896" text-anchor="middle" font-size="8" fill="#64748b">own capital</text>
+  <text x="715" y="896" text-anchor="middle" font-size="8" fill="#64748b">own capital + iNFT</text>
   <text x="825" y="896" text-anchor="middle" font-size="8" fill="#64748b">Sharpe track</text>
-  <text x="935" y="896" text-anchor="middle" font-size="8" fill="#64748b">token bucket</text>
+  <text x="935" y="896" text-anchor="middle" font-size="8" fill="#64748b">token bucket + EMAs</text>
   <text x="1045" y="896" text-anchor="middle" font-size="8" fill="#64748b">commissions</text>
-  <text x="1155" y="896" text-anchor="middle" font-size="8" fill="#64748b">if bad Sharpe</text>
+  <text x="1155" y="896" text-anchor="middle" font-size="8" fill="#64748b">drops to proving</text>
 
   <!-- ==================== USERS ==================== -->
   <rect x="1100" y="490" width="140" height="65" rx="10" fill="white" stroke="#22c55e" stroke-width="1.5" filter="url(#shadow)"/>
@@ -276,24 +303,27 @@
   <text x="1170" y="545" text-anchor="middle" font-size="9" fill="#64748b">Sepolia only</text>
 
   <!-- User to Satellite arrow -->
-  <line x1="1170" y1="488" x2="1145" y2="427" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <line x1="1170" y1="488" x2="1145" y2="437" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow-green)"/>
 
   <!-- ==================== LEGEND ==================== -->
-  <rect x="580" y="300" width="220" height="145" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
-  <text x="690" y="322" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">Legend</text>
+  <rect x="580" y="400" width="220" height="165" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+  <text x="690" y="422" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">Legend</text>
 
-  <line x1="600" y1="340" x2="630" y2="340" stroke="#f97316" stroke-width="2"/>
-  <text x="640" y="344" font-size="10" fill="#475569">Relayer messages</text>
+  <line x1="600" y1="440" x2="630" y2="440" stroke="#f97316" stroke-width="2"/>
+  <text x="640" y="444" font-size="10" fill="#475569">Relayer messages</text>
 
-  <line x1="600" y1="360" x2="630" y2="360" stroke="#8b5cf6" stroke-width="2"/>
-  <text x="640" y="364" font-size="10" fill="#475569">Agent intents (to AgentMgr)</text>
+  <line x1="600" y1="460" x2="630" y2="460" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="640" y="464" font-size="10" fill="#475569">Agent intents (to AgentMgr)</text>
 
-  <line x1="600" y1="380" x2="630" y2="380" stroke="#22c55e" stroke-width="2"/>
-  <text x="640" y="384" font-size="10" fill="#475569">User interactions (Sepolia)</text>
+  <line x1="600" y1="480" x2="630" y2="480" stroke="#22c55e" stroke-width="2"/>
+  <text x="640" y="484" font-size="10" fill="#475569">User interactions (Sepolia)</text>
 
-  <line x1="600" y1="400" x2="630" y2="400" stroke="#0ea5e9" stroke-width="2"/>
-  <text x="640" y="404" font-size="10" fill="#475569">Data reads (Subgraph)</text>
+  <line x1="600" y1="500" x2="630" y2="500" stroke="#0ea5e9" stroke-width="2"/>
+  <text x="640" y="504" font-size="10" fill="#475569">Data reads (MCP/Subgraph)</text>
 
-  <line x1="600" y1="420" x2="630" y2="420" stroke="#ef4444" stroke-width="2"/>
-  <text x="640" y="424" font-size="10" fill="#475569">Cross-contract (Vault<->AM)</text>
+  <line x1="600" y1="520" x2="630" y2="520" stroke="#ef4444" stroke-width="2"/>
+  <text x="640" y="524" font-size="10" fill="#475569">Cross-contract (Vault &lt;-> AM)</text>
+
+  <line x1="600" y1="540" x2="630" y2="540" stroke="#ff007a" stroke-width="2"/>
+  <text x="640" y="544" font-size="10" fill="#475569">Uniswap Trading API</text>
 </svg>
