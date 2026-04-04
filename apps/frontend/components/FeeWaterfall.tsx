@@ -81,8 +81,8 @@ function TierCard({ tier, label, amount, subtitle }: TierCardProps) {
 
 const WITHDRAWAL_STEPS = [
   { icon: "rocket_launch", label: "REQUEST" },
-  { icon: "schedule", label: "EPOCH_SETTLE" },
-  { icon: "gavel", label: "FORCE_CLOSE" },
+  { icon: "schedule", label: "EPOCH SETTLE" },
+  { icon: "gavel", label: "FORCE CLOSE" },
   { icon: "payments", label: "PAYOUT" },
 ] as const;
 
@@ -564,7 +564,7 @@ function PayoutSummaryFooter({ protocolFeesAccrued, commissionPool, depositorYie
           className="px-6 py-3 font-['Space_Grotesk'] text-xs font-bold uppercase tracking-widest transition-colors"
           style={{ color: "#849396" }}
         >
-          ABORT_CMD
+          ABORT CMD
         </button>
         <button
           className="px-8 py-3 font-['Space_Grotesk'] text-xs font-extrabold uppercase tracking-widest transition-all hover:brightness-125 active:scale-95"
@@ -574,7 +574,7 @@ function PayoutSummaryFooter({ protocolFeesAccrued, commissionPool, depositorYie
             boxShadow: "0 0 20px rgba(215,59,0,0.3)",
           }}
         >
-          CONFIRM_LIQUIDATION
+          CONFIRM LIQUIDATION
         </button>
       </div>
     </div>
@@ -601,7 +601,7 @@ export default function FeeWaterfall() {
 
   return (
     <div className="flex flex-col gap-6">
-      {isFeeLoading && <LoadingIndicator label="LOADING_FEE_DATA" />}
+      {isFeeLoading && <LoadingIndicator label="LOADING FEE DATA" />}
       {/* ── Section heading ── */}
       <div>
         <h2

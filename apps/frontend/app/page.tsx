@@ -13,7 +13,7 @@ import AgentDetail from "@/components/AgentDetail";
 const NAV_ITEMS = [
   { key: "arena", label: "ARENA", icon: "swords" },
   { key: "leaderboard", label: "LEADERBOARD", icon: "leaderboard" },
-  { key: "agents", label: "MY_AGENTS", icon: "smart_toy" },
+  { key: "agents", label: "MY AGENTS", icon: "smart_toy" },
   { key: "vault", label: "VAULT", icon: "account_balance_wallet" },
   { key: "infts", label: "iNFT", icon: "token" },
   { key: "fees", label: "FEES", icon: "waterfall_chart" },
@@ -110,7 +110,7 @@ export default function Home() {
                 className="text-[10px] font-black text-[#c3f5ff] tracking-widest uppercase"
                 style={{ fontFamily: "var(--font-space-grotesk)" }}
               >
-                OPERATOR_01
+                OPERATOR 01
               </p>
               <p
                 className="text-[8px] text-[#bac9cc] font-bold"
@@ -156,10 +156,10 @@ export default function Home() {
             type="button"
             className="bg-[#00e5ff] text-[#00363d] w-full py-3 text-xs font-black tracking-widest uppercase hover:opacity-90 transition-all flex items-center justify-center gap-2"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
-            title="DEPLOY_AGENT"
+            title="DEPLOY AGENT"
           >
             <span className="material-symbols-outlined text-[18px] flex-shrink-0">rocket_launch</span>
-            <span className="hidden lg:inline">DEPLOY_AGENT</span>
+            <span className="hidden lg:inline">DEPLOY AGENT</span>
           </button>
 
           <div className="hidden lg:flex flex-col gap-2">

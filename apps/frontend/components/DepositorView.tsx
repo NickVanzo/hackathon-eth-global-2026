@@ -85,13 +85,13 @@ export default function DepositorView() {
   };
 
   const depositBusy = isApproving || isConfirmingApprove || isDepositing || isConfirmingDeposit;
-  const depositLabel = isApproving ? "SIGN_APPROVE..." :
+  const depositLabel = isApproving ? "SIGN APPROVE..." :
     isConfirmingApprove ? "APPROVING..." :
-    needsApproval ? "APPROVE_USDC.e" :
-    isDepositing ? "SIGN_DEPOSIT..." :
+    needsApproval ? "APPROVE USDC.e" :
+    isDepositing ? "SIGN DEPOSIT..." :
     isConfirmingDeposit ? "DEPOSITING..." :
-    depositConfirmed ? "DEPOSIT_COMPLETE ✓" :
-    "EXECUTE_DEPOSIT";
+    depositConfirmed ? "DEPOSIT COMPLETE ✓" :
+    "EXECUTE DEPOSIT";
 
   // Withdraw flow
   const withdrawAmountInUnits = (() => { try { return withdrawAmount ? parseUnits(withdrawAmount, 6) : 0n; } catch { return 0n; } })();
@@ -164,7 +164,7 @@ export default function DepositorView() {
                 borderColor: "rgba(0,229,255,0.2)",
               }}
             >
-              DEPOSITS_OPEN
+              DEPOSITS OPEN
             </span>
           </div>
         </div>
@@ -188,7 +188,7 @@ export default function DepositorView() {
                 className="text-[10px] font-bold tracking-[0.2em] mb-4 uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                VAULT_SHARE_PRICE
+                VAULT SHARE PRICE
               </div>
               <div
                 className="text-3xl font-bold tracking-tighter"
@@ -197,7 +197,7 @@ export default function DepositorView() {
                 {isLoading ? <LoadingPulse className="h-8 w-24" /> : formatSharePrice(vault.sharePrice)}
               </div>
               <div className="text-[10px] mt-1 font-mono" style={{ color: "#00E5FF" }}>
-                +4.2% ALL_TIME
+                +4.2% ALL TIME
               </div>
             </div>
 
@@ -213,7 +213,7 @@ export default function DepositorView() {
                 className="text-[10px] font-bold tracking-[0.2em] mb-4 uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                TOTAL_ASSETS
+                TOTAL ASSETS
               </div>
               <div
                 className="text-3xl font-bold tracking-tighter"
@@ -238,7 +238,7 @@ export default function DepositorView() {
                 className="text-[10px] font-bold tracking-[0.2em] mb-4 uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                IDLE_RESERVE
+                IDLE RESERVE
               </div>
               <div
                 className="text-3xl font-bold tracking-tighter"
@@ -268,7 +268,7 @@ export default function DepositorView() {
                   style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#9cf0ff" }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>input</span>
-                  DEPOSIT_INTERFACE
+                  DEPOSIT INTERFACE
                 </h3>
                 <div className="space-y-6">
                   <div>
@@ -276,7 +276,7 @@ export default function DepositorView() {
                       className="flex justify-between text-[10px] font-bold tracking-widest uppercase mb-2"
                       style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
                     >
-                      <span>ASSET_INPUT</span>
+                      <span>ASSET INPUT</span>
                       <span>BALANCE: {liveUsdcBalance ? `${(Number(liveUsdcBalance) / 1_000_000).toFixed(2)} USDC.e` : "—"}</span>
                     </div>
                     <div className="relative">
@@ -375,7 +375,7 @@ export default function DepositorView() {
                   style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>output</span>
-                  WITHDRAW_INTERFACE
+                  WITHDRAW INTERFACE
                 </h3>
                 <div className="space-y-6">
                   <div className="flex flex-col gap-4">
@@ -468,7 +468,7 @@ export default function DepositorView() {
                   <div>
                     <div className="flex justify-between text-[10px] font-bold tracking-widest uppercase mb-2"
                       style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}>
-                      <span>AMOUNT_TO_WITHDRAW</span>
+                      <span>AMOUNT TO WITHDRAW</span>
                       <span>USDC.e</span>
                     </div>
                     <input
@@ -497,14 +497,14 @@ export default function DepositorView() {
                       className="flex justify-between text-[10px] font-bold tracking-widest uppercase mb-2"
                       style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
                     >
-                      <span>USER_SHARES</span>
+                      <span>USER SHARES</span>
                       <span>{formatShares(vault.userShares)} SHARES</span>
                     </div>
                     <div
                       className="text-xs flex justify-between"
                       style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
                     >
-                      <span>EQUIVALENT_VALUE</span>
+                      <span>EQUIVALENT VALUE</span>
                       <span style={{ color: "#9cf0ff" }}>
                         ~ {formatShareValue(vault.userShares, vault.sharePrice)} USDC.e
                       </span>
@@ -522,7 +522,7 @@ export default function DepositorView() {
                       border: "1px solid rgba(215,59,0,0.4)",
                     }}
                   >
-                    {isWithdrawing ? "SIGN_TX..." : isConfirmingWithdraw ? "PROCESSING..." : withdrawConfirmed ? "QUEUED ✓" : "EXECUTE_WITHDRAW"}
+                    {isWithdrawing ? "SIGN TX..." : isConfirmingWithdraw ? "PROCESSING..." : withdrawConfirmed ? "QUEUED ✓" : "EXECUTE WITHDRAW"}
                   </button>
                   {withdrawConfirmed && withdrawHash && (
                     <p className="text-[10px] text-center font-mono" style={{ color: "#ffb5a0" }}>
@@ -552,7 +552,7 @@ export default function DepositorView() {
                 borderColor: "rgba(59,73,76,0.2)",
               }}
             >
-              SYSTEM_ARCH
+              SYSTEM ARCH
             </h3>
             <div className="space-y-6">
               <div className="flex gap-4">
@@ -629,7 +629,7 @@ export default function DepositorView() {
                 borderColor: "rgba(59,73,76,0.2)",
               }}
             >
-              TIER_2_TECHNICAL_SPEC
+              TIER 2 TECHNICAL SPEC
             </h3>
             <div className="space-y-4 relative z-10">
               <p
@@ -680,7 +680,7 @@ export default function DepositorView() {
                 className="text-[10px] font-black tracking-widest uppercase"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
               >
-                NETWORK_FEES
+                NETWORK FEES
               </h3>
               <span
                 className="material-symbols-outlined"
@@ -691,15 +691,15 @@ export default function DepositorView() {
             </div>
             <div className="space-y-2">
               <div className="flex justify-between text-[10px] font-mono">
-                <span style={{ color: "#bac9cc" }}>DEPOSIT_FEE:</span>
+                <span style={{ color: "#bac9cc" }}>DEPOSIT FEE:</span>
                 <span style={{ color: "#9cf0ff" }}>0.00%</span>
               </div>
               <div className="flex justify-between text-[10px] font-mono">
-                <span style={{ color: "#bac9cc" }}>PERFORMANCE_FEE:</span>
+                <span style={{ color: "#bac9cc" }}>PERFORMANCE FEE:</span>
                 <span style={{ color: "#9cf0ff" }}>15.00%</span>
               </div>
               <div className="flex justify-between text-[10px] font-mono">
-                <span style={{ color: "#bac9cc" }}>EXIT_FEE (TIER 1):</span>
+                <span style={{ color: "#bac9cc" }}>EXIT FEE (TIER 1):</span>
                 <span style={{ color: "#ffb5a0" }}>0.10%</span>
               </div>
             </div>
@@ -717,7 +717,7 @@ export default function DepositorView() {
             className="text-[10px] font-bold tracking-[0.2em] uppercase opacity-40"
             style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
           >
-            © 2024 ARENA_OS_PROTOCOLS
+            © 2024 ARENA OS PROTOCOLS
           </span>
           <div className="flex gap-4">
             <span
