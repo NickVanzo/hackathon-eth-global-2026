@@ -18,6 +18,7 @@ import {
   AgentManager_ForceCloseRequested,
   AgentManager_AgentPromoted,
   AgentManager_AgentEvicted,
+  IndexedIntent,
 } from "generated";
 
 import { sepoliaPublicClient, sepoliaWalletClient, zgPublicClient } from "../relayer/clients";
@@ -70,6 +71,20 @@ AgentManager.IntentQueued.handler(async ({ event, context }) => {
     blockNumber: event.params.blockNumber,
   };
   context.AgentManager_IntentQueued.set(entity);
+
+  // Create IndexedIntent for frontend (status starts as "pending", updated below)
+  const actionNames = ["OPEN_POSITION", "CLOSE_POSITION", "MODIFY_POSITION"] as const;
+  const intentId = `intent_${event.chainId}_${event.block.number}_${event.logIndex}`;
+  const indexedIntent: IndexedIntent = {
+    id: intentId,
+    agentId: event.params.agentId,
+    actionType: actionNames[Number(event.params.actionType)] ?? "UNKNOWN",
+    status: "pending",
+    timestamp: BigInt(event.block.timestamp),
+    txHash: "",
+    blockNumber: BigInt(event.block.number),
+  };
+  context.IndexedIntent.set(indexedIntent);
 
   const agentId = event.params.agentId;
   const actionType = Number(event.params.actionType);

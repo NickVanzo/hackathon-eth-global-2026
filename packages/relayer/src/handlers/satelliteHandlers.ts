@@ -14,12 +14,14 @@ import {
   Satellite_CommissionClaimRequested,
   Satellite_Deposited,
   Satellite_PauseRequested,
+  Satellite_PositionOpened,
   Satellite_PositionClosed,
   Satellite_ValuesReported,
   Satellite_WithdrawFromArenaRequested,
   Satellite_WithdrawRequested,
   Satellite_WithdrawalCompleted,
   AgentPerformanceSnapshot,
+  IndexedPosition,
 } from "generated";
 
 import {
@@ -281,6 +283,42 @@ Satellite.ValuesReported.handler(async ({ event, context }) => {
 });
 
 // ---------------------------------------------------------------------------
+// PositionOpened
+// Emitted by satellite._mintPosition() when a new LP position is minted.
+// Creates an IndexedPosition entity for the frontend positions table.
+// ---------------------------------------------------------------------------
+
+Satellite.PositionOpened.handler(async ({ event, context }) => {
+  const entity: Satellite_PositionOpened = {
+    id: `${event.chainId}_${event.block.number}_${event.logIndex}`,
+    agentId: event.params.agentId,
+    tokenId: event.params.tokenId,
+    tickLower: event.params.tickLower,
+    tickUpper: event.params.tickUpper,
+    liquidity: event.params.liquidity,
+    amountUSDC: event.params.amountUSDC,
+  };
+  context.Satellite_PositionOpened.set(entity);
+
+  // Create IndexedPosition for frontend
+  const position: IndexedPosition = {
+    id: `pos_${event.params.tokenId}`,
+    agentId: event.params.agentId,
+    tokenId: event.params.tokenId,
+    tickLower: event.params.tickLower,
+    tickUpper: event.params.tickUpper,
+    liquidity: event.params.liquidity.toString(),
+    feesCollected: "0",
+    status: "active",
+    openBlockNumber: BigInt(event.block.number),
+    openTimestamp: BigInt(event.block.timestamp),
+    closeBlockNumber: 0n,
+    closeTimestamp: 0n,
+  };
+  context.IndexedPosition.set(position);
+});
+
+// ---------------------------------------------------------------------------
 // PositionClosed
 // Emitted by satellite on any position close (agent-initiated, modify, or forceClose).
 // Relay:
@@ -302,6 +340,19 @@ Satellite.PositionClosed.handler(async ({ event, context }) => {
     recoveredAmount: event.params.recoveredAmount,
   };
   context.Satellite_PositionClosed.set(entity);
+
+  // Update IndexedPosition → closed
+  const posId = `pos_${event.params.positionId}`;
+  const existing = await context.IndexedPosition.get(posId);
+  if (existing) {
+    context.IndexedPosition.set({
+      ...existing,
+      status: "closed",
+      feesCollected: event.params.recoveredAmount.toString(),
+      closeBlockNumber: BigInt(event.block.number),
+      closeTimestamp: BigInt(event.block.timestamp),
+    });
+  }
 
   // Determine source from agent phase on 0G (0=PROVING, 1=VAULT).
   // NOTE: We cannot read positionSource from Satellite here because

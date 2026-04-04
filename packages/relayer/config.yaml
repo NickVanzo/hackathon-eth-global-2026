@@ -43,6 +43,7 @@ networks:
     - event: CommissionClaimRequested(uint256 indexed agentId, address indexed caller)
     - event: Deposited(address indexed user, uint256 amount)
     - event: PauseRequested(uint256 indexed agentId, address indexed caller, bool paused)
+    - event: PositionOpened(uint256 indexed agentId, uint256 indexed tokenId, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amountUSDC)
     - event: PositionClosed(uint256 indexed agentId, uint256 indexed positionId, uint256 recoveredAmount)
     - event: ValuesReported(uint256 indexed agentId, uint256 positionValue, uint256 feesCollected)
     - event: WithdrawFromArenaRequested(uint256 indexed agentId, address indexed caller)
