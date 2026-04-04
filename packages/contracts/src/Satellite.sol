@@ -167,21 +167,21 @@ contract Satellite is ISatellite, ReentrancyGuard {
     mapping(uint256 agentId => uint256 amount) public commissionReserve;
 
     /// @notice Running total of all commission reserves across agents.
-    uint256 private _totalCommissionReserves;
+    uint256 internal _totalCommissionReserves;
 
     /// @notice Proving capital earmarked per agent at registration.
     ///         Belongs to deployer — NOT vault depositor funds.
     mapping(uint256 agentId => uint256 amount) public provingCapital;
 
     /// @notice Running total of all proving capital across all agents.
-    uint256 private _totalProvingCapital;
+    uint256 internal _totalProvingCapital;
 
     // -------------------------------------------------------------------------
     // State: agent registry
     // -------------------------------------------------------------------------
 
     /// @notice Sequential agentId counter. Starts at 1.
-    uint256 private _nextAgentId;
+    uint256 internal _nextAgentId;
 
     /// @notice Deployer address recorded at registration (proving capital owner).
     mapping(uint256 agentId => address deployer) public agentDeployer;
@@ -192,7 +192,7 @@ contract Satellite is ISatellite, ReentrancyGuard {
 
     /// @notice Queued Tier-2 withdrawal amount per user (set by relayer after
     ///         vault epoch settlement frees capital).
-    mapping(address user => uint256 tokenAmount) private _pendingWithdrawals;
+    mapping(address user => uint256 tokenAmount) internal _pendingWithdrawals;
 
     // -------------------------------------------------------------------------
     // Modifiers
