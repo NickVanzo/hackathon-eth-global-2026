@@ -1,0 +1,128 @@
+type Satellite_AgentRegistered {
+  id: ID!
+  agentId: BigInt!
+  agentAddress: String!
+  deployer: String!
+  provingAmount: BigInt!
+}
+
+type Satellite_ClaimWithdrawRequested {
+  id: ID!
+  user: String!
+  tokenAmount: BigInt!
+}
+
+type Satellite_CommissionClaimRequested {
+  id: ID!
+  agentId: BigInt!
+  caller: String!
+}
+
+type Satellite_Deposited {
+  id: ID!
+  user: String!
+  amount: BigInt!
+}
+
+type Satellite_PauseRequested {
+  id: ID!
+  agentId: BigInt!
+  caller: String!
+  paused: Boolean!
+}
+
+type Satellite_PositionClosed {
+  id: ID!
+  agentId: BigInt!
+  positionId: BigInt!
+  recoveredAmount: BigInt!
+}
+
+type Satellite_ValuesReported {
+  id: ID!
+  agentId: BigInt!
+  positionValue: BigInt!
+  feesCollected: BigInt!
+}
+
+type Satellite_WithdrawFromArenaRequested {
+  id: ID!
+  agentId: BigInt!
+  caller: String!
+}
+
+type Satellite_WithdrawRequested {
+  id: ID!
+  user: String!
+  tokenAmount: BigInt!
+}
+
+type Satellite_WithdrawalCompleted {
+  id: ID!
+  user: String!
+  tokenAmount: BigInt!
+}
+
+type Vault_Approval {
+  id: ID!
+  owner: String!
+  spender: String!
+  value: BigInt!
+}
+
+type Vault_CommissionAccrued {
+  id: ID!
+  agentId: BigInt!
+  amount: BigInt!
+}
+
+type Vault_CommissionApproved {
+  id: ID!
+  agentId: BigInt!
+  caller: String!
+  amount: BigInt!
+}
+
+type Vault_EpochSettled {
+  id: ID!
+  sharePrice: BigInt!
+  totalShares: BigInt!
+  totalAssets: BigInt!
+}
+
+type Vault_ForceCloseRequested {
+  id: ID!
+  agentId: BigInt!
+  source: BigInt!
+}
+
+type Vault_ProtocolFeeAccrued {
+  id: ID!
+  amount: BigInt!
+}
+
+type Vault_RecoveryRecorded {
+  id: ID!
+  agentId: BigInt!
+  recoveredAmount: BigInt!
+}
+
+type Vault_Transfer {
+  id: ID!
+  from: String!
+  to: String!
+  value: BigInt!
+}
+
+type Vault_WithdrawApproved {
+  id: ID!
+  user: String!
+  tokenAmount: BigInt!
+}
+
+type Vault_WithdrawReleased {
+  id: ID!
+  user: String!
+  tokenAmount: BigInt!
+}
+
