@@ -6,14 +6,14 @@
  * see the API key. The key is read from `process.env.UNISWAP_API_KEY`
  * (a Firebase secret injected at runtime).
  *
- * Base URL: https://api.uniswap.org/v1
+ * Base URL: https://trade-api.gateway.uniswap.org/v1
  */
 Object.defineProperty(exports, "__esModule", { value: true });
 exports.fetchQuote = fetchQuote;
 exports.fetchRoute = fetchRoute;
 exports.fetchPools = fetchPools;
 exports.fetchPositions = fetchPositions;
-const BASE_URL = "https://api.uniswap.org/v1";
+const BASE_URL = "https://trade-api.gateway.uniswap.org/v1";
 // ---------------------------------------------------------------------------
 // Internal helper
 // ---------------------------------------------------------------------------
@@ -25,24 +25,23 @@ function getApiKey() {
     return key;
 }
 /**
- * Generic GET request to the Uniswap Trading API.
+ * Generic POST request to the Uniswap Trading API.
  *
  * - Reads the API key from the environment.
- * - Builds the URL with query parameters.
+ * - Sends JSON body via POST (the Trading API uses POST, not GET).
  * - Enforces an 8-second timeout via `AbortSignal.timeout`.
- * - Throws on non-2xx responses or GraphQL-style `errors` payloads.
+ * - Throws on non-2xx responses or error payloads.
  */
-async function callTradingApi(path, params) {
+async function callTradingApi(path, body) {
     const key = getApiKey();
-    const url = new URL(`${BASE_URL}${path}`);
-    const searchParams = new URLSearchParams(params);
-    url.search = searchParams.toString();
-    const response = await fetch(url.toString(), {
-        method: "GET",
+    const response = await fetch(`${BASE_URL}${path}`, {
+        method: "POST",
         headers: {
             "x-api-key": key,
+            "Content-Type": "application/json",
             Accept: "application/json",
         },
+        body: JSON.stringify(body),
         signal: AbortSignal.timeout(8000),
     });
     if (!response.ok) {
@@ -56,51 +55,52 @@ async function callTradingApi(path, params) {
     return data;
 }
 async function fetchQuote(params) {
-    const qs = {
-        tokenInChainId: params.tokenInChainId,
-        tokenOutChainId: params.tokenOutChainId,
-        tokenInAddress: params.tokenInAddress,
-        tokenOutAddress: params.tokenOutAddress,
+    const body = {
+        tokenInChainId: Number(params.tokenInChainId),
+        tokenOutChainId: Number(params.tokenOutChainId),
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
         amount: params.amount,
         type: params.type,
+        swapper: params.swapper,
+        configs: [{ routingType: "CLASSIC", protocols: ["V3"] }],
     };
     if (params.slippageTolerance !== undefined) {
-        qs.slippageTolerance = params.slippageTolerance;
+        body.slippageTolerance = params.slippageTolerance;
     }
-    return callTradingApi("/quote", qs);
+    return callTradingApi("/quote", body);
 }
 async function fetchRoute(params) {
-    const qs = {
-        tokenInChainId: params.tokenInChainId,
-        tokenOutChainId: params.tokenOutChainId,
-        tokenInAddress: params.tokenInAddress,
-        tokenOutAddress: params.tokenOutAddress,
+    const body = {
+        tokenInChainId: Number(params.tokenInChainId),
+        tokenOutChainId: Number(params.tokenOutChainId),
+        tokenIn: params.tokenIn,
+        tokenOut: params.tokenOut,
         amount: params.amount,
         type: params.type,
+        swapper: params.swapper,
+        configs: [{ routingType: "CLASSIC", protocols: ["V3"] }],
     };
     if (params.slippageTolerance !== undefined) {
-        qs.slippageTolerance = params.slippageTolerance;
+        body.slippageTolerance = params.slippageTolerance;
     }
-    return callTradingApi("/route", qs);
+    return callTradingApi("/route", body);
 }
 async function fetchPools(params) {
-    const qs = {
-        chainId: params.chainId,
+    const body = {
+        chainId: Number(params.chainId),
     };
-    if (params.token0Address !== undefined) {
-        qs.token0Address = params.token0Address;
-    }
-    if (params.token1Address !== undefined) {
-        qs.token1Address = params.token1Address;
-    }
-    if (params.fee !== undefined) {
-        qs.fee = params.fee;
-    }
-    return callTradingApi("/pools", qs);
+    if (params.tokenIn !== undefined)
+        body.tokenIn = params.tokenIn;
+    if (params.tokenOut !== undefined)
+        body.tokenOut = params.tokenOut;
+    if (params.fee !== undefined)
+        body.fee = params.fee;
+    return callTradingApi("/pools", body);
 }
 async function fetchPositions(params) {
     return callTradingApi("/positions", {
-        chainId: params.chainId,
+        chainId: Number(params.chainId),
         address: params.address,
     });
 }

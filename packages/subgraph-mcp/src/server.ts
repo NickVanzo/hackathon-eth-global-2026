@@ -143,144 +143,88 @@ export function createMcpServer(): McpServer {
       inputSchema: {
         tokenInChainId: z.number().int().describe("Chain ID for the input token"),
         tokenOutChainId: z.number().int().describe("Chain ID for the output token"),
-        tokenInAddress: poolAddressSchema,
-        tokenOutAddress: poolAddressSchema,
+        tokenIn: poolAddressSchema.describe("Input token address"),
+        tokenOut: poolAddressSchema.describe("Output token address"),
         amount: z.string().describe("Token amount in smallest unit (wei)"),
         type: z.enum(["EXACT_INPUT", "EXACT_OUTPUT"]).describe("Quote type"),
+        swapper: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Swapper wallet address"),
       },
     },
-    async ({
-      tokenInChainId,
-      tokenOutChainId,
-      tokenInAddress,
-      tokenOutAddress,
-      amount,
-      type,
-    }: {
-      tokenInChainId: number;
-      tokenOutChainId: number;
-      tokenInAddress: string;
-      tokenOutAddress: string;
-      amount: string;
-      type: "EXACT_INPUT" | "EXACT_OUTPUT";
+    async ({ tokenInChainId, tokenOutChainId, tokenIn, tokenOut, amount, type, swapper }: {
+      tokenInChainId: number; tokenOutChainId: number; tokenIn: string; tokenOut: string;
+      amount: string; type: "EXACT_INPUT" | "EXACT_OUTPUT"; swapper: string;
     }) => {
       try {
         const result = await fetchQuote({
-          tokenInChainId: String(tokenInChainId),
-          tokenOutChainId: String(tokenOutChainId),
-          tokenInAddress,
-          tokenOutAddress,
-          amount,
-          type,
+          tokenInChainId: String(tokenInChainId), tokenOutChainId: String(tokenOutChainId),
+          tokenIn, tokenOut, amount, type, swapper,
         });
         return buildToolResult(result as unknown as Record<string, unknown>);
-      } catch (err) {
-        return buildErrorResult(toErrorMessage(err));
-      }
+      } catch (err) { return buildErrorResult(toErrorMessage(err)); }
     }
   );
 
   server.registerTool(
     "get_route",
     {
-      description:
-        "Get the full swap route details for a Uniswap trade.",
+      description: "Get the full swap route details for a Uniswap trade.",
       inputSchema: {
         tokenInChainId: z.number().int().describe("Chain ID for the input token"),
         tokenOutChainId: z.number().int().describe("Chain ID for the output token"),
-        tokenInAddress: poolAddressSchema,
-        tokenOutAddress: poolAddressSchema,
+        tokenIn: poolAddressSchema.describe("Input token address"),
+        tokenOut: poolAddressSchema.describe("Output token address"),
         amount: z.string().describe("Token amount in smallest unit (wei)"),
         type: z.enum(["EXACT_INPUT", "EXACT_OUTPUT"]).describe("Quote type"),
+        swapper: z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Swapper wallet address"),
       },
     },
-    async ({
-      tokenInChainId,
-      tokenOutChainId,
-      tokenInAddress,
-      tokenOutAddress,
-      amount,
-      type,
-    }: {
-      tokenInChainId: number;
-      tokenOutChainId: number;
-      tokenInAddress: string;
-      tokenOutAddress: string;
-      amount: string;
-      type: "EXACT_INPUT" | "EXACT_OUTPUT";
+    async ({ tokenInChainId, tokenOutChainId, tokenIn, tokenOut, amount, type, swapper }: {
+      tokenInChainId: number; tokenOutChainId: number; tokenIn: string; tokenOut: string;
+      amount: string; type: "EXACT_INPUT" | "EXACT_OUTPUT"; swapper: string;
     }) => {
       try {
         const result = await fetchRoute({
-          tokenInChainId: String(tokenInChainId),
-          tokenOutChainId: String(tokenOutChainId),
-          tokenInAddress,
-          tokenOutAddress,
-          amount,
-          type,
+          tokenInChainId: String(tokenInChainId), tokenOutChainId: String(tokenOutChainId),
+          tokenIn, tokenOut, amount, type, swapper,
         });
         return buildToolResult(result as unknown as Record<string, unknown>);
-      } catch (err) {
-        return buildErrorResult(toErrorMessage(err));
-      }
+      } catch (err) { return buildErrorResult(toErrorMessage(err)); }
     }
   );
 
   server.registerTool(
     "get_pools",
     {
-      description:
-        "List Uniswap pools, optionally filtered by token addresses.",
+      description: "List Uniswap pools, optionally filtered by token addresses.",
       inputSchema: {
         chainId: z.number().int().describe("Chain ID to query pools on"),
-        token0Address: poolAddressSchema.optional().describe("Optional token0 address filter"),
-        token1Address: poolAddressSchema.optional().describe("Optional token1 address filter"),
+        tokenIn: poolAddressSchema.optional().describe("Optional input token address filter"),
+        tokenOut: poolAddressSchema.optional().describe("Optional output token address filter"),
       },
     },
-    async ({
-      chainId,
-      token0Address,
-      token1Address,
-    }: {
-      chainId: number;
-      token0Address?: string;
-      token1Address?: string;
-    }) => {
+    async ({ chainId, tokenIn, tokenOut }: { chainId: number; tokenIn?: string; tokenOut?: string }) => {
       try {
-        const result = await fetchPools({
-          chainId: String(chainId),
-          token0Address,
-          token1Address,
-        });
+        const result = await fetchPools({ chainId: String(chainId), tokenIn, tokenOut });
         return buildToolResult(result as unknown as Record<string, unknown>);
-      } catch (err) {
-        return buildErrorResult(toErrorMessage(err));
-      }
+      } catch (err) { return buildErrorResult(toErrorMessage(err)); }
     }
   );
 
   server.registerTool(
     "get_positions",
     {
-      description:
-        "Get Uniswap liquidity positions for a wallet address on a given chain.",
+      description: "Get Uniswap liquidity positions for a wallet address on a given chain.",
       inputSchema: {
         chainId: z.number().int().describe("Chain ID to query positions on"),
-        address: z
-          .string()
-          .regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid Ethereum address")
+        address: z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid Ethereum address")
           .describe("Wallet address to look up positions for"),
       },
     },
     async ({ chainId, address }: { chainId: number; address: string }) => {
       try {
-        const result = await fetchPositions({
-          chainId: String(chainId),
-          address,
-        });
+        const result = await fetchPositions({ chainId: String(chainId), address });
         return buildToolResult(result as unknown as Record<string, unknown>);
-      } catch (err) {
-        return buildErrorResult(toErrorMessage(err));
-      }
+      } catch (err) { return buildErrorResult(toErrorMessage(err)); }
     }
   );
 

@@ -87,20 +87,17 @@ function createMcpServer() {
         inputSchema: {
             tokenInChainId: zod_1.z.number().int().describe("Chain ID for the input token"),
             tokenOutChainId: zod_1.z.number().int().describe("Chain ID for the output token"),
-            tokenInAddress: poolAddressSchema,
-            tokenOutAddress: poolAddressSchema,
+            tokenIn: poolAddressSchema.describe("Input token address"),
+            tokenOut: poolAddressSchema.describe("Output token address"),
             amount: zod_1.z.string().describe("Token amount in smallest unit (wei)"),
             type: zod_1.z.enum(["EXACT_INPUT", "EXACT_OUTPUT"]).describe("Quote type"),
+            swapper: zod_1.z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Swapper wallet address"),
         },
-    }, async ({ tokenInChainId, tokenOutChainId, tokenInAddress, tokenOutAddress, amount, type, }) => {
+    }, async ({ tokenInChainId, tokenOutChainId, tokenIn, tokenOut, amount, type, swapper }) => {
         try {
             const result = await (0, trading_api_js_1.fetchQuote)({
-                tokenInChainId: String(tokenInChainId),
-                tokenOutChainId: String(tokenOutChainId),
-                tokenInAddress,
-                tokenOutAddress,
-                amount,
-                type,
+                tokenInChainId: String(tokenInChainId), tokenOutChainId: String(tokenOutChainId),
+                tokenIn, tokenOut, amount, type, swapper,
             });
             return buildToolResult(result);
         }
@@ -113,20 +110,17 @@ function createMcpServer() {
         inputSchema: {
             tokenInChainId: zod_1.z.number().int().describe("Chain ID for the input token"),
             tokenOutChainId: zod_1.z.number().int().describe("Chain ID for the output token"),
-            tokenInAddress: poolAddressSchema,
-            tokenOutAddress: poolAddressSchema,
+            tokenIn: poolAddressSchema.describe("Input token address"),
+            tokenOut: poolAddressSchema.describe("Output token address"),
             amount: zod_1.z.string().describe("Token amount in smallest unit (wei)"),
             type: zod_1.z.enum(["EXACT_INPUT", "EXACT_OUTPUT"]).describe("Quote type"),
+            swapper: zod_1.z.string().regex(/^0x[0-9a-fA-F]{40}$/).describe("Swapper wallet address"),
         },
-    }, async ({ tokenInChainId, tokenOutChainId, tokenInAddress, tokenOutAddress, amount, type, }) => {
+    }, async ({ tokenInChainId, tokenOutChainId, tokenIn, tokenOut, amount, type, swapper }) => {
         try {
             const result = await (0, trading_api_js_1.fetchRoute)({
-                tokenInChainId: String(tokenInChainId),
-                tokenOutChainId: String(tokenOutChainId),
-                tokenInAddress,
-                tokenOutAddress,
-                amount,
-                type,
+                tokenInChainId: String(tokenInChainId), tokenOutChainId: String(tokenOutChainId),
+                tokenIn, tokenOut, amount, type, swapper,
             });
             return buildToolResult(result);
         }
@@ -138,16 +132,12 @@ function createMcpServer() {
         description: "List Uniswap pools, optionally filtered by token addresses.",
         inputSchema: {
             chainId: zod_1.z.number().int().describe("Chain ID to query pools on"),
-            token0Address: poolAddressSchema.optional().describe("Optional token0 address filter"),
-            token1Address: poolAddressSchema.optional().describe("Optional token1 address filter"),
+            tokenIn: poolAddressSchema.optional().describe("Optional input token address filter"),
+            tokenOut: poolAddressSchema.optional().describe("Optional output token address filter"),
         },
-    }, async ({ chainId, token0Address, token1Address, }) => {
+    }, async ({ chainId, tokenIn, tokenOut }) => {
         try {
-            const result = await (0, trading_api_js_1.fetchPools)({
-                chainId: String(chainId),
-                token0Address,
-                token1Address,
-            });
+            const result = await (0, trading_api_js_1.fetchPools)({ chainId: String(chainId), tokenIn, tokenOut });
             return buildToolResult(result);
         }
         catch (err) {
@@ -158,17 +148,12 @@ function createMcpServer() {
         description: "Get Uniswap liquidity positions for a wallet address on a given chain.",
         inputSchema: {
             chainId: zod_1.z.number().int().describe("Chain ID to query positions on"),
-            address: zod_1.z
-                .string()
-                .regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid Ethereum address")
+            address: zod_1.z.string().regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid Ethereum address")
                 .describe("Wallet address to look up positions for"),
         },
     }, async ({ chainId, address }) => {
         try {
-            const result = await (0, trading_api_js_1.fetchPositions)({
-                chainId: String(chainId),
-                address,
-            });
+            const result = await (0, trading_api_js_1.fetchPositions)({ chainId: String(chainId), address });
             return buildToolResult(result);
         }
         catch (err) {
