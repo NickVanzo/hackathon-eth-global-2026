@@ -36,11 +36,11 @@ interface IVault {
     event CommissionApproved(uint256 indexed agentId, address indexed caller, uint256 amount);
 
     /// @notice Emitted at epoch settlement — protocol's cut of collected fees.
-    ///         Relayer calls satellite.reserveFees(protocolFeeAmount, 0, 0) on Sepolia.
+    ///         Relayer calls satellite.reserveProtocolFees(amount) on Sepolia.
     event ProtocolFeeAccrued(uint256 amount);
 
     /// @notice Emitted at epoch settlement — agent commission accrued.
-    ///         Relayer calls satellite.reserveFees(0, agentId, commissionAmount) on Sepolia.
+    ///         Relayer calls satellite.reserveCommission(agentId, amount) on Sepolia.
     event CommissionAccrued(uint256 indexed agentId, uint256 amount);
 
     /// @notice Emitted after a force-close position recovery is recorded.
@@ -80,11 +80,11 @@ interface IVault {
     // -------------------------------------------------------------------------
 
     /// @notice Called by AgentManager after verifying iNFT ownership.
-    ///         Zeroes commissionsOwed and emits CommissionApproved.
+    ///         Reads commissionsOwed[agentId] from its own state, zeroes it,
+    ///         and emits CommissionApproved. No amount param — Vault owns the data.
     /// @param agentId  The agent whose commission is being released.
     /// @param caller   The iNFT owner who initiated the claim (for the event).
-    /// @param amount   Token amount to release.
-    function approveCommissionRelease(uint256 agentId, address caller, uint256 amount) external;
+    function approveCommissionRelease(uint256 agentId, address caller) external;
 
     // -------------------------------------------------------------------------
     // Public functions (callable by anyone, including relayer)
@@ -120,4 +120,10 @@ interface IVault {
 
     /// @notice Commissions owed to an agent's iNFT owner (claimable on Sepolia).
     function commissionsOwed(uint256 agentId) external view returns (uint256);
+
+    /// @notice Deposit token address (stored for dashboard reads; Vault never calls it).
+    function depositToken() external view returns (address);
+
+    /// @notice Pool address (stored for dashboard reads; Vault never calls it).
+    function pool() external view returns (address);
 }

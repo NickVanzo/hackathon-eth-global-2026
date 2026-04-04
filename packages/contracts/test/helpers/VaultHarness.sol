@@ -13,6 +13,8 @@ contract VaultHarness is Vault {
         uint256 _protocolFeeRate,
         address _protocolTreasury,
         uint256 _commissionRate,
+        address _depositToken,
+        address _pool,
         address _messenger
     ) Vault(
         _agentManager,
@@ -21,6 +23,8 @@ contract VaultHarness is Vault {
         _protocolFeeRate,
         _protocolTreasury,
         _commissionRate,
+        _depositToken,
+        _pool,
         _messenger
     ) {}
 

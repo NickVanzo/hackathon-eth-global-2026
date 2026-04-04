@@ -107,9 +107,15 @@ abstract contract SatelliteTestBase is Test {
         usdc.mint(address(satellite), amount);
     }
 
-    /// @dev Reserve fees via the messenger.
-    function _reserveFees(uint256 protocolFee, uint256 agentId, uint256 commission) internal {
+    /// @dev Reserve protocol fees via the messenger.
+    function _reserveProtocolFees(uint256 amount) internal {
         vm.prank(messenger);
-        satellite.reserveFees(protocolFee, agentId, commission);
+        satellite.reserveProtocolFees(amount);
+    }
+
+    /// @dev Reserve commission for an agent via the messenger.
+    function _reserveCommission(uint256 agentId, uint256 amount) internal {
+        vm.prank(messenger);
+        satellite.reserveCommission(agentId, amount);
     }
 }

@@ -43,6 +43,9 @@ abstract contract VaultTestBase is Test {
     // setUp
     // -------------------------------------------------------------------------
 
+    address internal depositToken = makeAddr("depositToken");
+    address internal pool_        = makeAddr("pool");
+
     function setUp() public virtual {
         agentMgr = new MockAgentManager();
 
@@ -53,6 +56,8 @@ abstract contract VaultTestBase is Test {
             PROTOCOL_FEE_RATE,
             treasury,
             COMMISSION_RATE,
+            depositToken,
+            pool_,
             messenger
         );
 
@@ -107,13 +112,29 @@ abstract contract VaultTestBase is Test {
         return new IShared.AgentSettlementData[](0);
     }
 
-    /// @dev Single-agent settlement with given fees.
+    /// @dev Single-agent settlement with given fees and optional position value.
     function _singleAgentData(uint256 agentId, uint256 fees)
         internal pure returns (IShared.AgentSettlementData[] memory data)
     {
         data = new IShared.AgentSettlementData[](1);
         data[0] = IShared.AgentSettlementData({
             agentId:       agentId,
+            positionValue: 0,
+            feesCollected: fees,
+            evicted:       false,
+            promoted:      false,
+            forceClose:    false
+        });
+    }
+
+    /// @dev Single-agent settlement with fees and position value.
+    function _singleAgentDataWithPosition(uint256 agentId, uint256 fees, uint256 posValue)
+        internal pure returns (IShared.AgentSettlementData[] memory data)
+    {
+        data = new IShared.AgentSettlementData[](1);
+        data[0] = IShared.AgentSettlementData({
+            agentId:       agentId,
+            positionValue: posValue,
             feesCollected: fees,
             evicted:       false,
             promoted:      false,
