@@ -81,6 +81,27 @@ DRY_RUN=true \
 node data-seed/cron-trigger.js
 ```
 
+## Contract Address Management — CRITICAL
+
+After any contract deployment or redeployment, **ALL** of the following files must be updated with new addresses. Missing even one causes silent failures (relayer calls old contracts, scripts submit to wrong AgentManager, etc.):
+
+| File | What to update |
+|------|----------------|
+| `packages/contracts/.env` | VAULT_ADDRESS, AGENT_MANAGER_ADDRESS, SATELLITE_ADDRESS |
+| `packages/contracts/.env.example` | Same as above |
+| `packages/relayer/.env` | SATELLITE_ADDRESS, VAULT_ADDRESS, AGENT_MANAGER_ADDRESS |
+| `packages/relayer/.env.example` | Same as above |
+| `packages/relayer/config.yaml` | Contract addresses under each network + start_block values |
+| `packages/relayer/src/relayer/env.ts` | Hardcoded fallback addresses |
+| `data-seed/workspaces/agent-{alpha,beta,gamma}/.env` | VAULT_ADDRESS, AGENT_MANAGER_ADDRESS |
+| `scripts/run-epochs.mjs` | Hardcoded AGENT_MANAGER_ADDR, VAULT_ADDR, SATELLITE_ADDR |
+
+**Use `./scripts/deploy-all.sh`** — it updates all of the above automatically. But if `packages/relayer/.env` was created manually, it must also be updated (the deploy script handles this now).
+
+**After updating addresses:** restart the Envio relayer (`npx envio stop && npx envio dev`). It loads config at startup and does NOT hot-reload.
+
+**Verify after deploy:** always run on-chain cross-reference checks (AM↔Vault, messenger on all 3 contracts). The deploy script prints these but manual verification catches bugs the script can't.
+
 ## Quick Start
 
 When a developer asks to build something on 0G:

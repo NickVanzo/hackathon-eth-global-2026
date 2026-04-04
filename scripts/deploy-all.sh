@@ -285,6 +285,14 @@ update_quoted_env_var "$RELAYER_DIR/.env.example" "VAULT_ADDRESS" "$VAULT_ADDRES
 update_quoted_env_var "$RELAYER_DIR/.env.example" "AGENT_MANAGER_ADDRESS" "$AGENT_MANAGER_ADDRESS"
 ok "Updated packages/relayer/.env.example"
 
+# --- 5e2. packages/relayer/.env (if it exists) ---
+if [[ -f "$RELAYER_DIR/.env" ]]; then
+    update_quoted_env_var "$RELAYER_DIR/.env" "SATELLITE_ADDRESS" "$SATELLITE_ADDRESS"
+    update_quoted_env_var "$RELAYER_DIR/.env" "VAULT_ADDRESS" "$VAULT_ADDRESS"
+    update_quoted_env_var "$RELAYER_DIR/.env" "AGENT_MANAGER_ADDRESS" "$AGENT_MANAGER_ADDRESS"
+    ok "Updated packages/relayer/.env"
+fi
+
 # --- 5f. packages/relayer/src/relayer/env.ts — update hardcoded fallbacks ---
 info "Updating packages/relayer/src/relayer/env.ts fallback addresses..."
 ENV_TS="$RELAYER_DIR/src/relayer/env.ts"
