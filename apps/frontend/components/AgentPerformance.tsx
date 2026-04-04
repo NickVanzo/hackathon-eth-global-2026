@@ -1,355 +1,1259 @@
 "use client";
 
-import type { CSSProperties } from "react";
+import type { ReactNode } from "react";
 import { MOCK_AGENTS } from "@/lib/mock-data";
 
-// ─── Formatting helpers ───────────────────────────────────────────────────────
+// ─── Design tokens extracted from Stitch leaderboard.html ────────────────────
+
+const COLORS = {
+  background: "#131313",
+  surfaceContainerLowest: "#0e0e0e",
+  surfaceContainer: "#201f1f",
+  surfaceContainerLow: "#1c1b1b",
+  surfaceContainerHigh: "#2a2a2a",
+  surfaceContainerHighest: "#353534",
+  onSurface: "#e5e2e1",
+  onSurfaceVariant: "#bac9cc",
+  primary: "#c3f5ff",
+  primaryContainer: "#00e5ff",
+  onPrimary: "#00363d",
+  secondary: "#ffb5a0",
+  secondaryContainer: "#d73b00",
+  outlineVariant: "#3b494c",
+  outline: "#849396",
+} as const;
+
+// ─── Helpers ──────────────────────────────────────────────────────────────────
 
 function truncateAddress(address: string): string {
   return `${address.slice(0, 6)}...${address.slice(-4)}`;
 }
 
-function formatEmaReturn(value: number): string {
+function formatPerf(value: number): string {
   const sign = value >= 0 ? "+" : "";
-  return `${sign}${(value * 100).toFixed(2)}%`;
+  return `${sign}${(value * 100).toFixed(1)}%`;
 }
 
-// ─── Sub-components ───────────────────────────────────────────────────────────
+// ─── Tier badge derived from mock data ────────────────────────────────────────
 
-interface TokenBucketBarProps {
-  credits: number;
-  maxCredits: number;
-  refillRate: number;
+type TierClass = "S-TIER GLADIATOR" | "VAULT_ELITE" | "PROVING_GROUNDS";
+
+function resolveTierClass(
+  phase: "vault" | "proving",
+  sharpeScore: number,
+  rank: number
+): TierClass {
+  if (rank === 1 && sharpeScore > 2) return "S-TIER GLADIATOR";
+  if (phase === "vault") return "VAULT_ELITE";
+  return "PROVING_GROUNDS";
 }
 
-function TokenBucketBar({ credits, maxCredits, refillRate }: TokenBucketBarProps) {
-  const fillPct = maxCredits > 0 ? Math.min((credits / maxCredits) * 100, 100) : 0;
+interface TierBadgeProps {
+  tier: TierClass;
+}
+
+function TierBadge({ tier }: TierBadgeProps) {
+  if (tier === "S-TIER GLADIATOR") {
+    return (
+      <span
+        style={{
+          display: "inline-flex",
+          alignItems: "center",
+          padding: "2px 8px",
+          backgroundColor: COLORS.primaryContainer,
+          color: COLORS.onPrimary,
+          fontSize: "10px",
+          fontWeight: 900,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          borderRadius: "2px",
+          fontFamily: "'Space Grotesk', sans-serif",
+        }}
+      >
+        S-TIER GLADIATOR
+      </span>
+    );
+  }
 
   return (
-    <div className="flex flex-col gap-1.5">
-      <div className="flex items-center justify-between text-xs">
-        <span style={{ color: "#787776" }}>
-          {credits}/{maxCredits}
-        </span>
-        <span style={{ color: "#787776" }}>+{refillRate}/ep</span>
-      </div>
-      <div
-        className="h-1.5 w-32 overflow-hidden rounded-full"
-        style={{ backgroundColor: "#1c1b1b" }}
-        role="meter"
-        aria-valuenow={credits}
-        aria-valuemin={0}
-        aria-valuemax={maxCredits}
-        aria-label={`Token bucket: ${credits} of ${maxCredits} credits`}
-      >
+    <span
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        padding: "2px 8px",
+        backgroundColor: COLORS.surfaceContainerHighest,
+        border: `1px solid rgba(59,73,76,0.3)`,
+        color: COLORS.onSurface,
+        fontSize: "10px",
+        fontWeight: 900,
+        letterSpacing: "0.1em",
+        textTransform: "uppercase",
+        borderRadius: "2px",
+        fontFamily: "'Space Grotesk', sans-serif",
+      }}
+    >
+      {tier}
+    </span>
+  );
+}
+
+// ─── Status dot ───────────────────────────────────────────────────────────────
+
+interface StatusDotProps {
+  active?: boolean;
+  dimmed?: boolean;
+}
+
+function StatusDot({ active = true, dimmed = false }: StatusDotProps) {
+  const color = active ? COLORS.primaryContainer : `${COLORS.primaryContainer}66`;
+  const shadow = active
+    ? `0 0 8px rgba(0,229,255,0.8)`
+    : undefined;
+  return (
+    <span
+      aria-hidden="true"
+      style={{
+        display: "inline-block",
+        width: "8px",
+        height: "8px",
+        borderRadius: "50%",
+        backgroundColor: dimmed ? COLORS.secondary : color,
+        boxShadow: dimmed ? `0 0 8px rgba(255,87,34,0.8)` : shadow,
+        flexShrink: 0,
+      }}
+    />
+  );
+}
+
+// ─── Sidebar navigation ───────────────────────────────────────────────────────
+
+function SideNav() {
+  return (
+    <aside
+      style={{
+        position: "fixed",
+        left: 0,
+        top: 0,
+        height: "100%",
+        width: "256px",
+        display: "flex",
+        flexDirection: "column",
+        paddingTop: "80px",
+        paddingBottom: "32px",
+        backgroundColor: COLORS.surfaceContainerLowest,
+        borderRight: `1px solid rgba(59,73,76,0.15)`,
+        zIndex: 40,
+      }}
+    >
+      {/* Operator profile */}
+      <div style={{ padding: "0 24px", marginBottom: "40px" }}>
         <div
-          className="h-full rounded-full transition-all"
           style={{
-            width: `${fillPct}%`,
-            backgroundColor: fillPct <= 10 ? "#FF5722" : "#00E5FF",
-            boxShadow: fillPct > 10 ? "0 0 6px rgba(0,229,255,0.5)" : undefined,
+            display: "flex",
+            alignItems: "center",
+            gap: "12px",
+            padding: "12px",
+            backgroundColor: COLORS.surfaceContainer,
+            borderRadius: "4px",
+            border: `1px solid rgba(59,73,76,0.1)`,
+          }}
+        >
+          <div
+            style={{
+              width: "40px",
+              height: "40px",
+              borderRadius: "2px",
+              overflow: "hidden",
+              backgroundColor: "rgba(0,229,255,0.2)",
+              flexShrink: 0,
+            }}
+          >
+            {/* Placeholder avatar */}
+            <div
+              style={{
+                width: "100%",
+                height: "100%",
+                background:
+                  "linear-gradient(135deg, rgba(0,229,255,0.3) 0%, rgba(0,54,61,0.8) 100%)",
+              }}
+            />
+          </div>
+          <div>
+            <p
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "10px",
+                fontWeight: 900,
+                color: COLORS.primary,
+                letterSpacing: "0.15em",
+                textTransform: "uppercase",
+              }}
+            >
+              OPERATOR_01
+            </p>
+            <p
+              style={{
+                fontFamily: "'Space Grotesk', sans-serif",
+                fontSize: "8px",
+                color: COLORS.onSurfaceVariant,
+                fontWeight: 700,
+                textTransform: "uppercase",
+              }}
+            >
+              RANK: ELITE
+            </p>
+          </div>
+        </div>
+      </div>
+
+      {/* Nav links */}
+      <nav
+        style={{
+          flex: 1,
+          display: "flex",
+          flexDirection: "column",
+          gap: "4px",
+        }}
+        aria-label="Main navigation"
+      >
+        <NavLink icon="swords" label="ARENA" active={false} />
+        <NavLink icon="leaderboard" label="LEADERBOARD" active={true} />
+        <NavLink icon="smart_toy" label="MY_AGENTS" active={false} />
+        <NavLink icon="account_balance_wallet" label="VAULT" active={false} />
+      </nav>
+
+      {/* Bottom actions */}
+      <div
+        style={{
+          padding: "0 24px",
+          marginTop: "auto",
+          display: "flex",
+          flexDirection: "column",
+          gap: "24px",
+        }}
+      >
+        <button
+          style={{
+            backgroundColor: COLORS.primaryContainer,
+            color: COLORS.onPrimary,
+            width: "100%",
+            padding: "12px",
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: "12px",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            border: "none",
+            cursor: "pointer",
+            transition: "opacity 150ms",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.opacity = "0.9";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.opacity = "1";
+          }}
+        >
+          DEPLOY_AGENT
+        </button>
+        <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
+          <FooterLink icon="terminal" label="TERMINAL" />
+          <FooterLink icon="help_center" label="SUPPORT" />
+        </div>
+      </div>
+    </aside>
+  );
+}
+
+interface NavLinkProps {
+  icon: string;
+  label: string;
+  active: boolean;
+}
+
+function NavLink({ icon, label, active }: NavLinkProps) {
+  return (
+    <a
+      href="#"
+      aria-current={active ? "page" : undefined}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "16px",
+        padding: "12px 24px",
+        fontFamily: "'Space Grotesk', sans-serif",
+        fontSize: "12px",
+        fontWeight: 700,
+        letterSpacing: "0.15em",
+        textTransform: "uppercase",
+        textDecoration: "none",
+        transition: "all 200ms",
+        ...(active
+          ? {
+              background:
+                "linear-gradient(to right, rgba(0,229,255,0.1), transparent)",
+              color: COLORS.primaryContainer,
+              borderLeft: `4px solid ${COLORS.primaryContainer}`,
+            }
+          : {
+              color: COLORS.onSurfaceVariant,
+              borderLeft: "4px solid transparent",
+            }),
+      }}
+      onMouseEnter={(e) => {
+        if (!active) {
+          const el = e.currentTarget as HTMLAnchorElement;
+          el.style.backgroundColor = COLORS.surfaceContainerLow;
+          el.style.color = "#ffffff";
+        }
+      }}
+      onMouseLeave={(e) => {
+        if (!active) {
+          const el = e.currentTarget as HTMLAnchorElement;
+          el.style.backgroundColor = "transparent";
+          el.style.color = COLORS.onSurfaceVariant;
+        }
+      }}
+    >
+      <span
+        className="material-symbols-outlined"
+        aria-hidden="true"
+        style={{ fontSize: "18px" }}
+      >
+        {icon}
+      </span>
+      {label}
+    </a>
+  );
+}
+
+interface FooterLinkProps {
+  icon: string;
+  label: string;
+}
+
+function FooterLink({ icon, label }: FooterLinkProps) {
+  return (
+    <a
+      href="#"
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: "12px",
+        fontFamily: "'Space Grotesk', sans-serif",
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.15em",
+        textTransform: "uppercase",
+        textDecoration: "none",
+        color: COLORS.onSurfaceVariant,
+        transition: "color 200ms",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLAnchorElement).style.color = "#ffffff";
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLAnchorElement).style.color =
+          COLORS.onSurfaceVariant;
+      }}
+    >
+      <span
+        className="material-symbols-outlined"
+        aria-hidden="true"
+        style={{ fontSize: "14px" }}
+      >
+        {icon}
+      </span>
+      {label}
+    </a>
+  );
+}
+
+// ─── Top nav bar ──────────────────────────────────────────────────────────────
+
+function TopNav() {
+  return (
+    <header
+      style={{
+        position: "fixed",
+        top: 0,
+        width: "100%",
+        zIndex: 50,
+        display: "flex",
+        justifyContent: "space-between",
+        alignItems: "center",
+        padding: "0 24px",
+        height: "64px",
+        backgroundColor: "rgba(19,19,19,0.8)",
+        backdropFilter: "blur(12px)",
+        boxShadow: "0 0 20px rgba(0,229,255,0.08)",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: "32px" }}>
+        <span
+          style={{
+            fontSize: "20px",
+            fontWeight: 900,
+            fontStyle: "italic",
+            color: COLORS.primaryContainer,
+            fontFamily: "'Space Grotesk', sans-serif",
+            letterSpacing: "-0.05em",
+            textTransform: "uppercase",
+          }}
+        >
+          ARENA_OS
+        </span>
+        <nav
+          style={{ display: "flex", alignItems: "center", gap: "24px" }}
+          aria-label="Stats"
+        >
+          <span
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: "-0.05em",
+              textTransform: "uppercase",
+              fontSize: "12px",
+              fontWeight: 700,
+              color: COLORS.onSurfaceVariant,
+              cursor: "pointer",
+            }}
+          >
+            TVL: $1.2B
+          </span>
+          <span
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: "-0.05em",
+              textTransform: "uppercase",
+              fontSize: "12px",
+              fontWeight: 700,
+              color: COLORS.onSurfaceVariant,
+              cursor: "pointer",
+            }}
+          >
+            APY: 24.5%
+          </span>
+        </nav>
+      </div>
+
+      <div style={{ display: "flex", alignItems: "center", gap: "16px" }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: "16px",
+            padding: "6px 16px",
+            borderRadius: "4px",
+            backgroundColor: COLORS.surfaceContainerHigh,
+            border: `1px solid rgba(59,73,76,0.1)`,
+          }}
+        >
+          <span
+            className="material-symbols-outlined"
+            aria-label="Notifications"
+            style={{ color: COLORS.primaryContainer, fontSize: "14px" }}
+          >
+            notifications
+          </span>
+          <span
+            className="material-symbols-outlined"
+            aria-label="Settings"
+            style={{ color: COLORS.onSurfaceVariant, fontSize: "14px" }}
+          >
+            settings
+          </span>
+        </div>
+        <button
+          style={{
+            backgroundColor: COLORS.primaryContainer,
+            color: COLORS.onPrimary,
+            padding: "6px 16px",
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontWeight: 700,
+            fontSize: "12px",
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+            border: "none",
+            cursor: "pointer",
+            transition: "transform 150ms",
+          }}
+          onMouseEnter={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "scale(0.95)";
+          }}
+          onMouseLeave={(e) => {
+            (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
+          }}
+        >
+          CONNECT_VOICE
+        </button>
+      </div>
+    </header>
+  );
+}
+
+// ─── Leaderboard row ──────────────────────────────────────────────────────────
+
+interface AgentRowProps {
+  agent: (typeof MOCK_AGENTS)[number];
+  rank: number;
+  isAlt: boolean;
+}
+
+function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
+  const tier = resolveTierClass(agent.phase, agent.sharpeScore, rank);
+  const isTopRank = rank === 1;
+  const perfPositive = agent.emaReturn >= 0;
+  const rankStr = String(rank).padStart(2, "0");
+
+  const rowBg = isAlt ? COLORS.surfaceContainer : COLORS.surfaceContainerLow;
+  const borderColor = isTopRank
+    ? COLORS.primary
+    : "rgba(59,73,76,0.3)";
+
+  // Subtitle label derived from tier
+  const subtitleMap: Record<TierClass, string> = {
+    "S-TIER GLADIATOR": "PROBABILITY_ENGINE_v4",
+    VAULT_ELITE: "QUANT_REACTION_NODE",
+    PROVING_GROUNDS: "HFT_ARBITRAGE_CORE",
+  };
+
+  // Controller org label
+  const orgLabels = ["VALOR_HOLDINGS", "ANONYMOUS", "ZENITH_LABS"];
+  const orgLabel = orgLabels[rank - 1] ?? "ANONYMOUS";
+
+  return (
+    <div
+      role="row"
+      style={{
+        display: "grid",
+        gridTemplateColumns:
+          "1fr 4fr 2fr 1fr 2fr 2fr",
+        padding: "20px 24px",
+        backgroundColor: rowBg,
+        borderLeft: `4px solid ${borderColor}`,
+        position: "relative",
+        overflow: "hidden",
+        transition: "background-color 300ms",
+        cursor: "default",
+      }}
+      onMouseEnter={(e) => {
+        (e.currentTarget as HTMLDivElement).style.backgroundColor =
+          COLORS.surfaceContainerHighest;
+      }}
+      onMouseLeave={(e) => {
+        (e.currentTarget as HTMLDivElement).style.backgroundColor = rowBg;
+      }}
+    >
+      {/* Hover overlay */}
+      {isTopRank && (
+        <div
+          aria-hidden="true"
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundColor: "rgba(195,245,255,0.05)",
+            pointerEvents: "none",
           }}
         />
+      )}
+
+      {/* RK */}
+      <div
+        role="cell"
+        style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontSize: "18px",
+          fontWeight: 900,
+          fontStyle: "italic",
+          color: isTopRank ? COLORS.primary : COLORS.onSurfaceVariant,
+          alignSelf: "center",
+        }}
+      >
+        {rankStr}
+      </div>
+
+      {/* AGENT_IDENTIFIER */}
+      <div
+        role="cell"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: "12px",
+        }}
+      >
+        <StatusDot dimmed={!perfPositive} />
+        <div>
+          <p
+            style={{
+              fontFamily: "'Space Grotesk', sans-serif",
+              fontSize: "14px",
+              fontWeight: 900,
+              letterSpacing: "-0.02em",
+              color: "#ffffff",
+              textTransform: "uppercase",
+              lineHeight: 1.2,
+            }}
+          >
+            {agent.name.replace(" ", "-").toUpperCase()}
+          </p>
+          <p
+            style={{
+              fontSize: "10px",
+              color: COLORS.onSurfaceVariant,
+              fontWeight: 700,
+              letterSpacing: "0.1em",
+              textTransform: "uppercase",
+              fontFamily: "'Space Grotesk', sans-serif",
+            }}
+          >
+            {subtitleMap[tier]}
+          </p>
+        </div>
+      </div>
+
+      {/* TIER_CLASS */}
+      <div
+        role="cell"
+        style={{ display: "flex", alignItems: "center" }}
+      >
+        <TierBadge tier={tier} />
+      </div>
+
+      {/* SHARPE */}
+      <div
+        role="cell"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: "14px",
+          color: isTopRank ? COLORS.primary : COLORS.onSurface,
+        }}
+      >
+        {agent.sharpeScore.toFixed(2)}
+      </div>
+
+      {/* 7D_PERF */}
+      <div
+        role="cell"
+        style={{
+          display: "flex",
+          alignItems: "center",
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontWeight: 700,
+          fontSize: "14px",
+          color: perfPositive ? COLORS.primary : COLORS.secondary,
+        }}
+      >
+        {formatPerf(agent.emaReturn * 100)}
+      </div>
+
+      {/* CONTROLLER */}
+      <div
+        role="cell"
+        style={{ textAlign: "right", alignSelf: "center" }}
+      >
+        <p
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "10px",
+            fontWeight: 700,
+            color: COLORS.onSurfaceVariant,
+            letterSpacing: "-0.03em",
+          }}
+        >
+          {truncateAddress(agent.address)}
+        </p>
+        <p
+          style={{
+            fontSize: "8px",
+            fontWeight: 700,
+            textTransform: "uppercase",
+            color: isTopRank
+              ? `rgba(195,245,255,0.5)`
+              : `rgba(186,201,204,0.5)`,
+          }}
+        >
+          {orgLabel}
+        </p>
       </div>
     </div>
   );
 }
 
-interface ZeroSharpeWarningProps {
-  streak: number;
-}
+// ─── Intelligence side panel ──────────────────────────────────────────────────
 
-function ZeroSharpeWarning({ streak }: ZeroSharpeWarningProps) {
-  if (streak === 0) return null;
+function RecentPromotions() {
+  const promotions = [
+    { name: "GLITCH_RUNNER_8", tier: "S-TIER", time: "2m ago" },
+    { name: "CYBER_HAWK", tier: "VAULT_ELITE", time: "14m ago" },
+  ];
+
   return (
-    <span
-      className="inline-flex items-center gap-1 text-xs font-medium"
-      style={{ color: "#FF5722" }}
-      title={`Zero-Sharpe streak: ${streak} epoch${streak !== 1 ? "s" : ""}`}
-      aria-label={`Warning: zero-Sharpe streak of ${streak}`}
+    <section
+      style={{
+        backgroundColor: COLORS.surfaceContainer,
+        border: `1px solid rgba(59,73,76,0.1)`,
+        borderRadius: "4px",
+        overflow: "hidden",
+      }}
+      aria-labelledby="promotions-heading"
     >
-      {/* Warning triangle — decorative, aria-hidden */}
-      <svg
-        aria-hidden="true"
-        focusable="false"
-        className="h-3.5 w-3.5 shrink-0"
-        viewBox="0 0 16 16"
-        fill="currentColor"
-      >
-        <path d="M8 1.5a.5.5 0 0 1 .434.252l6.5 11A.5.5 0 0 1 14.5 13.5h-13a.5.5 0 0 1-.434-.748l6.5-11A.5.5 0 0 1 8 1.5ZM8 5a.5.5 0 0 0-.5.5v3a.5.5 0 0 0 1 0v-3A.5.5 0 0 0 8 5Zm0 6.5a.75.75 0 1 0 0-1.5.75.75 0 0 0 0 1.5Z" />
-      </svg>
-      {streak}
-    </span>
-  );
-}
-
-// ─── Phase badge ──────────────────────────────────────────────────────────────
-
-interface PhaseBadgeProps {
-  phase: "vault" | "proving";
-}
-
-function PhaseBadge({ phase }: PhaseBadgeProps) {
-  if (phase === "vault") {
-    return (
-      <span
-        className="inline-flex items-center rounded px-2 py-0.5 text-xs font-bold tracking-widest uppercase border"
+      <div
         style={{
-          color: "#00E5FF",
-          borderColor: "rgba(0,229,255,0.35)",
-          backgroundColor: "rgba(0,229,255,0.08)",
+          padding: "12px 16px",
+          backgroundColor: COLORS.surfaceContainerHigh,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
         }}
       >
-        VAULT
-      </span>
-    );
-  }
-  return (
-    <span
-      className="inline-flex items-center rounded px-2 py-0.5 text-xs font-bold tracking-widest uppercase border"
-      style={{
-        color: "#a78bfa",
-        borderColor: "rgba(112,0,255,0.4)",
-        backgroundColor: "rgba(112,0,255,0.1)",
-      }}
-    >
-      PROVING
-    </span>
+        <span
+          id="promotions-heading"
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.2em",
+            color: COLORS.primary,
+            textTransform: "uppercase",
+          }}
+        >
+          RECENT_PROMOTIONS
+        </span>
+        <span
+          className="material-symbols-outlined"
+          aria-hidden="true"
+          style={{ color: COLORS.primary, fontSize: "14px" }}
+        >
+          trending_up
+        </span>
+      </div>
+      <div
+        style={{
+          padding: "16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+        }}
+      >
+        {promotions.map((p) => (
+          <div
+            key={p.name}
+            style={{ display: "flex", gap: "12px", alignItems: "center" }}
+          >
+            <div
+              aria-hidden="true"
+              style={{
+                width: "4px",
+                height: "32px",
+                backgroundColor: COLORS.primaryContainer,
+                borderRadius: "999px",
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <p
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: "11px",
+                  fontWeight: 900,
+                  color: "#ffffff",
+                }}
+              >
+                {p.name}
+              </p>
+              <p style={{ fontSize: "9px", color: COLORS.onSurfaceVariant }}>
+                Moved to{" "}
+                <span
+                  style={{
+                    color: COLORS.primaryContainer,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {p.tier}
+                </span>
+              </p>
+            </div>
+            <span
+              style={{
+                marginLeft: "auto",
+                fontSize: "9px",
+                color: COLORS.onSurfaceVariant,
+                fontFamily: "monospace",
+              }}
+            >
+              {p.time}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
-// ─── Rank badge ───────────────────────────────────────────────────────────────
+function RecentEvictions() {
+  const evictions = [
+    { name: "ERROR_FOUND_0", from: "ARENA", time: "5h ago" },
+    { name: "STALE_NODE_X", from: "PROVING", time: "8h ago" },
+  ];
 
-function RankDisplay({ rank }: { rank: number }) {
-  const isTop3 = rank <= 3;
   return (
-    <span
-      className="font-mono font-bold tabular-nums"
+    <section
       style={{
-        fontSize: isTop3 ? "1.1rem" : "0.875rem",
-        color: isTop3 ? "#00E5FF" : "#787776",
-        textShadow: isTop3 ? "0 0 10px rgba(0,229,255,0.5)" : undefined,
+        backgroundColor: COLORS.surfaceContainer,
+        border: `1px solid rgba(59,73,76,0.1)`,
+        borderRadius: "4px",
+        overflow: "hidden",
       }}
+      aria-labelledby="evictions-heading"
     >
-      #{rank}
-    </span>
+      <div
+        style={{
+          padding: "12px 16px",
+          backgroundColor: COLORS.surfaceContainerHigh,
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+        }}
+      >
+        <span
+          id="evictions-heading"
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "10px",
+            fontWeight: 700,
+            letterSpacing: "0.2em",
+            color: COLORS.secondary,
+            textTransform: "uppercase",
+          }}
+        >
+          RECENT_EVICTIONS
+        </span>
+        <span
+          className="material-symbols-outlined"
+          aria-hidden="true"
+          style={{ color: COLORS.secondary, fontSize: "14px" }}
+        >
+          trending_down
+        </span>
+      </div>
+      <div
+        style={{
+          padding: "16px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "16px",
+        }}
+      >
+        {evictions.map((e) => (
+          <div
+            key={e.name}
+            style={{
+              display: "flex",
+              gap: "12px",
+              alignItems: "center",
+              opacity: 0.6,
+            }}
+          >
+            <div
+              aria-hidden="true"
+              style={{
+                width: "4px",
+                height: "32px",
+                backgroundColor: COLORS.secondary,
+                borderRadius: "999px",
+                flexShrink: 0,
+              }}
+            />
+            <div>
+              <p
+                style={{
+                  fontFamily: "'Space Grotesk', sans-serif",
+                  fontSize: "11px",
+                  fontWeight: 900,
+                  color: "#ffffff",
+                }}
+              >
+                {e.name}
+              </p>
+              <p style={{ fontSize: "9px", color: COLORS.onSurfaceVariant }}>
+                Evicted from{" "}
+                <span
+                  style={{
+                    color: COLORS.secondary,
+                    fontWeight: 700,
+                    textTransform: "uppercase",
+                  }}
+                >
+                  {e.from}
+                </span>
+              </p>
+            </div>
+            <span
+              style={{
+                marginLeft: "auto",
+                fontSize: "9px",
+                color: COLORS.onSurfaceVariant,
+                fontFamily: "monospace",
+              }}
+            >
+              {e.time}
+            </span>
+          </div>
+        ))}
+      </div>
+    </section>
   );
 }
 
-// ─── Row glow logic ────────────────────────────────────────────────────────────
-
-function rowGlowStyle(credits: number, maxCredits: number): CSSProperties {
-  if (maxCredits === 0) return {};
-  const ratio = credits / maxCredits;
-  if (ratio < 0.1) {
-    return {
-      boxShadow: "0 0 20px rgba(255,87,34,0.15)",
-      borderLeft: "2px solid #FF5722",
-    };
-  }
-  if (ratio > 0.8) {
-    return {
-      boxShadow: "0 0 20px rgba(0,229,255,0.15)",
-      borderLeft: "2px solid rgba(0,229,255,0.5)",
-    };
-  }
-  return { borderLeft: "2px solid transparent" };
+function PromoCard() {
+  return (
+    <div
+      style={{
+        position: "relative",
+        borderRadius: "4px",
+        overflow: "hidden",
+        height: "192px",
+      }}
+      role="img"
+      aria-label="Stake Agent NFT — Earn Passive Rewards"
+    >
+      {/* Gradient background in place of image */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(135deg, #0e0e0e 0%, #1a2a2b 40%, #0e1a1c 100%)",
+        }}
+      />
+      {/* Decorative grid overlay */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          backgroundImage:
+            "radial-gradient(circle at 2px 2px, rgba(0,229,255,0.08) 1px, transparent 0)",
+          backgroundSize: "24px 24px",
+        }}
+      />
+      {/* Gradient fade to bottom */}
+      <div
+        aria-hidden="true"
+        style={{
+          position: "absolute",
+          inset: 0,
+          background:
+            "linear-gradient(to top, #131313 0%, rgba(19,19,19,0.4) 50%, transparent 100%)",
+        }}
+      />
+      <div
+        style={{
+          position: "absolute",
+          bottom: "16px",
+          left: "16px",
+          right: "16px",
+        }}
+      >
+        <h3
+          style={{
+            fontFamily: "'Space Grotesk', sans-serif",
+            fontSize: "18px",
+            fontWeight: 900,
+            color: "#ffffff",
+            fontStyle: "italic",
+            lineHeight: 1.2,
+            marginBottom: "4px",
+          }}
+        >
+          STAKE_AGENT_NFT
+        </h3>
+        <p
+          style={{
+            fontSize: "10px",
+            color: COLORS.primaryContainer,
+            fontWeight: 700,
+            letterSpacing: "0.15em",
+            textTransform: "uppercase",
+          }}
+        >
+          EARN_PASSIVE_REWARDS
+        </p>
+      </div>
+    </div>
+  );
 }
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const sortedAgents = [...MOCK_AGENTS].sort((a, b) => b.sharpeScore - a.sharpeScore);
+const sortedAgents = [...MOCK_AGENTS].sort(
+  (a, b) => b.sharpeScore - a.sharpeScore
+);
 
 export default function AgentPerformance() {
   return (
-    <section
-      aria-labelledby="leaderboard-heading"
-      style={{ backgroundColor: "#0D0D0D" }}
-      className="rounded-xl overflow-hidden"
-    >
-      {/* Header */}
+    <>
+      {/* Google Fonts + global overrides */}
+      {/* eslint-disable-next-line react/no-danger */}
+      <style
+        dangerouslySetInnerHTML={{
+          __html: `
+            @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@300;400;500;600;700;900&family=Manrope:wght@300;400;500;600;700;800&display=swap');
+            @import url('https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@24,300,0,0&display=swap');
+            .material-symbols-outlined {
+              font-variation-settings: 'FILL' 0, 'wght' 300, 'GRAD' 0, 'opsz' 24;
+              vertical-align: middle;
+            }
+            @keyframes arena-pulse { 0%,100%{opacity:1} 50%{opacity:.5} }
+          `,
+        }}
+      />
+
       <div
-        className="px-6 py-5 border-b"
-        style={{ borderColor: "#1c1b1b" }}
+        style={{
+          color: COLORS.onSurface,
+          fontFamily: "'Manrope', sans-serif",
+        }}
       >
-        <h2
-          id="leaderboard-heading"
-          className="text-2xl font-black uppercase tracking-[0.2em]"
-          style={{
-            color: "#E5E2E1",
-            letterSpacing: "0.2em",
-            textShadow: "0 0 30px rgba(0,229,255,0.1)",
-          }}
-        >
-          LEADERBOARD
-        </h2>
-        <p className="text-xs mt-1 tracking-widest uppercase" style={{ color: "#787776" }}>
-          Ranked by Sharpe Score
-        </p>
-      </div>
-
-      {/* Table */}
-      <table
-        className="w-full text-sm"
-        aria-label="Agent performance leaderboard"
-        style={{ backgroundColor: "#0D0D0D" }}
-      >
-        <caption className="sr-only">
-          Agents ranked by Sharpe score, highest first
-        </caption>
-
-        <thead>
-          <tr
-            className="text-left border-b"
-            style={{ borderColor: "#1c1b1b" }}
+          {/* Dashboard header */}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              gap: "32px",
+              marginBottom: "48px",
+            }}
           >
-            <th
-              scope="col"
-              className="px-6 py-3 w-12 text-xs font-bold uppercase tracking-widest"
-              style={{ color: "#787776" }}
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-end",
+                gap: "32px",
+                flexWrap: "wrap",
+              }}
             >
-              Rank
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-3 text-xs font-bold uppercase tracking-widest"
-              style={{ color: "#787776" }}
-            >
-              Agent
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-3 text-xs font-bold uppercase tracking-widest"
-              style={{ color: "#787776" }}
-            >
-              Phase
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-3 text-right text-xs font-bold uppercase tracking-widest"
-              style={{ color: "#787776" }}
-            >
-              Sharpe
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-3 text-right text-xs font-bold uppercase tracking-widest"
-              style={{ color: "#787776" }}
-            >
-              EMA Return
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-3 text-xs font-bold uppercase tracking-widest"
-              style={{ color: "#787776" }}
-            >
-              Token Bucket
-            </th>
-            <th
-              scope="col"
-              className="px-4 py-3 text-xs font-bold uppercase tracking-widest text-center"
-              style={{ color: "#787776" }}
-            >
-              Streak
-            </th>
-          </tr>
-        </thead>
+              {/* Title block */}
+              <div>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: "12px",
+                    marginBottom: "8px",
+                  }}
+                >
+                  <span
+                    aria-hidden="true"
+                    style={{
+                      width: "8px",
+                      height: "8px",
+                      borderRadius: "50%",
+                      backgroundColor: COLORS.primary,
+                      animation: "arena-pulse 2s cubic-bezier(0.4,0,0.6,1) infinite",
+                    }}
+                  />
+                  <span
+                    style={{
+                      fontFamily: "'Space Grotesk', sans-serif",
+                      fontSize: "10px",
+                      fontWeight: 700,
+                      letterSpacing: "0.3em",
+                      color: COLORS.primary,
+                      textTransform: "uppercase",
+                    }}
+                  >
+                    LIVE_SIMULATION_ACTIVE
+                  </span>
+                </div>
+                <h1
+                  id="leaderboard-heading"
+                  style={{
+                    fontFamily: "'Space Grotesk', sans-serif",
+                    fontSize: "48px",
+                    fontWeight: 900,
+                    fontStyle: "italic",
+                    color: COLORS.onSurface,
+                    letterSpacing: "-0.05em",
+                    textTransform: "uppercase",
+                    lineHeight: 1,
+                    margin: 0,
+                  }}
+                >
+                  LEADERBOARD
+                </h1>
+                <p
+                  style={{
+                    color: COLORS.onSurfaceVariant,
+                    maxWidth: "448px",
+                    marginTop: "8px",
+                    fontWeight: 500,
+                    fontSize: "14px",
+                  }}
+                >
+                  Rankings updated every block. Top S-Tier Gladiators are
+                  eligible for monthly yield distribution.
+                </p>
+              </div>
 
-        <tbody>
-          {sortedAgents.map((agent, index) => {
-            const rank = index + 1;
-            const glowStyle = rowGlowStyle(agent.credits, agent.maxCredits);
-            const sharpePositive = agent.sharpeScore >= 0;
+              {/* Stats cards */}
+              <div style={{ display: "flex", gap: "16px" }}>
+                <StatCard
+                  label="TOTAL_REWARDS"
+                  value="842.05 ETH"
+                  valueColor={COLORS.primary}
+                />
+                <StatCard
+                  label="ARENA_TIME"
+                  value="14:02:55:09"
+                  valueColor={COLORS.secondary}
+                />
+              </div>
+            </div>
+          </div>
 
-            return (
-              <tr
-                key={agent.id}
-                className="border-b transition-colors"
+          {/* Main grid: table + sidebar */}
+          <div
+            style={{
+              display: "flex",
+              gap: "48px",
+              alignItems: "flex-start",
+            }}
+          >
+            {/* Ranking table */}
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px" }}>
+              {/* Table header */}
+              <div
+                role="row"
                 style={{
-                  borderColor: "#1c1b1b",
-                  ...glowStyle,
-                }}
-                onMouseEnter={(e) => {
-                  (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
-                    "rgba(255,255,255,0.03)";
-                }}
-                onMouseLeave={(e) => {
-                  (e.currentTarget as HTMLTableRowElement).style.backgroundColor =
-                    "transparent";
+                  display: "grid",
+                  gridTemplateColumns: "1fr 4fr 2fr 1fr 2fr 2fr",
+                  padding: "16px 24px",
+                  backgroundColor: COLORS.surfaceContainerLow,
+                  borderBottom: `1px solid rgba(59,73,76,0.2)`,
+                  alignItems: "center",
                 }}
               >
-                {/* Rank */}
-                <td className="px-6 py-4">
-                  <RankDisplay rank={rank} />
-                </td>
+                <ColHeader>RK</ColHeader>
+                <ColHeader>AGENT_IDENTIFIER</ColHeader>
+                <ColHeader>TIER_CLASS</ColHeader>
+                <ColHeader>SHARPE</ColHeader>
+                <ColHeader>7D_PERF</ColHeader>
+                <ColHeader right>CONTROLLER</ColHeader>
+              </div>
 
-                {/* Agent name + address */}
-                <td className="px-4 py-4">
-                  <p
-                    className="font-semibold tracking-wide"
-                    style={{ color: "#E5E2E1" }}
-                  >
-                    {agent.name}
-                  </p>
-                  <p
-                    className="font-mono text-xs mt-0.5"
-                    style={{ color: "#787776" }}
-                  >
-                    {truncateAddress(agent.address)}
-                  </p>
-                </td>
-
-                {/* Phase badge */}
-                <td className="px-4 py-4">
-                  <PhaseBadge phase={agent.phase} />
-                </td>
-
-                {/* Sharpe score */}
-                <td className="px-4 py-4 text-right">
-                  <span
-                    className="text-lg font-black tabular-nums"
-                    style={{
-                      color: sharpePositive ? "#00E5FF" : "#FF5722",
-                      textShadow: sharpePositive
-                        ? "0 0 12px rgba(0,229,255,0.4)"
-                        : "0 0 12px rgba(255,87,34,0.4)",
-                    }}
-                  >
-                    {sharpePositive ? "+" : ""}
-                    {agent.sharpeScore.toFixed(2)}
-                  </span>
-                </td>
-
-                {/* EMA return */}
-                <td className="px-4 py-4 text-right">
-                  <span
-                    className="tabular-nums font-medium text-sm"
-                    style={{
-                      color: agent.emaReturn >= 0 ? "#00E5FF" : "#FF5722",
-                    }}
-                  >
-                    {formatEmaReturn(agent.emaReturn)}
-                  </span>
-                </td>
-
-                {/* Token bucket */}
-                <td className="px-4 py-4">
-                  <TokenBucketBar
-                    credits={agent.credits}
-                    maxCredits={agent.maxCredits}
-                    refillRate={agent.refillRate}
+              {/* Rows */}
+              <div
+                role="table"
+                aria-labelledby="leaderboard-heading"
+                style={{ display: "flex", flexDirection: "column", gap: "12px" }}
+              >
+                {sortedAgents.map((agent, index) => (
+                  <AgentRow
+                    key={agent.id}
+                    agent={agent}
+                    rank={index + 1}
+                    isAlt={index % 2 === 0}
                   />
-                </td>
+                ))}
+              </div>
+            </div>
 
-                {/* Zero-Sharpe streak */}
-                <td className="px-4 py-4 text-center">
-                  <ZeroSharpeWarning streak={agent.zeroSharpeStreak} />
-                </td>
-              </tr>
-            );
-          })}
-        </tbody>
-      </table>
-    </section>
+            {/* Intelligence panel */}
+            <aside
+              style={{
+                width: "320px",
+                flexShrink: 0,
+                display: "flex",
+                flexDirection: "column",
+                gap: "24px",
+              }}
+              aria-label="Intelligence panel"
+            >
+              <RecentPromotions />
+              <RecentEvictions />
+              <PromoCard />
+            </aside>
+          </div>
+      </div>
+    </>
+  );
+}
+
+// ─── Tiny presentational components ──────────────────────────────────────────
+
+interface ColHeaderProps {
+  children: ReactNode;
+  right?: boolean;
+}
+
+function ColHeader({ children, right = false }: ColHeaderProps) {
+  return (
+    <div
+      role="columnheader"
+      style={{
+        fontFamily: "'Space Grotesk', sans-serif",
+        fontSize: "10px",
+        fontWeight: 700,
+        letterSpacing: "0.1em",
+        color: COLORS.onSurfaceVariant,
+        textTransform: "uppercase",
+        textAlign: right ? "right" : "left",
+      }}
+    >
+      {children}
+    </div>
+  );
+}
+
+interface StatCardProps {
+  label: string;
+  value: string;
+  valueColor: string;
+}
+
+function StatCard({ label, value, valueColor }: StatCardProps) {
+  return (
+    <div
+      style={{
+        backgroundColor: COLORS.surfaceContainerHigh,
+        border: `1px solid rgba(59,73,76,0.1)`,
+        padding: "16px",
+        borderRadius: "4px",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "flex-end",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontSize: "10px",
+          color: COLORS.onSurfaceVariant,
+          fontWeight: 700,
+          letterSpacing: "0.1em",
+          textTransform: "uppercase",
+          marginBottom: "4px",
+        }}
+      >
+        {label}
+      </span>
+      <span
+        style={{
+          fontFamily: "'Space Grotesk', sans-serif",
+          fontSize: "24px",
+          fontWeight: 900,
+          color: valueColor,
+          letterSpacing: "-0.05em",
+        }}
+      >
+        {value}
+      </span>
+    </div>
   );
 }

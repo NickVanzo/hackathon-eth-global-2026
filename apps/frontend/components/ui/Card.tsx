@@ -3,16 +3,28 @@ import type { ReactNode } from "react";
 interface CardProps {
   children: ReactNode;
   className?: string;
-  /** Adds a subtle cyan glow to highlight important cards */
+  /** Adds a left accent border in the primary (cyan) color */
+  accent?: boolean;
+  /** Adds a subtle cyan glow */
   glow?: boolean;
 }
 
-export function Card({ children, className = "", glow = false }: CardProps) {
+export function Card({
+  children,
+  className = "",
+  accent = false,
+  glow = false,
+}: CardProps) {
   return (
     <div
-      className={`bg-[#111111] border border-[#1c1b1b] rounded-xl p-6 ${
-        glow ? "glow-cyan border-[rgba(0,229,255,0.3)]" : ""
-      } ${className}`}
+      className={[
+        "bg-[#201f1f] border border-[#3b494c]/10 p-6",
+        accent ? "border-l-2 border-l-[#00e5ff]" : "",
+        glow ? "shadow-[0_0_20px_rgba(0,229,255,0.12)]" : "",
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
     >
       {children}
     </div>

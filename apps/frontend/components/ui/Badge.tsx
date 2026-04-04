@@ -1,6 +1,6 @@
 import type { ReactNode } from "react";
 
-type BadgeVariant = "positive" | "negative" | "neutral";
+type BadgeVariant = "positive" | "negative" | "neutral" | "tier" | "warning";
 
 interface BadgeProps {
   children: ReactNode;
@@ -8,10 +8,20 @@ interface BadgeProps {
   className?: string;
 }
 
+// Exact token values from the Stitch design system
 const variantStyles: Record<BadgeVariant, string> = {
-  positive: "bg-cyan-500/20 text-cyan-400 border-cyan-500/30",
-  negative: "bg-orange-500/20 text-orange-400 border-orange-500/30",
-  neutral: "bg-purple-500/20 text-purple-400 border-purple-500/30",
+  // Positive / S-Tier — primary cyan
+  positive: "bg-[#00e5ff] text-[#00363d]",
+  // Negative / eviction — secondary orange-red
+  negative:
+    "bg-[#353534] border border-[#3b494c]/30 text-[#e5e2e1]",
+  // Neutral — surface container variant
+  neutral:
+    "bg-[#353534] border border-[#3b494c]/30 text-[#e5e2e1]",
+  // Tier classification badge (e.g. VAULT_TIER, PROVING_GROUNDS)
+  tier: "bg-[#00e5ff]/10 text-[#c3f5ff] border border-[#00e5ff]/20",
+  // Warning / alert state — secondary container
+  warning: "bg-[#d73b00]/10 text-[#ffb5a0] border border-[#d73b00]/20",
 };
 
 export function Badge({
@@ -21,7 +31,14 @@ export function Badge({
 }: BadgeProps) {
   return (
     <span
-      className={`inline-flex items-center rounded-md border px-2 py-0.5 text-xs font-medium ${variantStyles[variant]} ${className}`}
+      className={[
+        "inline-flex items-center px-2 py-0.5 text-[10px] font-black tracking-widest uppercase",
+        variantStyles[variant],
+        className,
+      ]
+        .filter(Boolean)
+        .join(" ")}
+      style={{ fontFamily: "var(--font-space-grotesk)" }}
     >
       {children}
     </span>
