@@ -229,7 +229,7 @@ AgentManager is done. Now build the strategies that use it.
 - **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
 ### PM — Wire dashboard to real contracts
-- [ ] Replace all mock data with real contract reads using deployed addresses + ABIs
+- [x] Replace all mock data with real contract reads using deployed addresses + ABIs
 - [ ] Verify deposit/withdraw forms call real satellite functions
 - [ ] Verify agent performance view reads real AgentManager state (Sharpe, EMAs, credits)
 - **Skills**: `frontend-dev`, `viem-integration`
