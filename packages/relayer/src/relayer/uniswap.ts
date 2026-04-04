@@ -66,7 +66,7 @@ async function getSwapCalldata(
     tokenOutChainId: String(SEPOLIA_CHAIN_ID),
     amount: amount.toString(),
     type: "EXACT_INPUT",
-    slippageTolerance: 1.0, // 1 % — generous for hackathon
+    slippageTolerance: 5.0, // 5 % — high tolerance for testnet thin liquidity
     routingPreference: "BEST_PRICE", // satellite is a contract — we filter for CLASSIC in the response
     protocols: ["V3"],
   };

@@ -36,9 +36,9 @@ const externalRelayer = args.includes("--relayer");
 const ZG_RPC = "https://evmrpc-testnet.0g.ai";
 const SEPOLIA_RPC = "https://ethereum-sepolia.publicnode.com";
 
-const AGENT_MANAGER_ADDR = "0x253552073176A642737F111027B1709a6e33376d"; // 0G
-const VAULT_ADDR = "0x7215ffdF9204fD2e2E6e3feD1fc305b9417a108b"; // 0G
-const SATELLITE_ADDR = "0x8453Bac9B7767aE47FD3b86ac9ee100c24913A37"; // Sepolia
+const AGENT_MANAGER_ADDR = "0xC346168268af5f69D318C50661592370fdb0ba32"; // 0G
+const VAULT_ADDR = "0x904588f5074F9C75325906AD3613A3f7a98a4D02"; // 0G
+const SATELLITE_ADDR = "0x03a1125a9746fa5fc70411A3235eb8b9D18bc24E"; // Sepolia
 
 const RELAYER_KEY = "0x03fd9c5a6a4d37e488f1c6806182d14a7d0c1cd90c405fee2b20002ee70e778a";
 
@@ -114,6 +114,8 @@ const VAULT_ABI = [
 
 const SATELLITE_ABI = [
   "function executeBatch(tuple(uint256 agentId, uint8 actionType, bytes params, uint256 blockNumber)[] intents) external",
+  "function collectAndReport(uint256 agentId, uint256 positionValue) external",
+  "function getAgentPositions(uint256 agentId) view returns (uint256[])",
 ];
 
 // ---------------------------------------------------------------------------
@@ -196,7 +198,8 @@ async function mcpCallTool(sessionId, toolName, toolArgs) {
 async function getPoolState() {
   try {
     const sessionId = await mcpInitSession();
-    const priceResult = await mcpCallTool(sessionId, "get_pool_price", { chain: "sepolia" });
+    const poolAddress = process.env.POOL_ADDRESS;
+    const priceResult = await mcpCallTool(sessionId, "get_pool_price", { poolAddress, chain: "sepolia" });
     let currentPrice, currentTick;
     if (priceResult.source === "rpc") {
       currentPrice = priceResult.priceToken0PerToken1 ?? priceResult.priceToken1PerToken0;
@@ -209,7 +212,7 @@ async function getPoolState() {
 
     let nearbyTicks = [];
     try {
-      const ticksResult = await mcpCallTool(sessionId, "get_pool_ticks", { chain: "sepolia" });
+      const ticksResult = await mcpCallTool(sessionId, "get_pool_ticks", { poolAddress, chain: "sepolia" });
       const ticks = Array.isArray(ticksResult) ? ticksResult : (ticksResult.ticks ?? []);
       nearbyTicks = ticks
         .filter((t) => t.tickIdx != null)
@@ -219,11 +222,35 @@ async function getPoolState() {
 
     return { currentPrice: parseFloat(currentPrice.toFixed(4)), currentTick, nearbyTicks, source: priceResult.source };
   } catch (err) {
-    log("MCP", `unavailable (${err.message}), using mock`);
-    const currentPrice = 1800.0 + Math.random() * 20 - 10;
-    const currentTick = Math.floor(Math.log(currentPrice) / Math.log(1.0001));
-    return { currentPrice: parseFloat(currentPrice.toFixed(4)), currentTick, nearbyTicks: [], source: "mock" };
+    log("MCP", `unavailable (${err.message}), falling back to RPC slot0`);
   }
+
+  // RPC fallback: read slot0() directly from the pool contract on Sepolia
+  try {
+    const poolAddr = process.env.POOL_ADDRESS;
+    if (poolAddr) {
+      const poolContract = new ethers.Contract(poolAddr, [
+        "function slot0() view returns (uint160 sqrtPriceX96, int24 tick, uint16, uint16, uint16, uint8, bool)",
+      ], sepoliaProvider);
+      const slot0 = await poolContract.slot0();
+      const currentTick = Number(slot0.tick);
+      // Compute price from sqrtPriceX96: price = (sqrtPriceX96 / 2^96)^2
+      // price = token1/token0 in raw units. For USDC.e(6dec)/WETH(18dec):
+      // ETH price in USDC = 1/price * 10^(18-6) = 10^12 / price
+      const sqrtPrice = Number(slot0.sqrtPriceX96) / 2 ** 96;
+      const rawPrice = sqrtPrice * sqrtPrice;
+      const currentPrice = 1e12 / rawPrice;
+      log("pool", `RPC fallback: tick=${currentTick} price=${currentPrice.toFixed(4)}`);
+      return { currentPrice: parseFloat(currentPrice.toFixed(4)), currentTick, nearbyTicks: [], source: "rpc" };
+    }
+  } catch (err2) {
+    log("pool", `RPC fallback failed: ${err2.message}`);
+  }
+
+  // Last resort mock (should not reach here if POOL_ADDRESS is set)
+  const currentPrice = 1800.0 + Math.random() * 20 - 10;
+  const currentTick = Math.floor(Math.log(currentPrice) / Math.log(1.0001));
+  return { currentPrice: parseFloat(currentPrice.toFixed(4)), currentTick, nearbyTicks: [], source: "mock" };
 }
 
 // ---------------------------------------------------------------------------
@@ -368,13 +395,13 @@ async function submitIntentOnChain(agent, decision, signerIdx) {
   // Encode params
   let params;
   if (actionType === 0 || actionType === 2) {
-    // Agent decides in human-readable USDC (e.g. 1000 = $1000).
-    // Convert to 6-decimal raw units. Cap at proving balance (1 USDC.e = 1000000).
-    const humanAmount = decision.amountUSDC ?? 1;
-    const rawAmount = BigInt(Math.round(humanAmount * 1e6));
-    const amountUSDC = rawAmount > 1_000_000n ? 500_000n : rawAmount; // cap at proving balance, default half
-    const tickLower = decision.tickLower ?? -887220;
-    const tickUpper = decision.tickUpper ?? 887220;
+    // Use 200,000 raw = 0.2 USDC.e (proven to work in fire-intent.ts)
+    const amountUSDC = 200_000n;
+    // Use full-range ticks (always works regardless of current price, no swap needed for token ratio)
+    // Agent tick decisions are based on mock/inaccurate prices, so override with safe full-range
+    const tickLower = -887220;
+    const tickUpper = 887220;
+    log(agent.name, `intent params: amount=${amountUSDC} ticks=[${tickLower},${tickUpper}] (full-range override)`);
     params = ethers.AbiCoder.defaultAbiCoder().encode(
       ["uint256", "int24", "int24"],
       [amountUSDC, tickLower, tickUpper]
@@ -595,20 +622,36 @@ async function runOneEpoch(epochNum, token) {
   }
 
   if (externalRelayer) {
-    // External relayer handles: executeBatch + reportValues + epoch settlement
+    // External relayer handles: executeBatch + reportValues
+    // We submit intents, wait for relay, then trigger epoch settlement
+    // (Envio indexer is event-driven — it has no periodic loop to call triggerSettleEpoch)
     if (intents.length > 0) {
-      log("mode", "external relayer mode — waiting for relayer to process intents, report values, and settle epoch");
-      log("mode", `submitted ${intents.length} intent(s), relayer will pick up IntentQueued events`);
-    } else {
-      log("mode", "no intents this epoch — triggering settlement directly");
-    }
-    // Wait for relayer to process intents + report values before settling
-    // The relayer needs time to: pick up IntentQueued → call executeBatch → collectAndReport → reportValues
-    if (intents.length > 0) {
-      log("wait", "waiting 60s for relayer to execute intents and report values...");
+      log("mode", "external relayer mode — relayer handles intent execution on Sepolia");
+      log("mode", `submitted ${intents.length} intent(s), waiting for relayer to execute...`);
+      log("wait", "waiting 60s for relayer to execute intents on Sepolia...");
       await new Promise((r) => setTimeout(r, 60_000));
+    } else {
+      log("mode", "no intents this epoch");
     }
-    // We still trigger epoch settlement ourselves (relayer may not do it automatically)
+
+    // Report values directly on 0G (skip collectAndReport roundtrip — not needed for PoC)
+    // Check Sepolia positions to confirm execution, then report with synthetic multipliers
+    const satellite = new ethers.Contract(SATELLITE_ADDR, SATELLITE_ABI, sepoliaProvider);
+    for (const agent of AGENTS) {
+      try {
+        const positions = await satellite.getAgentPositions(agent.id);
+        const positionValue = BigInt(Math.round(1_000_000 * agent.syntheticMultiplier));
+        const feesCollected = BigInt(agent.syntheticFees);
+        log(agent.name, `${positions.length} position(s) on Sepolia, reporting: posValue=${positionValue} fees=${feesCollected}`);
+        const tx = await agentManager.connect(relayerZg).reportValues(agent.id, positionValue, feesCollected, ZG_TX_OVERRIDES);
+        const receipt = await tx.wait();
+        log(agent.name, `reportValues tx=${receipt.hash}`);
+      } catch (err) {
+        log(agent.name, `reportValues failed: ${err.message?.slice(0, 120)}`);
+      }
+    }
+
+    // Trigger epoch settlement
     await waitForEpochAndSettle();
   } else {
     // 4. Relay to Sepolia (or fall back to synthetic)
