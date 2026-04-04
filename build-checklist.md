@@ -73,27 +73,27 @@ The agent lifecycle contract — scoring, intents, token bucket. Separate from t
 
 **Skills**: `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/SECURITY.md`
 
-- [ ] Agent registry: agent state (phase PROVING/VAULT, provingBalance, provingDeployed, agentAddress, epochsCompleted, zeroSharpeStreak)
-- [ ] iNFT contract (ERC-721): mint on registration, `ownerOf` for auth checks
-- [ ] `recordRegistration(agentId, agentAddress, deployer, provingAmount)` — `onlyMessenger`, registers agent, records provingBalance, mints iNFT
-- [ ] `totalDeployedVault` — running counter of vault capital deployed; public getter for Vault to read
-- [ ] `submitIntent(agentId, actionType, params)` — proving/vault branching, cooldown (`minActionInterval`), credit refill/check for vault agents, `provingBalance - provingDeployed` for proving agents, vault agents check `vault.totalAssets() - totalDeployedVault >= amount`, increment `totalDeployedVault` for vault intents, auto-set `source` field (PROVING/VAULT) based on phase, emit `IntentQueued`
-- [ ] Token bucket: credits, refillRate, maxCredits per agent, credit refill logic
-- [ ] `recordClosure(agentId, recoveredAmount, source)` — `onlyMessenger`; `source` from relayer's position cache (NOT agent phase lookup). If VAULT: decrement `totalDeployedVault`, refund credits (if agent exists). If PROVING: decrement `provingDeployed`. If agent deregistered: skip per-agent bookkeeping silently
-- [ ] `reportValues(agentId, positionValue, feesCollected)` — `onlyMessenger`, stores last reported values + `lastReportedBlock`
-- [ ] `settleAgents(totalAssets, maxExposureRatio)` — `onlyVault`, receives both params from Vault:
+- [x] Agent registry: agent state (phase PROVING/VAULT, provingBalance, provingDeployed, agentAddress, epochsCompleted, zeroSharpeStreak)
+- [x] iNFT contract (ERC-721): uses pre-deployed AgenticID (ERC-7857) at 0x2700F6...; mint on registration via `iMint`, `ownerOf` for auth checks
+- [x] `recordRegistration(agentId, agentAddress, deployer, provingAmount)` — `onlyMessenger`, registers agent, records provingBalance, mints iNFT with 3 IntelligentData fields (strategy name, model, agent address)
+- [x] `totalDeployedVault` — running counter of vault capital deployed; public getter for Vault to read
+- [x] `submitIntent(agentId, actionType, params)` — proving/vault branching, cooldown (`minActionInterval`), credit refill/check for vault agents, `provingBalance - provingDeployed` for proving agents, vault agents check `vault.totalAssets() - totalDeployedVault >= amount`, increment `totalDeployedVault` for vault intents, emit `IntentQueued`
+- [x] Token bucket: credits, refillRate, maxCredits per agent, credit refill logic
+- [x] `recordClosure(agentId, recoveredAmount, source)` — `onlyMessenger`; `source` from relayer's position cache (NOT agent phase lookup). If VAULT: decrement `totalDeployedVault`, refund credits (if agent exists). If PROVING: decrement `provingDeployed`. If agent deregistered: skip per-agent bookkeeping silently
+- [x] `reportValues(agentId, positionValue, feesCollected)` — `onlyMessenger`, stores last reported values + `lastReportedBlock`
+- [x] `settleAgents(totalAssets, maxExposureRatio)` — `onlyVault`, receives both params from Vault:
   - EMA updates (emaReturn, emaReturnSq) with alpha decay
-  - Sharpe computation with `Math.sqrt`, `MIN_VARIANCE` floor, negative clamping, all-zero fallback
-  - Score-to-credit allocation (refillRate, maxCredits using passed totalAssets + maxExposureRatio), promotion ramp (effectiveMaxCredits, maxPromotionShare, rampEpochs)
-  - Promotion check (epochsCompleted + minPromotionSharpe), reset zeroSharpeStreak on promotion, carry over proving-phase EMAs as starting point (do NOT reset — no cold start)
+  - Sharpe computation with `_sqrt`, `MIN_VARIANCE` floor, negative clamping
+  - Score-to-credit allocation (refillRate, maxCredits using passed totalAssets + maxExposureRatio), promotion ramp
+  - Promotion check (epochsCompleted + minPromotionSharpe), reset zeroSharpeStreak on promotion, carry over proving-phase EMAs as starting point (no cold start)
   - Eviction check (zeroSharpeStreak, skip paused, evictionEpochs): vault eviction emits `ForceCloseRequested(agentId, VAULT)` + drops to proving + resets EMAs; proving ejection emits `ForceCloseRequested(agentId, PROVING)` + deregisters immediately
-  - Returns to Vault: per-agent feesCollected, aggregate vault-agent position value, Sharpe-sorted agent list (lowest first)
-- [ ] `processPause(agentId, caller, paused)` — `onlyMessenger`, checks `iNFT.ownerOf(agentId) == caller`
-- [ ] `processCommissionClaim(agentId, caller)` — `onlyMessenger`, checks `iNFT.ownerOf(agentId) == caller`, then calls `Vault.approveCommissionRelease(agentId)` (no amount — Vault reads own state)
-- [ ] `processWithdrawFromArena(agentId, caller)` — `onlyMessenger`, checks iNFT ownership, emits `ForceCloseRequested(agentId, ALL)`, deregisters agent immediately (clears token bucket, EMAs, registry, frees `maxAgents` slot)
-- [ ] `setVault(address)` — one-time initialization to set circular reference after Vault deploys
-- [ ] `onlyMessenger` and `onlyVault` modifiers
-- [ ] Compile AgentManager + iNFT, generate ABIs, push to `shared/abis/`
+  - Returns to Vault: per-agent feesCollected, aggregate vault-agent position value
+- [x] `processPause(agentId, caller, paused)` — `onlyMessenger`, checks `agenticId.ownerOf(agentToTokenId[agentId]) == caller`
+- [x] `processCommissionClaim(agentId, caller)` — `onlyMessenger`, checks iNFT ownership, calls `vault.approveCommissionRelease(agentId, caller)`
+- [x] `processWithdrawFromArena(agentId, caller)` — `onlyMessenger`, checks iNFT ownership, emits `ForceCloseRequested(agentId, ALL)`, deregisters agent immediately (clears token bucket, EMAs, registry)
+- [x] `setVault(address)` — one-time initialization to set circular reference after Vault deploys
+- [x] `onlyMessenger` and `onlyVault` modifiers
+- [ ] Compile AgentManager + iNFT, generate ABIs, push to `shared/abis/` (pending deployment)
 
 **After AgentManager is done (~hour 3:45)**: Dev A starts building agent strategies (see Hour 4:45 section) or helps Dev B with Vault if needed.
 
