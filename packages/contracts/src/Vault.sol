@@ -274,8 +274,16 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         emit CommissionApproved(agentId, caller, amount);
     }
 
+    // =========================================================================
+    // 3.4 — EPOCH SETTLEMENT
+    // =========================================================================
+
+    /// @notice Called by AgentManager's epochCheck modifier when it fires before
+    ///         any on-chain agent action.  Triggers settlement if due.
     function triggerSettleEpoch() external onlyAgentManager {
-        revert("Vault: triggerSettleEpoch not implemented");
+        if (!_settling && block.number >= lastEpochBlock + epochLength) {
+            _settleEpoch();
+        }
     }
 
     function totalAssets() external view returns (uint256) { return _trackedTotalAssets; }
@@ -303,6 +311,125 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         return (shares * _trackedTotalAssets) / supply;
     }
 
-    function _settleEpoch() internal virtual { }
-    function _processPendingWithdrawals() internal virtual { }
+    // -------------------------------------------------------------------------
+    // Internal: settlement orchestration
+    // -------------------------------------------------------------------------
+
+    /// @dev Full epoch settlement — called by epochCheck modifier or triggerSettleEpoch().
+    ///
+    ///   Order of operations:
+    ///     1. settleAgents()         — EMA, Sharpe, promotion, eviction
+    ///     2. fee waterfall          — protocolFee → commission → depositorReturn
+    ///     3. Tier-2 queue           — process pending withdrawals if idle allows
+    ///     4. EpochSettled event     — relayer syncs satellite share price
+    ///     5. advance epoch counter
+    function _settleEpoch() internal {
+        _settling = true;
+
+        // ── Step 1: settle agents ─────────────────────────────────────────────
+        // AgentManager updates EMAs, Sharpe scores, promotion ramp, evictions,
+        // and returns per-agent settlement data for the fee waterfall.
+        IShared.AgentSettlementData[] memory data =
+            IAgentManager(agentManager).settleAgents();
+
+        // ── Step 2: fee waterfall ─────────────────────────────────────────────
+        // For each agent with collected fees:
+        //   protocolFee     = feesCollected × protocolFeeRate / 10000
+        //   agentCommission = (feesCollected − protocolFee) × commissionRate / 10000
+        //   depositorReturn = feesCollected − protocolFee − agentCommission
+        //
+        // protocolFee + agentCommission are reserved on the Satellite when the
+        // relayer processes ProtocolFeeAccrued / CommissionAccrued events.
+        // depositorReturn stays in _trackedTotalAssets — it increases share value.
+        uint256 totalProtocolFee;
+
+        for (uint256 i = 0; i < data.length; i++) {
+            IShared.AgentSettlementData memory d = data[i];
+            if (d.feesCollected == 0) continue;
+
+            uint256 protocolFee     = (d.feesCollected * protocolFeeRate) / 10_000;
+            uint256 remaining       = d.feesCollected - protocolFee;
+            uint256 commission      = (remaining * commissionRate) / 10_000;
+            uint256 depositorReturn = remaining - commission;
+
+            if (protocolFee > 0) {
+                protocolFeesAccrued += protocolFee;
+                totalProtocolFee    += protocolFee;
+            }
+
+            if (commission > 0) {
+                commissionsOwed[d.agentId] += commission;
+                emit CommissionAccrued(d.agentId, commission);
+            }
+
+            // Depositor share stays in vault equity: both total and idle increase
+            // (the fees were collected back to idle on the Satellite).
+            if (depositorReturn > 0) {
+                _trackedTotalAssets += depositorReturn;
+                _trackedIdleBalance += depositorReturn;
+            }
+        }
+
+        // Single ProtocolFeeAccrued per epoch — relayer batches the satellite call.
+        if (totalProtocolFee > 0) {
+            emit ProtocolFeeAccrued(totalProtocolFee);
+        }
+
+        // ── Step 3: process Tier-2 withdrawal queue ───────────────────────────
+        _processPendingWithdrawals();
+
+        // ── Step 4: emit EpochSettled ─────────────────────────────────────────
+        // Relayer calls satellite.updateSharePrice(sharePrice) on Sepolia so
+        // requestWithdraw() can convert tokenAmount → shares accurately.
+        emit EpochSettled(_sharePrice(), totalSupply(), _trackedTotalAssets);
+
+        // ── Step 5: advance epoch ─────────────────────────────────────────────
+        lastEpochBlock = block.number;
+        currentEpoch++;
+
+        _settling = false;
+    }
+
+    /// @dev FIFO processing of queued Tier-2 withdrawals.
+    ///      Iterates _pendingUsers, fulfils any entry that fits within current
+    ///      idle balance, and compacts the queue for the next epoch.
+    ///
+    ///      Gas bound: O(n) over _pendingUsers length.  Safe for demo scale
+    ///      (maxAgents ≤ 20, realistic depositor count ≤ hundreds).
+    function _processPendingWithdrawals() internal {
+        uint256 len = _pendingUsers.length;
+        if (len == 0) return;
+
+        address[] memory remaining = new address[](len);
+        uint256 remainingCount;
+
+        for (uint256 i = 0; i < len; i++) {
+            address user   = _pendingUsers[i];
+            uint256 amount = _pendingWithdrawals[user];
+
+            if (amount == 0) {
+                // Already cleared (e.g., user re-deposited and zeroed their entry)
+                _inPendingQueue[user] = false;
+                continue;
+            }
+
+            if (_trackedIdleBalance >= amount) {
+                // Fulfil
+                _trackedIdleBalance       -= amount;
+                _trackedTotalAssets       -= amount;
+                _pendingWithdrawals[user]  = 0;
+                _inPendingQueue[user]      = false;
+                emit WithdrawApproved(user, amount);
+            } else {
+                // Insufficient idle — carry over to next epoch
+                remaining[remainingCount++] = user;
+            }
+        }
+
+        // Rebuild queue with only unresolved entries
+        delete _pendingUsers;
+        for (uint256 i = 0; i < remainingCount; i++) {
+            _pendingUsers.push(remaining[i]);
+        }
+    }
 }
