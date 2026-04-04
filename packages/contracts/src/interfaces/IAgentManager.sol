@@ -84,9 +84,13 @@ interface IAgentManager {
 
     /// @notice Called by Vault._settleEpoch() to update EMAs, Sharpe scores,
     ///         token bucket params, handle promotions and evictions.
-    ///         Returns per-agent data the Vault needs for the fee waterfall
-    ///         and force-close queuing.
-    function settleAgents() external returns (IShared.AgentSettlementData[] memory);
+    ///         Vault passes its own totalAssets and maxExposureRatio so AgentManager
+    ///         can compute credit allocations without cross-contract reads.
+    ///         Returns per-agent settlement data (Sharpe-sorted, lowest first) and
+    ///         aggregate vault-agent position value for totalAssets reconciliation.
+    function settleAgents(uint256 totalAssets, uint256 maxExposureRatio)
+        external
+        returns (IShared.AgentSettlementData[] memory agentData, uint256 aggregateVaultPositionValue);
 
     // -------------------------------------------------------------------------
     // View functions
@@ -112,4 +116,8 @@ interface IAgentManager {
 
     /// @notice Returns the amount of proving balance currently deployed.
     function provingDeployed(uint256 agentId) external view returns (uint256);
+
+    /// @notice Running counter of vault capital currently deployed across all vault agents.
+    ///         Incremented on intent submission, decremented via recordClosure().
+    function totalDeployedVault() external view returns (uint256);
 }

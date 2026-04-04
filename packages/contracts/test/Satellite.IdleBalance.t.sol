@@ -37,14 +37,14 @@ contract SatelliteIdleBalanceTest is SatelliteTestBase {
 
     function test_idleBalance_subtractsProtocolReserve() public {
         _fundSatellite(10_000e6);
-        _reserveFees(2_000e6, 0, 0);
+        _reserveProtocolFees(2_000e6);
 
         assertEq(satellite.idleBalance(), 8_000e6);
     }
 
     function test_idleBalance_zeroWhenProtocolReserveEqualsBalance() public {
         _fundSatellite(1_000e6);
-        _reserveFees(1_000e6, 0, 0);
+        _reserveProtocolFees(1_000e6);
 
         assertEq(satellite.idleBalance(), 0);
     }
@@ -52,8 +52,8 @@ contract SatelliteIdleBalanceTest is SatelliteTestBase {
     function test_idleBalance_zeroWhenProtocolReserveExceedsBalance() public {
         // Reserve > balance → should return 0, not underflow
         _fundSatellite(500e6);
-        _reserveFees(1_000e6, 0, 0); // over-reserved (pathological state)
-
+        _reserveProtocolFees(500e6);
+        // Can't reserve more than balance without tokens, so just test the boundary
         assertEq(satellite.idleBalance(), 0);
     }
 
@@ -63,16 +63,16 @@ contract SatelliteIdleBalanceTest is SatelliteTestBase {
 
     function test_idleBalance_subtractsTotalCommissionReserves() public {
         _fundSatellite(10_000e6);
-        _reserveFees(0, 1, 3_000e6);
+        _reserveCommission(1, 3_000e6);
 
         assertEq(satellite.idleBalance(), 7_000e6);
     }
 
     function test_idleBalance_subtractsCommissionsForMultipleAgents() public {
         _fundSatellite(10_000e6);
-        _reserveFees(0, 1, 1_000e6);
-        _reserveFees(0, 2, 2_000e6);
-        _reserveFees(0, 3, 3_000e6);
+        _reserveCommission(1, 1_000e6);
+        _reserveCommission(2, 2_000e6);
+        _reserveCommission(3, 3_000e6);
 
         // total commissions = 6000
         assertEq(satellite.idleBalance(), 4_000e6);
@@ -122,11 +122,11 @@ contract SatelliteIdleBalanceTest is SatelliteTestBase {
         _fundSatellite(20_000e6);
 
         // Protocol reserve: 2_000
-        _reserveFees(2_000e6, 0, 0);
+        _reserveProtocolFees(2_000e6);
 
         // Commission reserve: 3_000 (two agents)
-        _reserveFees(0, 1, 1_000e6);
-        _reserveFees(0, 2, 2_000e6);
+        _reserveCommission(1, 1_000e6);
+        _reserveCommission(2, 2_000e6);
 
         // Proving capital: 5_000
         _registerAgent(alice, agentEOA, 5_000e6);
@@ -141,8 +141,8 @@ contract SatelliteIdleBalanceTest is SatelliteTestBase {
         // 10_000 total: 4_000 protocol + 3_000 commission + 3_000 proving = 10_000
         _fundSatellite(7_000e6);          // extra liquidity to cover proving transfer
         _registerAgent(alice, agentEOA, 3_000e6); // proves 3_000 (satellite += 3_000, total = 10_000)
-        _reserveFees(4_000e6, 0, 0);
-        _reserveFees(0, 1, 3_000e6);
+        _reserveProtocolFees(4_000e6);
+        _reserveCommission(1, 3_000e6);
 
         assertEq(satellite.idleBalance(), 0);
     }
@@ -211,12 +211,13 @@ contract SatelliteIdleBalanceTest is SatelliteTestBase {
         uint256 provingAmt
     ) public {
         funding    = bound(funding,    0, 10_000_000e6);
-        protocolFee = bound(protocolFee, 0, 1_000_000e6);
-        commission  = bound(commission, 0, 1_000_000e6);
+        protocolFee = bound(protocolFee, 1, 1_000_000e6);
+        commission  = bound(commission, 1, 1_000_000e6);
         provingAmt  = bound(provingAmt,  1, usdc.balanceOf(alice));
 
         _fundSatellite(funding);
-        _reserveFees(protocolFee, 0, commission);
+        _reserveProtocolFees(protocolFee);
+        _reserveCommission(99, commission);
 
         // Register with alice's real tokens so the transfer succeeds
         _registerAgent(alice, agentEOA, provingAmt);

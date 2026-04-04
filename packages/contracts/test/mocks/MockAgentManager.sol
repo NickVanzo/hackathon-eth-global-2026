@@ -23,10 +23,33 @@ contract MockAgentManager {
         }
     }
 
-    function settleAgents() external returns (IShared.AgentSettlementData[] memory) {
+    uint256 public lastTotalAssets;
+    uint256 public lastMaxExposureRatio;
+    uint256 public aggregateVaultPositionValue;
+
+    uint256 private _totalDeployedVault;
+
+    function setTotalDeployedVault(uint256 val) external {
+        _totalDeployedVault = val;
+    }
+
+    function totalDeployedVault() external view returns (uint256) {
+        return _totalDeployedVault;
+    }
+
+    function setAggregateVaultPositionValue(uint256 val) external {
+        aggregateVaultPositionValue = val;
+    }
+
+    function settleAgents(uint256 totalAssets, uint256 maxExposureRatio)
+        external
+        returns (IShared.AgentSettlementData[] memory, uint256)
+    {
         settleAgentsCalled = true;
         settleAgentsCallCount++;
-        return _nextSettlement;
+        lastTotalAssets = totalAssets;
+        lastMaxExposureRatio = maxExposureRatio;
+        return (_nextSettlement, aggregateVaultPositionValue);
     }
 
     // -------------------------------------------------------------------------
@@ -74,13 +97,16 @@ contract ReentrantAgentManager {
 
     function setVaultAddr(address v) external { vaultAddr = v; }
 
-    function settleAgents() external returns (IShared.AgentSettlementData[] memory) {
+    function settleAgents(uint256, uint256)
+        external
+        returns (IShared.AgentSettlementData[] memory, uint256)
+    {
         settleAgentsCallCount++;
         // Attempt re-entry — should be silently blocked by _settling flag
         (bool ok,) = vaultAddr.call(abi.encodeWithSignature("triggerSettleEpoch()"));
         // Ignore return value; we only care that vault didn't settle twice
         ok; // suppress unused-var warning
-        return new IShared.AgentSettlementData[](0);
+        return (new IShared.AgentSettlementData[](0), 0);
     }
 
     function setVault(address) external {}
@@ -98,4 +124,5 @@ contract ReentrantAgentManager {
     function sharpeScore(uint256) external pure returns (uint256) { return 0; }
     function provingBalance(uint256) external pure returns (uint256) { return 0; }
     function provingDeployed(uint256) external pure returns (uint256) { return 0; }
+    function totalDeployedVault() external pure returns (uint256) { return 0; }
 }

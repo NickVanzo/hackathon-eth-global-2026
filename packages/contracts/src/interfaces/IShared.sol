@@ -22,6 +22,14 @@ library IShared {
         VAULT     // 1 — managing vault funds via token bucket
     }
 
+    /// @notice Source of positions to close in a ForceClose operation.
+    ///         Carried from 0G intent → satellite positionSource mapping → recordClosure source param.
+    enum ForceCloseSource {
+        PROVING, // 0 — close only proving-phase positions (return capital to deployer)
+        VAULT,   // 1 — close only vault-phase positions (return capital to idle reserve)
+        ALL      // 2 — close all positions regardless of source (withdraw-from-arena)
+    }
+
     // -------------------------------------------------------------------------
     // Structs
     // -------------------------------------------------------------------------
@@ -43,8 +51,10 @@ library IShared {
     }
 
     /// @notice Per-agent data returned by AgentManager.settleAgents() to Vault.
+    ///         Array is Sharpe-sorted (lowest first) so Vault can target force-closes.
     struct AgentSettlementData {
         uint256 agentId;
+        uint256 positionValue; // reported LP position value (vault-phase only; 0 for proving)
         uint256 feesCollected; // liquid USDC.e fees from collect() during epoch
         bool    evicted;       // true if agent should be removed this epoch
         bool    promoted;      // true if agent just promoted from PROVING to VAULT
