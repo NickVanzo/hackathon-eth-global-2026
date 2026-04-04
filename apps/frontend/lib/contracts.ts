@@ -264,7 +264,7 @@ export function useVaultData(): {
   return {
     sharePrice:
       data?.[0]?.status === "success" && data[0].result !== undefined
-        ? (data[0].result as bigint).toString()
+        ? ((data[0].result as bigint) / 10n ** 12n).toString()  // WAD (1e18) → 6 decimals
         : undefined,
     totalAssets:
       data?.[1]?.status === "success" && data[1].result !== undefined

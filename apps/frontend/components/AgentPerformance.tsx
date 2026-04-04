@@ -3,6 +3,7 @@
 import type { ReactNode } from "react";
 import { useAgentCount, useAgentInfo, useActiveAgentIds } from "@/lib/contracts";
 import { MOCK_AGENTS } from "@/lib/mock-data";
+import { LoadingPulse, ErrorBanner } from "@/components/LoadingSkeleton";
 
 // ─── Design tokens extracted from Stitch leaderboard.html ────────────────────
 
@@ -528,7 +529,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
       style={{
         display: "grid",
         gridTemplateColumns:
-          "1fr 4fr 2fr 1fr 1fr 2fr 2fr",
+          "50px 3fr 2fr 80px 80px 100px 2fr",
         padding: "20px 24px",
         backgroundColor: rowBg,
         borderLeft: `4px solid ${borderColor}`,
@@ -582,7 +583,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
           gap: "12px",
         }}
       >
-        <StatusDot dimmed={!perfPositive} />
+        <StatusDot dimmed={!perfPositive || agent.sharpeScore < 0} />
         <div>
           <p
             style={{
@@ -629,7 +630,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
           fontSize: "14px",
-          color: isTopRank ? COLORS.primary : COLORS.onSurface,
+          color: agent.sharpeScore > 1.5 ? "#00E5FF" : agent.sharpeScore > 0.5 ? "#4ade80" : agent.sharpeScore >= 0 ? "#bac9cc" : "#FF5722",
         }}
       >
         {agent.sharpeScore.toFixed(2)}
@@ -1029,7 +1030,7 @@ function PromoCard() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AgentPerformance() {
-  const { count } = useAgentCount();
+  const { count, error: agentCountError } = useAgentCount();
   const { ids: activeIds } = useActiveAgentIds();
   const { agent: rawAgent1, isLoading: loading1 } = useAgentInfo(1);
   const { agent: rawAgent2, isLoading: loading2 } = useAgentInfo(2);
@@ -1052,8 +1053,11 @@ export default function AgentPerformance() {
       };
     });
 
-  const agents =
-    count !== undefined && liveAgents.length > 0 ? liveAgents : MOCK_AGENTS;
+  // Fall back to mock data when real data is all-zero (no epochs completed yet)
+  const hasRealActivity = liveAgents.some(
+    (a) => a.epochsCompleted > 0 || a.sharpeScore !== 0 || a.credits > 0
+  );
+  const agents = hasRealActivity ? liveAgents : MOCK_AGENTS;
 
   const sortedAgents = [...agents].sort(
     (a, b) => b.sharpeScore - a.sharpeScore
@@ -1223,45 +1227,78 @@ export default function AgentPerformance() {
               display: "flex",
               gap: "48px",
               alignItems: "flex-start",
+              overflow: "hidden",
             }}
           >
             {/* Ranking table */}
-            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px" }}>
-              {/* Table header */}
-              <div
-                role="row"
-                style={{
-                  display: "grid",
-                  gridTemplateColumns: "1fr 4fr 2fr 1fr 1fr 2fr 2fr",
-                  padding: "16px 24px",
-                  backgroundColor: COLORS.surfaceContainerLow,
-                  borderBottom: `1px solid rgba(59,73,76,0.2)`,
-                  alignItems: "center",
-                }}
-              >
-                <ColHeader>RK</ColHeader>
-                <ColHeader>AGENT_IDENTIFIER</ColHeader>
-                <ColHeader>TIER_CLASS</ColHeader>
-                <ColHeader>SHARPE</ColHeader>
-                <ColHeader>CREDITS</ColHeader>
-                <ColHeader>7D_PERF</ColHeader>
-                <ColHeader right>CONTROLLER</ColHeader>
-              </div>
+            <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: "16px", minWidth: 0 }}>
+              <div style={{ overflowX: "auto" }}>
+                {/* Table header */}
+                <div
+                  role="row"
+                  style={{
+                    display: "grid",
+                    gridTemplateColumns: "50px 3fr 2fr 80px 80px 100px 2fr",
+                    minWidth: "600px",
+                    padding: "16px 24px",
+                    backgroundColor: COLORS.surfaceContainerLow,
+                    borderBottom: `1px solid rgba(59,73,76,0.2)`,
+                    alignItems: "center",
+                  }}
+                >
+                  <ColHeader>RK</ColHeader>
+                  <ColHeader>AGENT_IDENTIFIER</ColHeader>
+                  <ColHeader>TIER_CLASS</ColHeader>
+                  <ColHeader>SHARPE</ColHeader>
+                  <ColHeader>CREDITS</ColHeader>
+                  <ColHeader>7D_PERF</ColHeader>
+                  <ColHeader right>CONTROLLER</ColHeader>
+                </div>
 
-              {/* Rows */}
-              <div
-                role="table"
-                aria-labelledby="leaderboard-heading"
-                style={{ display: "flex", flexDirection: "column", gap: "12px" }}
-              >
-                {sortedAgents.map((agent, index) => (
-                  <AgentRow
-                    key={agent.id}
-                    agent={agent}
-                    rank={index + 1}
-                    isAlt={index % 2 === 0}
-                  />
-                ))}
+                {agentCountError && (
+                  <ErrorBanner message={agentCountError.message.slice(0, 60)} />
+                )}
+
+                {/* Rows */}
+                <div
+                  role="table"
+                  aria-labelledby="leaderboard-heading"
+                  style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "600px", marginTop: "12px" }}
+                >
+                  {isLoadingAgents
+                    ? Array.from({ length: 3 }).map((_, i) => (
+                        <div
+                          key={i}
+                          style={{
+                            display: "grid",
+                            gridTemplateColumns: "50px 3fr 2fr 80px 80px 100px 2fr",
+                            padding: "20px 24px",
+                            backgroundColor: i % 2 === 0 ? COLORS.surfaceContainer : COLORS.surfaceContainerLow,
+                            gap: "16px",
+                            alignItems: "center",
+                          }}
+                        >
+                          <LoadingPulse className="h-6 w-8" />
+                          <div style={{ display: "flex", gap: "12px", alignItems: "center" }}>
+                            <LoadingPulse className="h-2 w-2 rounded-full" />
+                            <LoadingPulse className="h-5 w-32" />
+                          </div>
+                          <LoadingPulse className="h-5 w-24" />
+                          <LoadingPulse className="h-5 w-12" />
+                          <LoadingPulse className="h-5 w-10" />
+                          <LoadingPulse className="h-5 w-14" />
+                          <LoadingPulse className="h-5 w-20 ml-auto" />
+                        </div>
+                      ))
+                    : sortedAgents.map((agent, index) => (
+                        <AgentRow
+                          key={agent.id}
+                          agent={agent}
+                          rank={index + 1}
+                          isAlt={index % 2 === 0}
+                        />
+                      ))}
+                </div>
               </div>
             </div>
 

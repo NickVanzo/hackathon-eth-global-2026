@@ -7,6 +7,7 @@ import { useWriteContract, useWaitForTransactionReceipt } from "wagmi";
 import { useVaultData, useUserVaultShares, useSatelliteBalance, SATELLITE_ADDRESS, USDC_E_ADDRESS, USDC_E_ABI, SatelliteABI, useUSDCAllowance } from "@/lib/contracts";
 import { sepolia } from "@/lib/chains";
 import { MOCK_VAULT } from "@/lib/mock-data";
+import { LoadingPulse, ErrorBanner } from "@/components/LoadingSkeleton";
 
 function formatSharePrice(raw: string): string {
   const value = Number(formatUnits(BigInt(raw), 6));
@@ -52,10 +53,10 @@ export default function DepositorView() {
   const { allowance, refetch: refetchAllowance } = useUSDCAllowance(address, SATELLITE_ADDRESS);
   const needsApproval = allowance !== undefined && allowance < amountInUnits && amountInUnits > 0n;
 
-  const { writeContract: writeApprove, data: approveHash, isPending: isApproving } = useWriteContract();
+  const { writeContract: writeApprove, data: approveHash, isPending: isApproving, error: approveError } = useWriteContract();
   const { isLoading: isConfirmingApprove, isSuccess: approveSuccess } = useWaitForTransactionReceipt({ hash: approveHash });
 
-  const { writeContract: writeDeposit, data: depositHash, isPending: isDepositing } = useWriteContract();
+  const { writeContract: writeDeposit, data: depositHash, isPending: isDepositing, error: depositError } = useWriteContract();
   const { isLoading: isConfirmingDeposit, isSuccess: depositConfirmed } = useWaitForTransactionReceipt({ hash: depositHash });
 
   useEffect(() => {
@@ -95,7 +96,7 @@ export default function DepositorView() {
   // Withdraw flow
   const withdrawAmountInUnits = (() => { try { return withdrawAmount ? parseUnits(withdrawAmount, 6) : 0n; } catch { return 0n; } })();
 
-  const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawing } = useWriteContract();
+  const { writeContract: writeWithdraw, data: withdrawHash, isPending: isWithdrawing, error: withdrawError } = useWriteContract();
   const { isLoading: isConfirmingWithdraw, isSuccess: withdrawConfirmed } = useWaitForTransactionReceipt({ hash: withdrawHash });
 
   const handleWithdraw = () => {
@@ -109,13 +110,17 @@ export default function DepositorView() {
     });
   };
 
-  const vault = {
-    sharePrice: sharePrice ?? MOCK_VAULT.sharePrice,
-    totalAssets: totalAssets ?? MOCK_VAULT.totalAssets,
-    totalShares: totalShares ?? MOCK_VAULT.totalShares,
-    userShares: liveUserShares ?? MOCK_VAULT.userShares,
-    pendingWithdrawals: MOCK_VAULT.pendingWithdrawals,
-  };
+  // Fall back to mock data when real data is zero/empty (no deposits yet)
+  const realVaultActive = totalAssets !== undefined && totalAssets !== "0" && BigInt(totalAssets) > 0n;
+  const vault = realVaultActive
+    ? {
+        sharePrice: sharePrice ?? MOCK_VAULT.sharePrice,
+        totalAssets: totalAssets ?? MOCK_VAULT.totalAssets,
+        totalShares: totalShares ?? MOCK_VAULT.totalShares,
+        userShares: liveUserShares ?? MOCK_VAULT.userShares,
+        pendingWithdrawals: MOCK_VAULT.pendingWithdrawals,
+      }
+    : MOCK_VAULT;
 
   return (
     <div className="space-y-8">
@@ -167,7 +172,7 @@ export default function DepositorView() {
 
       <div className="grid grid-cols-1 md:grid-cols-12 gap-8">
         {/* Left Column */}
-        <div className="md:col-span-8 flex flex-col gap-8">
+        <div className="md:col-span-8 flex flex-col gap-8 min-w-0">
 
           {/* Stat Cards */}
           <section className="grid grid-cols-1 sm:grid-cols-3 gap-6">
@@ -189,7 +194,7 @@ export default function DepositorView() {
                 className="text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#c3f5ff" }}
               >
-                {formatSharePrice(vault.sharePrice)}
+                {isLoading ? <LoadingPulse className="h-8 w-24" /> : formatSharePrice(vault.sharePrice)}
               </div>
               <div className="text-[10px] mt-1 font-mono" style={{ color: "#00E5FF" }}>
                 +4.2% ALL_TIME
@@ -214,7 +219,7 @@ export default function DepositorView() {
                 className="text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
               >
-                {formatTotalAssets(vault.totalAssets)}
+                {isLoading ? <LoadingPulse className="h-8 w-32" /> : formatTotalAssets(vault.totalAssets)}
               </div>
               <div className="text-[10px] mt-1 font-mono uppercase" style={{ color: "#bac9cc" }}>
                 USDC.e (SEPOLIA)
@@ -239,7 +244,7 @@ export default function DepositorView() {
                 className="text-3xl font-bold tracking-tighter"
                 style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
               >
-                {formatIdleReserve(vault.totalAssets)}
+                {isLoading ? <LoadingPulse className="h-8 w-28" /> : formatIdleReserve(vault.totalAssets)}
               </div>
               <div
                 className="text-[10px] mt-1 font-mono uppercase"
@@ -317,6 +322,14 @@ export default function DepositorView() {
                       </div>
                     </div>
                   </div>
+                  {!address && (
+                    <p
+                      className="text-[10px] text-center"
+                      style={{ fontFamily: "'Space Grotesk', sans-serif", color: "rgba(186,201,204,0.6)" }}
+                    >
+                      Connect wallet to deposit
+                    </p>
+                  )}
                   <button
                     type="button"
                     onClick={handleDeposit}
@@ -342,6 +355,8 @@ export default function DepositorView() {
                       TX: {depositHash.slice(0, 10)}...{depositHash.slice(-6)}
                     </p>
                   )}
+                  {approveError && <ErrorBanner message={approveError.message.slice(0, 60)} />}
+                  {depositError && <ErrorBanner message={depositError.message.slice(0, 60)} />}
                   <p
                     className="text-[10px] leading-relaxed text-center italic"
                     style={{ fontFamily: "'Manrope', sans-serif", color: "rgba(186,201,204,0.6)" }}
@@ -514,6 +529,7 @@ export default function DepositorView() {
                       TX: {withdrawHash.slice(0, 10)}...{withdrawHash.slice(-6)}
                     </p>
                   )}
+                  {withdrawError && <ErrorBanner message={withdrawError.message.slice(0, 60)} />}
                 </div>
               </div>
             </div>
@@ -521,7 +537,7 @@ export default function DepositorView() {
         </div>
 
         {/* Right Column */}
-        <div className="md:col-span-4 flex flex-col gap-8">
+        <div className="md:col-span-4 flex flex-col gap-8 min-w-0">
 
           {/* System Arch */}
           <section
