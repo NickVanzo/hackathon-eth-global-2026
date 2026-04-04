@@ -1,7 +1,7 @@
 "use client";
 
-import { useAgentCount, useAgentInfo } from "@/lib/contracts";
-import { MOCK_AGENTS, MOCK_INTENTS, MOCK_POSITIONS, MOCK_VAULT } from "@/lib/mock-data";
+import { useAllAgents, useVaultData, type AgentInfo } from "@/lib/contracts";
+import { MOCK_INTENTS, MOCK_POSITIONS } from "@/lib/mock-data";
 
 // ─── Design tokens (extracted from Stitch arena.html) ────────────────────────
 // Primary:              #00E5FF  (primary / primary-container)
@@ -71,11 +71,15 @@ function isTickInRange(currentTick: number, tickLower: number, tickUpper: number
 
 // ─── Derived vault stats ──────────────────────────────────────────────────────
 
-function deriveVaultStats(agentList: typeof MOCK_AGENTS) {
-  const bestApy = Math.max(...agentList.map((a) => a.totalReturn * 100)).toFixed(1);
-  const bestSharpe = Math.max(...agentList.map((a) => a.sharpeScore)).toFixed(2);
+function deriveVaultStats(agentList: AgentInfo[], totalAssets?: string) {
+  const bestApy = agentList.length > 0
+    ? Math.max(...agentList.map((a) => a.totalReturn * 100)).toFixed(1)
+    : "0.0";
+  const bestSharpe = agentList.length > 0
+    ? Math.max(...agentList.map((a) => a.sharpeScore)).toFixed(2)
+    : "0.00";
   return {
-    tvl: formatTvl(MOCK_VAULT.totalAssets),
+    tvl: formatTvl(totalAssets ?? "0"),
     apy: `${bestApy}%`,
     sharpe: bestSharpe,
     drawdown: "2.1%",
@@ -116,7 +120,7 @@ function getTierLabel(phase: string): { label: string; classes: string } {
     : { label: "PROVING GROUNDS", classes: "bg-[#FF5722]/10 text-[#ffb5a0]" };
 }
 
-function getStatusDisplay(agent: (typeof MOCK_AGENTS)[number]) {
+function getStatusDisplay(agent: AgentInfo) {
   if (agent.sharpeScore > 1.5) return { label: "ACTIVE",  color: "text-[#00E5FF]", dot: "bg-[#00E5FF] shadow-[0_0_4px_#00E5FF]" };
   if (agent.sharpeScore > 0)   return { label: "HUNTING", color: "text-[#d73b00]", dot: "bg-[#d73b00] shadow-[0_0_4px_#d73b00]" };
   return                               { label: "IDLE",    color: "text-[#bac9cc]", dot: "bg-[#bac9cc]" };
@@ -202,11 +206,11 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
 
 // ─── LiveBattleFeed ───────────────────────────────────────────────────────────
 
-function LiveBattleFeed() {
+function LiveBattleFeed({ agents }: { agents: AgentInfo[] }) {
   const items = [...MOCK_INTENTS]
     .sort((a, b) => b.timestamp - a.timestamp)
     .map((intent, idx) => {
-      const agent = MOCK_AGENTS.find((a) => a.id === intent.agentId);
+      const agent = agents.find((a) => a.id === intent.agentId);
       const agentName = (agent?.name ?? `AGENT_${intent.agentId}`)
         .toUpperCase()
         .replace(" ", "_");
@@ -259,7 +263,7 @@ function LiveBattleFeed() {
 
 // ─── GladiatorCard ────────────────────────────────────────────────────────────
 
-function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
+function GladiatorCard({ agent }: { agent: AgentInfo }) {
   const tier   = getTierLabel(agent.phase);
   const status = getStatusDisplay(agent);
   const isVault = agent.phase === "vault";
@@ -436,40 +440,17 @@ function CtaBanner() {
 // ─── Root export ──────────────────────────────────────────────────────────────
 
 export default function PositionView() {
-  const { count } = useAgentCount();
-  const { agent: rawAgent1 } = useAgentInfo(1);
-  const { agent: rawAgent2 } = useAgentInfo(2);
-  const { agent: rawAgent3 } = useAgentInfo(3);
+  const { agents } = useAllAgents();
+  const { totalAssets } = useVaultData();
 
-  const liveAgents = [rawAgent1, rawAgent2, rawAgent3]
-    .filter((a): a is NonNullable<typeof a> => a != null)
-    .map((liveAgent) => {
-      const mockAgent = MOCK_AGENTS.find((m) => m.id === liveAgent.id);
-      return {
-        ...(mockAgent ?? MOCK_AGENTS[0]),
-        ...liveAgent,
-        name: mockAgent?.name ?? `Agent ${liveAgent.id}`,
-        totalReturn: mockAgent?.totalReturn ?? 0,
-        commissionYield: mockAgent?.commissionYield ?? 0,
-        provingBalance: mockAgent?.provingBalance ?? "0",
-        provingDeployed: mockAgent?.provingDeployed ?? "0",
-      };
-    });
-
-  // Fall back to mock data when real data is all-zero (no epochs completed yet)
-  const hasRealActivity = liveAgents.some(
-    (a) => a.epochsCompleted > 0 || a.sharpeScore !== 0 || a.credits > 0
-  );
-  const agents = hasRealActivity ? liveAgents : MOCK_AGENTS;
-
-  const stats = deriveVaultStats(agents);
+  const stats = deriveVaultStats(agents, totalAssets);
 
   return (
     <div className="space-y-10 font-[family-name:var(--font-manrope)]">
       {/* ── Hero: vault chart + live feed ─────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
         <VaultPerformanceChart stats={stats} />
-        <LiveBattleFeed />
+        <LiveBattleFeed agents={agents} />
       </div>
 
       {/* ── Top Gladiators grid ────────────────────────────────────────────── */}

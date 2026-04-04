@@ -1,8 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { MOCK_AGENTS, MOCK_POSITIONS, MOCK_INTENTS } from "@/lib/mock-data";
-import { INFT_ADDRESS } from "@/lib/contracts";
+import { MOCK_POSITIONS, MOCK_INTENTS } from "@/lib/mock-data";
+import { INFT_ADDRESS, useAgentInfo } from "@/lib/contracts";
 
 // Chart data for the historical performance line chart (7 days)
 const CHART_POINTS = [
@@ -41,11 +41,15 @@ interface AgentDetailProps {
 export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
   const [activeRange, setActiveRange] = useState<TimeRange>("1W");
 
-  const agent = MOCK_AGENTS.find((a) => a.id === agentId) ?? MOCK_AGENTS[0];
-  const positions = MOCK_POSITIONS.filter((p) => p.agentId === agent.id);
-  const intents = MOCK_INTENTS.filter((i) => i.agentId === agent.id);
+  const { agent, isLoading } = useAgentInfo(agentId);
+  const positions = MOCK_POSITIONS.filter((p) => p.agentId === agentId);
+  const intents = MOCK_INTENTS.filter((i) => i.agentId === agentId);
 
-  const creditsPercent = Math.round((agent.credits / agent.maxCredits) * 100);
+  if (isLoading || !agent) {
+    return <div style={{ color: "#849396", padding: "2rem", textAlign: "center" }}>Loading agent data...</div>;
+  }
+
+  const creditsPercent = agent.maxCredits > 0 ? Math.round((agent.credits / agent.maxCredits) * 100) : 0;
   const sharpePercent = Math.min(100, Math.round((agent.sharpeScore / 4) * 100));
   const commissions = (agent.commissionYield * 1_000_000).toFixed(2);
 

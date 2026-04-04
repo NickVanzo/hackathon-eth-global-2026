@@ -1,12 +1,20 @@
 "use client";
 
 import { useState } from "react";
-import { MOCK_INFTS } from "@/lib/mock-data";
-import { useAgentCount, useAgentInfo, useAgentTokenId, useINFTOwner } from "@/lib/contracts";
+import { useAgentCount, useAgentInfo, useAgentTokenId, useINFTOwner, type AgentInfo } from "@/lib/contracts";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-type INFTEntry = (typeof MOCK_INFTS)[number] & { paused?: boolean };
+type INFTEntry = {
+  tokenId: number;
+  agentId: number;
+  agentName: string;
+  owner: string;
+  sharpeScore: number;
+  totalReturn: number;
+  commissionYield: number;
+  paused?: boolean;
+};
 
 // ─── Helpers ──────────────────────────────────────────────────────────────────
 
@@ -721,29 +729,22 @@ export default function INFTMarketplace() {
   const { owner: owner2 } = useINFTOwner(tid2 ?? 0);
   const { owner: owner3 } = useINFTOwner(tid3 ?? 0);
 
-  // Build iNFT list: prefer live data when available, fall back to mock
-  const liveAgents = [agent1, agent2, agent3].filter(Boolean);
-  const hasRealData = liveAgents.some(a => a && a.epochsCompleted > 0);
+  const liveAgents = [agent1, agent2, agent3].filter((a): a is AgentInfo => a != null);
+  const owners = [owner1, owner2, owner3];
+  const tids = [tid1, tid2, tid3];
 
-  const infts: INFTEntry[] = hasRealData
-    ? liveAgents.map((agent, i) => {
-        const mock = MOCK_INFTS.find(m => m.agentId === agent!.id) ?? MOCK_INFTS[0];
-        const owners = [owner1, owner2, owner3];
-        const tids = [tid1, tid2, tid3];
-        return {
-          tokenId: tids[i] ?? mock.tokenId,
-          agentId: agent!.id,
-          agentName: mock.agentName,
-          owner: owners[i] ?? mock.owner,
-          sharpeScore: agent!.sharpeScore,
-          totalReturn: mock.totalReturn,
-          commissionYield: mock.commissionYield,
-          paused: false,
-        };
-      })
-    : MOCK_INFTS;
+  const infts: INFTEntry[] = liveAgents.map((agent, i) => ({
+    tokenId: tids[i] ?? agent.id,
+    agentId: agent.id,
+    agentName: agent.name,
+    owner: owners[i] ?? "0x0000000000000000000000000000000000000000",
+    sharpeScore: agent.sharpeScore,
+    totalReturn: agent.totalReturn,
+    commissionYield: agent.commissionYield,
+    paused: false,
+  }));
 
-  void count; // consumed indirectly via liveAgents length
+  void count;
 
   return (
     <section aria-label="iNFT Strategy Market">

@@ -1,9 +1,8 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useAgentCount, useAgentInfo, useActiveAgentIds } from "@/lib/contracts";
-import { MOCK_AGENTS } from "@/lib/mock-data";
-import { LoadingPulse, ErrorBanner } from "@/components/LoadingSkeleton";
+import { useAllAgents, type AgentInfo } from "@/lib/contracts";
+import { LoadingPulse } from "@/components/LoadingSkeleton";
 
 // ─── Design tokens extracted from Stitch leaderboard.html ────────────────────
 
@@ -496,7 +495,7 @@ function TopNav() {
 // ─── Leaderboard row ──────────────────────────────────────────────────────────
 
 interface AgentRowProps {
-  agent: (typeof MOCK_AGENTS)[number];
+  agent: AgentInfo;
   rank: number;
   isAlt: boolean;
 }
@@ -1030,34 +1029,7 @@ function PromoCard() {
 // ─── Main component ───────────────────────────────────────────────────────────
 
 export default function AgentPerformance() {
-  const { count, error: agentCountError } = useAgentCount();
-  const { ids: activeIds } = useActiveAgentIds();
-  const { agent: rawAgent1, isLoading: loading1 } = useAgentInfo(1);
-  const { agent: rawAgent2, isLoading: loading2 } = useAgentInfo(2);
-  const { agent: rawAgent3, isLoading: loading3 } = useAgentInfo(3);
-  const isLoadingAgents = loading1 || loading2 || loading3;
-
-  const liveAgents = [rawAgent1, rawAgent2, rawAgent3]
-    .filter((a): a is NonNullable<typeof a> => a != null)
-    .filter((a) => !activeIds || activeIds.includes(a.id))
-    .map((liveAgent) => {
-      const mockAgent = MOCK_AGENTS.find((m) => m.id === liveAgent.id);
-      return {
-        ...(mockAgent ?? MOCK_AGENTS[0]),
-        ...liveAgent,
-        name: mockAgent?.name ?? `Agent ${liveAgent.id}`,
-        totalReturn: mockAgent?.totalReturn ?? 0,
-        commissionYield: mockAgent?.commissionYield ?? 0,
-        provingBalance: mockAgent?.provingBalance ?? "0",
-        provingDeployed: mockAgent?.provingDeployed ?? "0",
-      };
-    });
-
-  // Fall back to mock data when real data is all-zero (no epochs completed yet)
-  const hasRealActivity = liveAgents.some(
-    (a) => a.epochsCompleted > 0 || a.sharpeScore !== 0 || a.credits > 0
-  );
-  const agents = hasRealActivity ? liveAgents : MOCK_AGENTS;
+  const { agents, isLoading: isLoadingAgents } = useAllAgents();
 
   const sortedAgents = [...agents].sort(
     (a, b) => b.sharpeScore - a.sharpeScore
@@ -1152,7 +1124,7 @@ export default function AgentPerformance() {
                   >
                     LIVE SIMULATION ACTIVE
                   </span>
-                  {count !== undefined && (
+                  {agents.length > 0 && (
                     <span
                       style={{
                         display: "inline-flex",
@@ -1255,9 +1227,6 @@ export default function AgentPerformance() {
                   <ColHeader right>CONTROLLER</ColHeader>
                 </div>
 
-                {agentCountError && (
-                  <ErrorBanner message={agentCountError.message.slice(0, 60)} />
-                )}
 
                 {/* Rows */}
                 <div
