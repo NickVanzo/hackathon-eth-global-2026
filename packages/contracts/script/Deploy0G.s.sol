@@ -110,7 +110,7 @@ contract Deploy0G is Script {
     // -------------------------------------------------------------------------
 
     function deployVaultOnly() external {
-        address deployer = vm.envAddress("ADDRESS_DEPLOYER");
+        console.log("Deploying Vault to 0G testnet...");
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_DEPLOYER"));
 
@@ -119,23 +119,23 @@ contract Deploy0G is Script {
             vm.envUint("EPOCH_LENGTH"),
             vm.envUint("MAX_EXPOSURE_RATIO"),
             vm.envUint("PROTOCOL_FEE_RATE"),
-            deployer,                            // treasury = deployer
+            vm.envAddress("ADDRESS_DEPLOYER"),     // treasury = deployer for hackathon
             vm.envUint("COMMISSION_RATE"),
-            vm.envAddress("DEPOSIT_TOKEN"),
-            vm.envAddress("UNISWAP_POOL"),
+            vm.envAddress("USDC_E_ADDRESS"),
+            vm.envAddress("UNISWAP_V3_POOL_ADDRESS"),
             vm.envAddress("ADDRESS_RELAYER")
         );
 
         vm.stopBroadcast();
 
-        console.log("Vault deployed:       ", address(vault));
-        console.log("agentManager param:   ", vault.agentManager());
-        console.log("epochLength:          ", vault.epochLength());
-        console.log("maxExposureRatio:     ", vault.maxExposureRatio());
-        console.log("protocolFeeRate:      ", vault.protocolFeeRate());
-        console.log("commissionRate:       ", vault.commissionRate());
-        console.log("messenger:            ", vault.messenger());
-        console.log("\nAdd to .env:");
+        console.log("Vault deployed at:    ", address(vault));
+        console.log("  agentManager:       ", vault.agentManager());
+        console.log("  epochLength:        ", vault.epochLength());
+        console.log("  maxExposureRatio:   ", vault.maxExposureRatio());
+        console.log("  protocolFeeRate:    ", vault.protocolFeeRate());
+        console.log("  commissionRate:     ", vault.commissionRate());
+        console.log("  messenger:          ", vault.messenger());
+        console.log("\n--- Copy into .env ---");
         console.log("VAULT_ADDRESS=", address(vault));
     }
 }

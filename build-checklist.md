@@ -133,9 +133,9 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 **Hour 3:15 - 3:30: Deploy satellite (15 min)**
 
-- [ ] Deploy satellite to Sepolia with constructor params (messenger, depositToken, pool, positionManager, universalRouter, protocolTreasury, idleReserveRatio)
-- [ ] Verify on Etherscan Sepolia
-- [ ] Record address in `.env`, announce to team
+- [x] Deploy satellite to Sepolia with constructor params (messenger, depositToken, pool, positionManager, universalRouter, protocolTreasury, idleReserveRatio)
+- [x] Verify on Etherscan Sepolia
+- [x] Record address in `.env`, announce to team
 
 **Skills**: `deploy-contract`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 

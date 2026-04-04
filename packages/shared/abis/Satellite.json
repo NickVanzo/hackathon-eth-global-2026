@@ -528,6 +528,11 @@
     "name": "releaseCommission",
     "inputs": [
       {
+        "name": "agentId",
+        "type": "uint256",
+        "internalType": "uint256"
+      },
+      {
         "name": "caller",
         "type": "address",
         "internalType": "address"
