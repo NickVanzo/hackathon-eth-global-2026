@@ -148,6 +148,8 @@ update_env_var() {
     if grep -q "^${key}=" "$file" 2>/dev/null; then
         sed -i '' "s|^${key}=.*|${key}=${value}|" "$file"
     else
+        # Ensure file ends with a newline before appending
+        [[ -s "$file" && "$(tail -c1 "$file")" != "" ]] && echo "" >> "$file"
         echo "${key}=${value}" >> "$file"
     fi
 }

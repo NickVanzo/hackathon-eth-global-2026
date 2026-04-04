@@ -2,12 +2,12 @@
 name: envio-indexer
 networks:
 - id: 16602
-  start_block: 25660467
+  start_block: 25680783
   rpc: https://evmrpc-testnet.0g.ai
   contracts:
   - name: Vault
     address:
-    - 0x5192fD3147D8e1a2392c8cBe7E33B8ec46e07628
+    - 0x0c7704a97cc88f9e068c1f7a99881666f1db675a
     handler: src/EventHandlers.ts
     events:
     - event: Approval(address indexed owner, address indexed spender, uint256 value)
@@ -22,7 +22,7 @@ networks:
     - event: WithdrawReleased(address indexed user, uint256 tokenAmount)
   - name: AgentManager
     address:
-    - 0x1c6e60F4DD431922Aa4E217e55a9238a96513a00
+    - 0x2346beaf07eed640166a2a921e9b650cbad0530b
     handler: src/EventHandlers.ts
     events:
     - event: IntentQueued(uint256 indexed agentId, uint8 actionType, bytes params, uint256 blockNumber)
@@ -30,12 +30,12 @@ networks:
     - event: AgentEvicted(uint256 indexed agentId, bool fullEviction)
     - event: ForceCloseRequested(uint256 indexed agentId, uint8 source)
 - id: 11155111
-  start_block: 10587000
+  start_block: 10588777
   rpc: https://ethereum-sepolia.publicnode.com
   contracts:
   - name: Satellite
     address:
-    - 0xeFD9583eF616e9770ca98E4201e940315128C0BF
+    - 0x2346beaf07eed640166a2a921e9b650cbad0530b
     handler: src/EventHandlers.ts
     events:
     - event: AgentRegistered(uint256 indexed agentId, address agentAddress, address indexed deployer, uint256 provingAmount)
