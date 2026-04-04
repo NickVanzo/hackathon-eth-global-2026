@@ -1,5 +1,6 @@
 "use client";
 
+import { useFeeData } from "@/lib/contracts";
 import { MOCK_FEES } from "@/lib/mock-data";
 
 // ─── Formatting ───────────────────────────────────────────────────────────────
@@ -527,8 +528,7 @@ function EpochTable() {
 
 // ─── Modal Footer: payout summary + actions ───────────────────────────────────
 
-function PayoutSummaryFooter() {
-  const { protocolFeesAccrued, commissionPool, depositorYield } = MOCK_FEES;
+function PayoutSummaryFooter({ protocolFeesAccrued, commissionPool, depositorYield }: { protocolFeesAccrued: string; commissionPool: string; depositorYield: string }) {
   const totalRaw =
     Number(protocolFeesAccrued) + Number(commissionPool) + Number(depositorYield);
   const total = (totalRaw / 1_000_000).toLocaleString("en-US", {
@@ -583,7 +583,16 @@ function PayoutSummaryFooter() {
 // ─── Root component ───────────────────────────────────────────────────────────
 
 export default function FeeWaterfall() {
-  const { protocolFeesAccrued, commissionPool, depositorYield } = MOCK_FEES;
+  const { protocolFeesAccrued: liveProtocolFees, commissionPool: liveCommissionPool, totalAssets: liveTotalAssets } = useFeeData();
+
+  const fees = {
+    protocolFeesAccrued: liveProtocolFees ?? MOCK_FEES.protocolFeesAccrued,
+    commissionPool: liveCommissionPool ?? MOCK_FEES.commissionPool,
+    depositorYield: liveTotalAssets ?? MOCK_FEES.depositorYield,
+    epochs: MOCK_FEES.epochs,
+  };
+
+  const { protocolFeesAccrued, commissionPool, depositorYield } = fees;
 
   return (
     <div className="flex flex-col gap-6">
@@ -753,7 +762,7 @@ export default function FeeWaterfall() {
         </div>
 
         {/* Payout footer (vault-exit modal footer pattern) */}
-        <PayoutSummaryFooter />
+        <PayoutSummaryFooter protocolFeesAccrued={protocolFeesAccrued} commissionPool={commissionPool} depositorYield={depositorYield} />
 
         {/* Decorative top line */}
         <div

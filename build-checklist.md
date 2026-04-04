@@ -196,7 +196,7 @@ Start with **mock data** (hardcoded agents, scores, positions). Wire to real con
 - [x] 6.4 - Depositor view: share price, total assets, user share balance, deposit form (`satellite.deposit()`), withdraw form (`satellite.requestWithdraw()`), pending/claimable withdrawals
 - [x] 6.5 - iNFT marketplace view: list iNFTs with track record (Sharpe, returns, commission yield), commission claim button (`satellite.claimCommissions()`), pause/unpause controls (`satellite.pauseAgent()`), withdraw-from-arena button (`satellite.withdrawFromArena()`)
 - [x] 6.6 - Fee waterfall display: protocol fees accrued, commission pool, depositor yield, per-epoch breakdown
-- [ ] Wire all mock data to real contract reads when ABIs land in `shared/abis/` (~hour 3:15+)
+- [x] Wire all mock data to real contract reads when ABIs land in `shared/abis/` (~hour 3:15+)
 
 **Skills**: `frontend-dev`, `viem-integration`
 

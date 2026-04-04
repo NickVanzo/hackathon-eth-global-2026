@@ -2,6 +2,8 @@
 
 import { useState } from "react";
 import { formatUnits } from "viem";
+import { useAccount } from "wagmi";
+import { useVaultData, useUserVaultShares, useSatelliteBalance } from "@/lib/contracts";
 import { MOCK_VAULT } from "@/lib/mock-data";
 
 function formatSharePrice(raw: string): string {
@@ -36,7 +38,18 @@ export default function DepositorView() {
   const [depositAmount, setDepositAmount] = useState("");
   const [withdrawTier, setWithdrawTier] = useState<"tier1" | "tier2" | null>(null);
 
-  const vault = MOCK_VAULT;
+  const { address } = useAccount();
+  const { sharePrice, totalAssets, totalShares, isLoading } = useVaultData();
+  const { shares: liveUserShares } = useUserVaultShares(address);
+  const liveUsdcBalance = useSatelliteBalance(address);
+
+  const vault = {
+    sharePrice: sharePrice ?? MOCK_VAULT.sharePrice,
+    totalAssets: totalAssets ?? MOCK_VAULT.totalAssets,
+    totalShares: totalShares ?? MOCK_VAULT.totalShares,
+    userShares: liveUserShares ?? MOCK_VAULT.userShares,
+    pendingWithdrawals: MOCK_VAULT.pendingWithdrawals,
+  };
 
   return (
     <div className="space-y-8">
@@ -214,7 +227,14 @@ export default function DepositorView() {
                       <div className="absolute right-4 top-1/2 -translate-y-1/2 flex items-center gap-2">
                         <button
                           type="button"
-                          onClick={() => setDepositAmount("5000")}
+                          onClick={() => {
+                            if (liveUsdcBalance) {
+                              const balanceNum = Number(liveUsdcBalance) / 1_000_000;
+                              setDepositAmount(balanceNum.toFixed(2));
+                            } else {
+                              setDepositAmount("5000");
+                            }
+                          }}
                           className="text-[10px] font-bold px-2 py-1 rounded uppercase transition-all"
                           style={{
                             fontFamily: "'Space Grotesk', sans-serif",
@@ -235,21 +255,22 @@ export default function DepositorView() {
                   </div>
                   <button
                     type="button"
-                    className="w-full py-4 font-extrabold tracking-[0.2em] rounded uppercase transition-all"
+                    disabled={isLoading}
+                    className="w-full py-4 font-extrabold tracking-[0.2em] rounded uppercase transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     style={{
                       fontFamily: "'Space Grotesk', sans-serif",
                       backgroundColor: "#00e5ff",
                       color: "#00363d",
                       boxShadow: "0 0 20px rgba(0,229,255,0.2)",
                     }}
-                    onMouseEnter={(e) =>
-                      (e.currentTarget.style.boxShadow = "0 0 30px rgba(0,229,255,0.4)")
-                    }
+                    onMouseEnter={(e) => {
+                      if (!isLoading) e.currentTarget.style.boxShadow = "0 0 30px rgba(0,229,255,0.4)";
+                    }}
                     onMouseLeave={(e) =>
                       (e.currentTarget.style.boxShadow = "0 0 20px rgba(0,229,255,0.2)")
                     }
                   >
-                    EXECUTE_DEPOSIT
+                    {isLoading ? "LOADING..." : "EXECUTE_DEPOSIT"}
                   </button>
                   <p
                     className="text-[10px] leading-relaxed text-center italic"

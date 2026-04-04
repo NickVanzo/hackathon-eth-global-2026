@@ -1,5 +1,6 @@
 "use client";
 
+import { useAgentCount, useAgentInfo } from "@/lib/contracts";
 import { MOCK_AGENTS, MOCK_INTENTS, MOCK_POSITIONS, MOCK_VAULT } from "@/lib/mock-data";
 
 // ─── Design tokens (extracted from Stitch arena.html) ────────────────────────
@@ -67,9 +68,9 @@ function isTickInRange(currentTick: number, tickLower: number, tickUpper: number
 
 // ─── Derived vault stats ──────────────────────────────────────────────────────
 
-function deriveVaultStats() {
-  const bestApy = Math.max(...MOCK_AGENTS.map((a) => a.totalReturn * 100)).toFixed(1);
-  const bestSharpe = Math.max(...MOCK_AGENTS.map((a) => a.sharpeScore)).toFixed(2);
+function deriveVaultStats(agentList: typeof MOCK_AGENTS) {
+  const bestApy = Math.max(...agentList.map((a) => a.totalReturn * 100)).toFixed(1);
+  const bestSharpe = Math.max(...agentList.map((a) => a.sharpeScore)).toFixed(2);
   return {
     tvl: formatTvl(MOCK_VAULT.totalAssets),
     apy: `${bestApy}%`,
@@ -428,7 +429,30 @@ function CtaBanner() {
 // ─── Root export ──────────────────────────────────────────────────────────────
 
 export default function PositionView() {
-  const stats = deriveVaultStats();
+  const { count } = useAgentCount();
+  const { agent: rawAgent1 } = useAgentInfo(1);
+  const { agent: rawAgent2 } = useAgentInfo(2);
+  const { agent: rawAgent3 } = useAgentInfo(3);
+
+  const liveAgents = [rawAgent1, rawAgent2, rawAgent3]
+    .filter((a): a is NonNullable<typeof a> => a != null)
+    .map((liveAgent) => {
+      const mockAgent = MOCK_AGENTS.find((m) => m.id === liveAgent.id);
+      return {
+        ...(mockAgent ?? MOCK_AGENTS[0]),
+        ...liveAgent,
+        name: mockAgent?.name ?? `Agent ${liveAgent.id}`,
+        totalReturn: mockAgent?.totalReturn ?? 0,
+        commissionYield: mockAgent?.commissionYield ?? 0,
+        provingBalance: mockAgent?.provingBalance ?? "0",
+        provingDeployed: mockAgent?.provingDeployed ?? "0",
+      };
+    });
+
+  const agents =
+    count !== undefined && liveAgents.length > 0 ? liveAgents : MOCK_AGENTS;
+
+  const stats = deriveVaultStats(agents);
 
   return (
     <div className="space-y-10 font-[family-name:var(--font-manrope)]">
@@ -449,7 +473,7 @@ export default function PositionView() {
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-          {MOCK_AGENTS.map((agent) => (
+          {agents.map((agent) => (
             <GladiatorCard key={agent.id} agent={agent} />
           ))}
           <DeployCtaCard />

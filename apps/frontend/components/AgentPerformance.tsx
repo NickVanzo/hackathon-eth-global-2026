@@ -1,6 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
+import { useAgentCount, useAgentInfo } from "@/lib/contracts";
 import { MOCK_AGENTS } from "@/lib/mock-data";
 
 // ─── Design tokens extracted from Stitch leaderboard.html ────────────────────
@@ -991,11 +992,34 @@ function PromoCard() {
 
 // ─── Main component ───────────────────────────────────────────────────────────
 
-const sortedAgents = [...MOCK_AGENTS].sort(
-  (a, b) => b.sharpeScore - a.sharpeScore
-);
-
 export default function AgentPerformance() {
+  const { count } = useAgentCount();
+  const { agent: rawAgent1 } = useAgentInfo(1);
+  const { agent: rawAgent2 } = useAgentInfo(2);
+  const { agent: rawAgent3 } = useAgentInfo(3);
+
+  const liveAgents = [rawAgent1, rawAgent2, rawAgent3]
+    .filter((a): a is NonNullable<typeof a> => a != null)
+    .map((liveAgent) => {
+      const mockAgent = MOCK_AGENTS.find((m) => m.id === liveAgent.id);
+      return {
+        ...(mockAgent ?? MOCK_AGENTS[0]),
+        ...liveAgent,
+        name: mockAgent?.name ?? `Agent ${liveAgent.id}`,
+        totalReturn: mockAgent?.totalReturn ?? 0,
+        commissionYield: mockAgent?.commissionYield ?? 0,
+        provingBalance: mockAgent?.provingBalance ?? "0",
+        provingDeployed: mockAgent?.provingDeployed ?? "0",
+      };
+    });
+
+  const agents =
+    count !== undefined && liveAgents.length > 0 ? liveAgents : MOCK_AGENTS;
+
+  const sortedAgents = [...agents].sort(
+    (a, b) => b.sharpeScore - a.sharpeScore
+  );
+
   return (
     <>
       {/* Google Fonts + global overrides */}
