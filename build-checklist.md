@@ -105,29 +105,29 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 **Skills**: `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/SECURITY.md`
 
-- [ ] Share token (ERC20 mint/burn), `totalAssets` state variable, `sharePrice()` = `totalAssets / totalShares`
-- [ ] `recordDeposit(user, amount)` — `onlyMessenger`, mints shares, increments `totalAssets`
-- [ ] `processWithdraw(user, shares)` — `onlyMessenger`; estimates idle as `totalAssets - agentManager.totalDeployedVault()`; if `shares * sharePrice <= idle` (Tier 1): burns shares, decrements `totalAssets`, emits `WithdrawApproved`; otherwise (Tier 2): locks shares, queues with timestamp
-- [ ] Withdrawal queue: Tier 1 instant, Tier 2 queued, `claimWithdraw(user, amount)` — `onlyMessenger`, marks queued entry processed, emits `WithdrawReleased`
-- [ ] `recordRecovery(agentId, recoveredAmount)` — `onlyMessenger`; does NOT update `totalAssets` (epoch reconciliation handles it); records audit event, emits `RecoveryRecorded`
-- [ ] `epochCheck` modifier + `_settleEpoch()` orchestration + public `triggerSettleEpoch()`:
+- [x] Share token (ERC20 mint/burn), `totalAssets` state variable, `sharePrice()` = `totalAssets / totalShares`
+- [x] `recordDeposit(user, amount)` — `onlyMessenger`, mints shares, increments `totalAssets`
+- [x] `processWithdraw(user, shares)` — `onlyMessenger`; estimates idle as `totalAssets - agentManager.totalDeployedVault()`; if `shares * sharePrice <= idle` (Tier 1): burns shares, decrements `totalAssets`, emits `WithdrawApproved`; otherwise (Tier 2): locks shares, queues with timestamp
+- [x] Withdrawal queue: Tier 1 instant, Tier 2 queued, `claimWithdraw(user, amount)` — `onlyMessenger`, marks queued entry processed, emits `WithdrawReleased`
+- [x] `recordRecovery(agentId, recoveredAmount)` — `onlyMessenger`; does NOT update `totalAssets` (epoch reconciliation handles it); records audit event, emits `RecoveryRecorded`
+- [x] `epochCheck` modifier + `_settleEpoch()` orchestration + public `triggerSettleEpoch()`:
   - Calls `AgentManager.settleAgents(totalAssets, maxExposureRatio)` — receives per-agent feesCollected, aggregate vault-agent position value, Sharpe-sorted agent list
   - Reconciles `totalAssets = aggregateVaultPositionValue + idle + depositorReturn`
   - Applies fee waterfall (protocolFee first, then agentCommission, remainder is depositorReturn)
   - Checks pending withdrawal queue against idle; emits `ForceCloseRequested(agentId, VAULT)` for lowest-Sharpe agents if insufficient
   - Emits `EpochSettled(sharePrice, totalShares, totalAssets)`
-- [ ] Fee waterfall: `protocolFeesAccrued`, `commissionsOwed[agentId]`, `approveCommissionRelease(agentId)` — `onlyAgentManager`, NO amount param (reads own state), zeroes commissionsOwed, emits `CommissionApproved(agentId, amount)`
-- [ ] `onlyMessenger` and `onlyAgentManager` modifiers
-- [ ] Compile Vault, generate ABIs, push to `shared/abis/`
+- [x] Fee waterfall: `protocolFeesAccrued`, `commissionsOwed[agentId]`, `approveCommissionRelease(agentId)` — `onlyAgentManager`, NO amount param (reads own state), zeroes commissionsOwed, emits `CommissionApproved(agentId, amount)`
+- [x] `onlyMessenger` and `onlyAgentManager` modifiers
+- [x] Compile Vault, generate ABIs, push to `shared/abis/`
 
 **Hour 2:00 - 3:15: Finish satellite (1.25 hours)**
 
-- [ ] Finish 2.1 - Core: `claimWithdraw()`, `releaseQueuedWithdraw()` (messenger only, for Tier 2), idle reserve tracking refinement
-- [ ] 2.2 - Uniswap execution: `executeBatch()` (messenger only), each intent carries `source` field (PROVING/VAULT) — satellite stores in `positionSource[tokenId]` mapping at mint time. Swap legs: forward Uniswap-API-generated calldata to **Universal Router** (not SwapRouter). LP: NonfungiblePositionManager.mint/decreaseLiquidity/collect. Zap-in/zap-out via Universal Router. Position NFT tracking per agentId. `collect()` on all positions at epoch reporting. Position valuation (slot0 + token amounts). Emit `ValuesReported(agentId, positionValue, feesCollected)`
-- [ ] 2.3 - Fee reserves: `reserveProtocolFees(amount)` + `reserveCommission(agentId, amount)` (two separate functions, both messenger only), `protocolReserve`/`commissionReserve` pools, `claimProtocolFees()` (protocolTreasury only), `claimCommissions(agentId)` (emit CommissionClaimRequested), `releaseCommission(caller, amount)` (messenger only, from commissionReserve)
-- [ ] 2.4 - Agent management: `pauseAgent(agentId)`/`unpauseAgent(agentId)` (emit PauseRequested), `withdrawFromArena(agentId)` (emit WithdrawFromArenaRequested)
-- [ ] 2.5 - Force-close: `forceClose(agentId, positionIds[], source)` (messenger only), close positions filtered by `source` tag via zap-out, emit `PositionClosed(agentId, positionId, recoveredAmount)` per position, return capital to correct destination
-- [ ] Compile satellite, generate ABIs, push to `shared/abis/`
+- [x] Finish 2.1 - Core: `claimWithdraw()`, `releaseQueuedWithdraw()` (messenger only, for Tier 2), idle reserve tracking refinement
+- [x] 2.2 - Uniswap execution: `executeBatch()` (messenger only), each intent carries `source` field (PROVING/VAULT) — satellite stores in `positionSource[tokenId]` mapping at mint time. Swap legs: forward Uniswap-API-generated calldata to **Universal Router** (not SwapRouter). LP: NonfungiblePositionManager.mint/decreaseLiquidity/collect. Zap-in/zap-out via Universal Router. Position NFT tracking per agentId. `collect()` on all positions at epoch reporting. Position valuation (slot0 + token amounts). Emit `ValuesReported(agentId, positionValue, feesCollected)`
+- [x] 2.3 - Fee reserves: `reserveProtocolFees(amount)` + `reserveCommission(agentId, amount)` (two separate functions, both messenger only), `protocolReserve`/`commissionReserve` pools, `claimProtocolFees()` (protocolTreasury only), `claimCommissions(agentId)` (emit CommissionClaimRequested), `releaseCommission(caller, amount)` (messenger only, from commissionReserve)
+- [x] 2.4 - Agent management: `pauseAgent(agentId)`/`unpauseAgent(agentId)` (emit PauseRequested), `withdrawFromArena(agentId)` (emit WithdrawFromArenaRequested)
+- [x] 2.5 - Force-close: `forceClose(agentId, positionIds[], source)` (messenger only), close positions filtered by `source` tag via zap-out, emit `PositionClosed(agentId, positionId, recoveredAmount)` per position, return capital to correct destination
+- [x] Compile satellite, generate ABIs, push to `shared/abis/`
 
 **Skills**: `.0g-skills/patterns/CHAIN.md`, `swap-integration`, `liquidity-planner`
 

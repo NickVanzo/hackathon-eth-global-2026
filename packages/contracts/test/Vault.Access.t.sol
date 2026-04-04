@@ -4,6 +4,7 @@ pragma solidity ^0.8.24;
 import {VaultTestBase} from "./helpers/VaultTestBase.sol";
 import {VaultHarness}  from "./helpers/VaultHarness.sol";
 import {MockAgentManager} from "./mocks/MockAgentManager.sol";
+import {IVault} from "../src/interfaces/IVault.sol";
 
 /// @notice Tests for Vault constructor validation, access modifiers, and ERC20 metadata.
 contract VaultAccessTest is VaultTestBase {
@@ -16,7 +17,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero agentManager");
         new VaultHarness(
             address(0), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -24,7 +25,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero treasury");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, address(0), COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, address(0), COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -32,7 +33,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero messenger");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, address(0)
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, address(0)
         );
     }
 
@@ -40,7 +41,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero epochLength");
         new VaultHarness(
             address(agentMgr), 0, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -52,7 +53,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: protocolFeeRate > 100%");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            10_001, treasury, COMMISSION_RATE, messenger
+            10_001, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -60,7 +61,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: commissionRate > 100%");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, 10_001, messenger
+            PROTOCOL_FEE_RATE, treasury, 10_001, depositToken, pool_, messenger
         );
     }
 
@@ -68,7 +69,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: maxExposureRatio > 100%");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, 10_001,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -79,7 +80,7 @@ contract VaultAccessTest is VaultTestBase {
     function test_constructor_acceptsMaxRates() public {
         VaultHarness v = new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, 10_000,
-            10_000, treasury, 10_000, messenger
+            10_000, treasury, 10_000, depositToken, pool_, messenger
         );
         assertEq(v.maxExposureRatio(), 10_000);
         assertEq(v.protocolFeeRate(),  10_000);
@@ -104,7 +105,7 @@ contract VaultAccessTest is VaultTestBase {
         uint256 deployBlock = block.number;
         VaultHarness v = new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
         assertEq(v.lastEpochBlock(), deployBlock);
     }
@@ -161,6 +162,72 @@ contract VaultAccessTest is VaultTestBase {
         vault.processWithdraw(alice, 100);
     }
 
+    function test_claimWithdraw_revertsForNonMessenger() public {
+        vm.prank(alice);
+        vm.expectRevert("Vault: not messenger");
+        vault.claimWithdraw(alice, ONE_USDC);
+    }
+
+    function test_claimWithdraw_messengerCanCall() public {
+        vm.prank(messenger);
+        vault.claimWithdraw(alice, ONE_USDC); // emits WithdrawReleased — no revert
+    }
+
+    function test_claimWithdraw_revertsOnZeroUser() public {
+        vm.prank(messenger);
+        vm.expectRevert("Vault: zero user");
+        vault.claimWithdraw(address(0), ONE_USDC);
+    }
+
+    function test_claimWithdraw_revertsOnZeroAmount() public {
+        vm.prank(messenger);
+        vm.expectRevert("Vault: zero amount");
+        vault.claimWithdraw(alice, 0);
+    }
+
+    function test_claimWithdraw_emitsWithdrawReleased() public {
+        vm.expectEmit(true, false, false, true, address(vault));
+        emit IVault.WithdrawReleased(alice, ONE_USDC);
+
+        vm.prank(messenger);
+        vault.claimWithdraw(alice, ONE_USDC);
+    }
+
+    function test_recordRecovery_revertsForNonMessenger() public {
+        vm.prank(alice);
+        vm.expectRevert("Vault: not messenger");
+        vault.recordRecovery(1, ONE_USDC);
+    }
+
+    function test_recordRecovery_messengerCanCall() public {
+        vm.prank(messenger);
+        vault.recordRecovery(1, ONE_USDC); // emits RecoveryRecorded — no revert
+    }
+
+    function test_recordRecovery_revertsOnZeroAmount() public {
+        vm.prank(messenger);
+        vm.expectRevert("Vault: zero amount");
+        vault.recordRecovery(1, 0);
+    }
+
+    function test_recordRecovery_emitsRecoveryRecorded() public {
+        vm.expectEmit(true, false, false, true, address(vault));
+        emit IVault.RecoveryRecorded(1, ONE_USDC);
+
+        vm.prank(messenger);
+        vault.recordRecovery(1, ONE_USDC);
+    }
+
+    function test_recordRecovery_doesNotChangeTotalAssets() public {
+        _seedVault(alice, TEN_K_USDC);
+        uint256 totalBefore = vault.trackedTotalAssets();
+
+        vm.prank(messenger);
+        vault.recordRecovery(1, ONE_USDC);
+
+        assertEq(vault.trackedTotalAssets(), totalBefore, "totalAssets unchanged");
+    }
+
     // =========================================================================
     // Access control — onlyAgentManager
     // =========================================================================
@@ -170,18 +237,34 @@ contract VaultAccessTest is VaultTestBase {
 
         vm.prank(alice);
         vm.expectRevert("Vault: not agentManager");
-        vault.approveCommissionRelease(1, alice, 500);
+        vault.approveCommissionRelease(1, alice);
     }
 
-    function test_triggerSettleEpoch_revertsForNonAgentManager() public {
-        vm.prank(alice);
-        vm.expectRevert("Vault: not agentManager");
-        vault.triggerSettleEpoch();
-    }
+    // =========================================================================
+    // triggerSettleEpoch — now public (no access restriction)
+    // =========================================================================
 
-    function test_triggerSettleEpoch_revertsForMessenger() public {
+    function test_triggerSettleEpoch_messengerCanCall() public {
+        _rollPastEpoch();
+        agentMgr.setSettlementData(_emptySettlement());
+
         vm.prank(messenger);
-        vm.expectRevert("Vault: not agentManager");
-        vault.triggerSettleEpoch();
+        vault.triggerSettleEpoch(); // should not revert
+    }
+
+    function test_triggerSettleEpoch_anyoneCanCall() public {
+        _rollPastEpoch();
+        agentMgr.setSettlementData(_emptySettlement());
+
+        vm.prank(alice);
+        vault.triggerSettleEpoch(); // any caller is now allowed
+    }
+
+    function test_triggerSettleEpoch_agentManagerCanStillCall() public {
+        _rollPastEpoch();
+        agentMgr.setSettlementData(_emptySettlement());
+
+        vm.prank(address(agentMgr));
+        vault.triggerSettleEpoch(); // agentManager also allowed
     }
 }
