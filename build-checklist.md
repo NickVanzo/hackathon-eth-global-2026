@@ -1,4 +1,4 @@
-# Agent Arena - Build Checklist (5.5 Hours Dev, 14 Hours Testing/Polish)
+# Agent Arena - Build Checklist (5.5 Hours Dev, 9 Hours Testing/Polish)
 
 ## Team
 
@@ -8,7 +8,7 @@
 
 **Rule**: everyone works in parallel at all times. If you need something from someone else, **mock it** and move on. Replace mocks with real implementations when the dependency is delivered.
 
-**Development scope**: everything needed to have a working system. Testing, integration, demo prep, and polish happen in the 14-hour buffer.
+**Development scope**: everything needed to have a working system. Testing, integration, demo prep, and polish happen in the 9-hour buffer. 0G Storage stretch goal is cut.
 
 ---
 
@@ -16,7 +16,7 @@
 
 ### Dev A — Shared interfaces + agent base
 - [x] Define `Intent` struct (agentId, actionType, params)
-- [x] Define all cross-chain event signatures (Deposited, AgentRegistered, WithdrawRequested, WithdrawalCompleted, IntentQueued, ValuesReported, EpochSettled, WithdrawApproved, CommissionAccrued, ProtocolFeeAccrued, CommissionClaimRequested, CommissionApproved, PauseRequested, WithdrawFromArenaRequested)
+- [x] Define all cross-chain event signatures (Deposited, AgentRegistered, WithdrawRequested, IntentQueued, ValuesReported, EpochSettled, WithdrawApproved, WithdrawReleased, CommissionAccrued, ProtocolFeeAccrued, CommissionClaimRequested, CommissionApproved, PauseRequested, WithdrawFromArenaRequested, ForceCloseRequested(agentId, source), PositionClosed(agentId, positionId, recoveredAmount), RecoveryRecorded, ClaimWithdrawRequested)
 - [x] Define all cross-chain function signatures for both contracts
 - [x] Write `IVault.sol`, `IAgentManager.sol`, and `ISatellite.sol` interface files
 - [x] Push to `contracts/interfaces/` so Dev B can start satellite immediately
@@ -75,21 +75,24 @@ The agent lifecycle contract — scoring, intents, token bucket. Separate from t
 
 - [ ] Agent registry: agent state (phase PROVING/VAULT, provingBalance, provingDeployed, agentAddress, epochsCompleted, zeroSharpeStreak)
 - [ ] iNFT contract (ERC-721): mint on registration, `ownerOf` for auth checks
-- [ ] `recordRegistration(agentId, agentAddress, deployer, provingAmount)` — registers agent, mints iNFT
-- [ ] `submitIntent(agentId, actionType, params)` — proving/vault branching, cooldown (`minActionInterval`), credit refill/check for vault agents, `provingBalance - provingDeployed` for proving agents, calls `Vault.idleBalance()` for vault agents, credit refund on close, emit `IntentQueued`
+- [ ] `recordRegistration(agentId, agentAddress, deployer, provingAmount)` — `onlyMessenger`, registers agent, records provingBalance, mints iNFT
+- [ ] `totalDeployedVault` — running counter of vault capital deployed; public getter for Vault to read
+- [ ] `submitIntent(agentId, actionType, params)` — proving/vault branching, cooldown (`minActionInterval`), credit refill/check for vault agents, `provingBalance - provingDeployed` for proving agents, vault agents check `vault.totalAssets() - totalDeployedVault >= amount`, increment `totalDeployedVault` for vault intents, auto-set `source` field (PROVING/VAULT) based on phase, emit `IntentQueued`
 - [ ] Token bucket: credits, refillRate, maxCredits per agent, credit refill logic
-- [ ] `reportValues(agentId, positionValue, feesCollected)` — stores last reported values + `lastReportedBlock` (messenger only)
-- [ ] `settleAgents()` — called by Vault during epoch settlement:
+- [ ] `recordClosure(agentId, recoveredAmount, source)` — `onlyMessenger`; `source` from relayer's position cache (NOT agent phase lookup). If VAULT: decrement `totalDeployedVault`, refund credits (if agent exists). If PROVING: decrement `provingDeployed`. If agent deregistered: skip per-agent bookkeeping silently
+- [ ] `reportValues(agentId, positionValue, feesCollected)` — `onlyMessenger`, stores last reported values + `lastReportedBlock`
+- [ ] `settleAgents(totalAssets, maxExposureRatio)` — `onlyVault`, receives both params from Vault:
   - EMA updates (emaReturn, emaReturnSq) with alpha decay
   - Sharpe computation with `Math.sqrt`, `MIN_VARIANCE` floor, negative clamping, all-zero fallback
-  - Score-to-credit allocation (refillRate, maxCredits), promotion ramp (effectiveMaxCredits, MAX_PROMOTION_SHARE, RAMP_EPOCHS)
-  - Promotion check (epochsCompleted + minPromotionSharpe)
-  - Eviction check (zeroSharpeStreak, skip paused, EVICTION_EPOCHS), vault eviction (drop to proving, reset EMAs), proving eviction (return capital)
-  - Returns per-agent feesCollected, eviction/promotion results, force-close intents
-- [ ] `processPause(agentId, caller, paused)` — checks `iNFT.ownerOf(agentId) == caller`
-- [ ] `processCommissionClaim(agentId, caller)` — checks `iNFT.ownerOf(agentId) == caller`, then calls `Vault.approveCommissionRelease(agentId, amount)`
-- [ ] Withdraw-from-arena: deregister agent, clear state, free `maxAgents` slot
+  - Score-to-credit allocation (refillRate, maxCredits using passed totalAssets + maxExposureRatio), promotion ramp (effectiveMaxCredits, maxPromotionShare, rampEpochs)
+  - Promotion check (epochsCompleted + minPromotionSharpe), reset zeroSharpeStreak on promotion, carry over proving-phase EMAs as starting point (do NOT reset — no cold start)
+  - Eviction check (zeroSharpeStreak, skip paused, evictionEpochs): vault eviction emits `ForceCloseRequested(agentId, VAULT)` + drops to proving + resets EMAs; proving ejection emits `ForceCloseRequested(agentId, PROVING)` + deregisters immediately
+  - Returns to Vault: per-agent feesCollected, aggregate vault-agent position value, Sharpe-sorted agent list (lowest first)
+- [ ] `processPause(agentId, caller, paused)` — `onlyMessenger`, checks `iNFT.ownerOf(agentId) == caller`
+- [ ] `processCommissionClaim(agentId, caller)` — `onlyMessenger`, checks `iNFT.ownerOf(agentId) == caller`, then calls `Vault.approveCommissionRelease(agentId)` (no amount — Vault reads own state)
+- [ ] `processWithdrawFromArena(agentId, caller)` — `onlyMessenger`, checks iNFT ownership, emits `ForceCloseRequested(agentId, ALL)`, deregisters agent immediately (clears token bucket, EMAs, registry, frees `maxAgents` slot)
 - [ ] `setVault(address)` — one-time initialization to set circular reference after Vault deploys
+- [ ] `onlyMessenger` and `onlyVault` modifiers
 - [ ] Compile AgentManager + iNFT, generate ABIs, push to `shared/abis/`
 
 **After AgentManager is done (~hour 3:45)**: Dev A starts building agent strategies (see Hour 4:45 section) or helps Dev B with Vault if needed.
@@ -102,29 +105,35 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 **Skills**: `.0g-skills/patterns/CHAIN.md`, `.0g-skills/patterns/SECURITY.md`
 
-- [ ] Share token (ERC20 mint/burn), `totalAssets()`, `sharePrice()`, `idleBalance()`
-- [ ] `recordDeposit(user, amount)` — messenger only, mints shares
-- [ ] `processWithdraw(user, shares)` — burns shares, emits `WithdrawApproved`
-- [ ] Withdrawal queue: Tier 1 instant (check idle, burn, approve), Tier 2 queued (lock shares, record epoch), `claimWithdraw` processing
-- [ ] `epochCheck` modifier + `_settleEpoch()` orchestration + public `triggerSettleEpoch()` (called by AgentManager's epochCheck): calls `AgentManager.settleAgents()`, applies fee waterfall (protocolFee first, then agentCommission), handles pending withdrawals (reduce allocations, queue force-close for lowest-Sharpe), emits `EpochSettled(sharePrice, totalShares, totalAssets)`
-- [ ] Fee waterfall: `protocolFeesAccrued`, `commissionsOwed[agentId]`, `approveCommissionRelease(agentId, amount)` — called by AgentManager after ownership check, zeroes commissionsOwed and emits CommissionApproved
-- [ ] `onlyMessenger` modifier
+- [ ] Share token (ERC20 mint/burn), `totalAssets` state variable, `sharePrice()` = `totalAssets / totalShares`
+- [ ] `recordDeposit(user, amount)` — `onlyMessenger`, mints shares, increments `totalAssets`
+- [ ] `processWithdraw(user, shares)` — `onlyMessenger`; estimates idle as `totalAssets - agentManager.totalDeployedVault()`; if `shares * sharePrice <= idle` (Tier 1): burns shares, decrements `totalAssets`, emits `WithdrawApproved`; otherwise (Tier 2): locks shares, queues with timestamp
+- [ ] Withdrawal queue: Tier 1 instant, Tier 2 queued, `claimWithdraw(user, amount)` — `onlyMessenger`, marks queued entry processed, emits `WithdrawReleased`
+- [ ] `recordRecovery(agentId, recoveredAmount)` — `onlyMessenger`; does NOT update `totalAssets` (epoch reconciliation handles it); records audit event, emits `RecoveryRecorded`
+- [ ] `epochCheck` modifier + `_settleEpoch()` orchestration + public `triggerSettleEpoch()`:
+  - Calls `AgentManager.settleAgents(totalAssets, maxExposureRatio)` — receives per-agent feesCollected, aggregate vault-agent position value, Sharpe-sorted agent list
+  - Reconciles `totalAssets = aggregateVaultPositionValue + idle + depositorReturn`
+  - Applies fee waterfall (protocolFee first, then agentCommission, remainder is depositorReturn)
+  - Checks pending withdrawal queue against idle; emits `ForceCloseRequested(agentId, VAULT)` for lowest-Sharpe agents if insufficient
+  - Emits `EpochSettled(sharePrice, totalShares, totalAssets)`
+- [ ] Fee waterfall: `protocolFeesAccrued`, `commissionsOwed[agentId]`, `approveCommissionRelease(agentId)` — `onlyAgentManager`, NO amount param (reads own state), zeroes commissionsOwed, emits `CommissionApproved(agentId, amount)`
+- [ ] `onlyMessenger` and `onlyAgentManager` modifiers
 - [ ] Compile Vault, generate ABIs, push to `shared/abis/`
 
 **Hour 2:00 - 3:15: Finish satellite (1.25 hours)**
 
-- [ ] Finish 2.1 - Core: `claimWithdraw()`, idle reserve tracking refinement
-- [ ] 2.2 - Uniswap execution: `executeBatch()` (messenger only), zap-in (swap half USDC.e for paired token via SwapRouter), LP open (NonfungiblePositionManager.mint), LP close (decreaseLiquidity + collect), LP modify (decrease + re-mint), zap-out (swap back to USDC.e), position NFT tracking per agentId, `collect()` on all positions at epoch reporting, position valuation (slot0 + token amounts), emit `ValuesReported(agentId, positionValue, feesCollected)`
-- [ ] 2.3 - Fee reserves: `reserveFees()` (messenger only), `protocolReserve`/`commissionReserve` pools, `claimProtocolFees()` (protocolTreasury only), `claimCommissions()` (emit CommissionClaimRequested), `releaseCommission()` (messenger only, from commissionReserve)
-- [ ] 2.4 - Agent management: `pauseAgent()`/`unpauseAgent()` (emit PauseRequested), `withdrawFromArena()` (emit WithdrawFromArenaRequested)
-- [ ] 2.5 - Force-close: `forceClose()` (messenger only), close all agent positions via zap-out, return capital to correct destination
+- [ ] Finish 2.1 - Core: `claimWithdraw()`, `releaseQueuedWithdraw()` (messenger only, for Tier 2), idle reserve tracking refinement
+- [ ] 2.2 - Uniswap execution: `executeBatch()` (messenger only), each intent carries `source` field (PROVING/VAULT) — satellite stores in `positionSource[tokenId]` mapping at mint time. Swap legs: forward Uniswap-API-generated calldata to **Universal Router** (not SwapRouter). LP: NonfungiblePositionManager.mint/decreaseLiquidity/collect. Zap-in/zap-out via Universal Router. Position NFT tracking per agentId. `collect()` on all positions at epoch reporting. Position valuation (slot0 + token amounts). Emit `ValuesReported(agentId, positionValue, feesCollected)`
+- [ ] 2.3 - Fee reserves: `reserveProtocolFees(amount)` + `reserveCommission(agentId, amount)` (two separate functions, both messenger only), `protocolReserve`/`commissionReserve` pools, `claimProtocolFees()` (protocolTreasury only), `claimCommissions(agentId)` (emit CommissionClaimRequested), `releaseCommission(caller, amount)` (messenger only, from commissionReserve)
+- [ ] 2.4 - Agent management: `pauseAgent(agentId)`/`unpauseAgent(agentId)` (emit PauseRequested), `withdrawFromArena(agentId)` (emit WithdrawFromArenaRequested)
+- [ ] 2.5 - Force-close: `forceClose(agentId, positionIds[], source)` (messenger only), close positions filtered by `source` tag via zap-out, emit `PositionClosed(agentId, positionId, recoveredAmount)` per position, return capital to correct destination
 - [ ] Compile satellite, generate ABIs, push to `shared/abis/`
 
 **Skills**: `.0g-skills/patterns/CHAIN.md`, `swap-integration`, `liquidity-planner`
 
 **Hour 3:15 - 3:30: Deploy satellite (15 min)**
 
-- [ ] Deploy satellite to Sepolia with constructor params (pool, depositToken, messenger, protocolTreasury)
+- [ ] Deploy satellite to Sepolia with constructor params (messenger, depositToken, pool, positionManager, universalRouter, protocolTreasury, idleReserveRatio)
 - [ ] Verify on Etherscan Sepolia
 - [ ] Record address in `.env`, announce to team
 
@@ -134,19 +143,27 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 - [ ] Set up ethers v6 providers for both 0G testnet and Sepolia
 - [ ] Load ABIs from `shared/abis/`
-- [ ] Implement all 12 event routes (note: some go to Vault, some to AgentManager):
-  - [ ] `Deposited` -> `vault.recordDeposit()`
-  - [ ] `AgentRegistered` -> `agentManager.recordRegistration()`
-  - [ ] `WithdrawRequested` -> `vault.processWithdraw()`
-  - [ ] `IntentQueued` -> `satellite.executeBatch()`
-  - [ ] `ValuesReported` -> `agentManager.reportValues()`
-  - [ ] `EpochSettled` -> `satellite.updateSharePrice()`
-  - [ ] `WithdrawApproved` -> `satellite.release()`
-  - [ ] `CommissionAccrued` + `ProtocolFeeAccrued` -> `satellite.reserveFees()`
-  - [ ] `CommissionClaimRequested` -> `agentManager.processCommissionClaim()`
-  - [ ] `CommissionApproved` -> `satellite.releaseCommission()`
-  - [ ] `PauseRequested` -> `agentManager.processPause()`
-  - [ ] `WithdrawFromArenaRequested` -> agentManager withdraw-from-arena flow
+- [ ] Maintain relayer position cache: `agentId → [{tokenId, source}]` mapping, updated by watching `executeBatch` mints and `PositionClosed` burns on satellite
+- [ ] Uniswap Trading API integration: call POST `/swap` and `/route` endpoints to generate optimized calldata before each `executeBatch` dispatch
+- [ ] Implement event routes — **Sepolia → 0G**:
+  - [ ] `Deposited` → `vault.recordDeposit()`
+  - [ ] `AgentRegistered` → `agentManager.recordRegistration()`
+  - [ ] `WithdrawRequested` → `vault.processWithdraw()`
+  - [ ] `ValuesReported` → `agentManager.reportValues()`
+  - [ ] `CommissionClaimRequested` → `agentManager.processCommissionClaim()`
+  - [ ] `PauseRequested` → `agentManager.processPause()`
+  - [ ] `WithdrawFromArenaRequested` → `agentManager.processWithdrawFromArena()`
+  - [ ] `ClaimWithdrawRequested` → `vault.claimWithdraw()` then `satellite.releaseQueuedWithdraw()`
+  - [ ] `PositionClosed` → `agentManager.recordClosure(agentId, recoveredAmount, source)` + `vault.recordRecovery(agentId, recoveredAmount)` (source from position cache)
+- [ ] Implement event routes — **0G → Sepolia**:
+  - [ ] `IntentQueued` → Uniswap Trading API POST → `satellite.executeBatch()` (with API calldata + source field)
+  - [ ] `EpochSettled` → `satellite.updateSharePrice()`
+  - [ ] `WithdrawApproved` → `satellite.release()`
+  - [ ] `ProtocolFeeAccrued` → `satellite.reserveProtocolFees(amount)` (once per epoch)
+  - [ ] `CommissionAccrued` → `satellite.reserveCommission(agentId, amount)` (once per agent)
+  - [ ] `CommissionApproved` → `satellite.releaseCommission(caller, amount)`
+  - [ ] `ForceCloseRequested(agentId, source)` → look up position cache → `satellite.forceClose(agentId, positionIds[], source)` (listen on BOTH Vault and AgentManager)
+- [ ] Periodic `vault.triggerSettleEpoch()` call (once per epoch in main loop)
 - [ ] Event deduplication (don't process same event twice)
 - [ ] Retry logic + nonce management
 - [ ] Structured logging (timestamp, event type, tx hash, chain)
@@ -159,9 +176,10 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 **Hour 1:15 - 2:15: Finish MCP server (1 hour)**
 
-- [ ] Implement MCP tools: `getPoolPrice`, `getPoolTicks`, `getPoolVolume`, `getPoolFees`, `getRecentSwaps`, `getPoolTVL`
+- [ ] Implement MCP tools — subgraph data: `getPoolPrice`, `getPoolTicks`, `getPoolVolume`, `getPoolFees`, `getRecentSwaps`, `getPoolTVL`
 - [ ] Connect to Uniswap v3 subgraph on Sepolia via TheGraph
 - [ ] Implement GraphQL queries for each tool
+- [ ] Implement MCP tools — Uniswap Trading API GET proxying: `getQuote` (→ GET /quote), `getRoute` (→ GET /route), `getPools` (→ GET /pools), `getPositions` (→ GET /positions). MCP server holds the Uniswap API key — agents never see it
 - [ ] Add RPC fallback for current spot price (direct `slot0()` read)
 - [ ] Test against live Sepolia pool data
 - [ ] Deploy/run MCP server, record endpoint URL in `.env`
@@ -201,8 +219,8 @@ AgentManager is done. Now build the strategies that use it.
 
 ### Dev B — Deploy all 0G contracts + verify relayer
 - [ ] Deploy iNFT contract to 0G testnet
-- [ ] Deploy AgentManager to 0G testnet (with constructor params: alpha, maxAgents, totalRefillBudget, provingEpochsRequired, minPromotionSharpe, minActionInterval, messenger)
-- [ ] Deploy Vault to 0G testnet (with constructor params: agentManager address, epochLength, maxExposureRatio, protocolFeeRate, protocolTreasury, commissionRate, depositToken, pool, messenger, satellite)
+- [ ] Deploy AgentManager to 0G testnet (with constructor params: alpha, maxAgents, totalRefillBudget, provingEpochsRequired, minPromotionSharpe, minActionInterval, maxPromotionShare, rampEpochs, evictionEpochs, messenger)
+- [ ] Deploy Vault to 0G testnet (with constructor params: agentManager, epochLength, maxExposureRatio, protocolFeeRate, protocolTreasury, commissionRate, depositToken, pool, messenger). Verify deployment invariant: `maxExposureRatio + idleReserveRatio = 10000`
 - [ ] Call `AgentManager.setVault(vaultAddress)` to complete circular reference
 - [ ] Verify all contracts on 0G explorer
 - [ ] Record all addresses in `.env`, announce to team
@@ -221,49 +239,69 @@ AgentManager is done. Now build the strategies that use it.
 ## Development Complete (~5.25 hours)
 
 At this point, all components are built and deployed:
-- Vault on 0G testnet (pure accounting: shares, deposits, withdrawals, fee waterfall, epoch orchestration)
-- AgentManager on 0G testnet (agent lifecycle: registry, intents, token bucket, Sharpe scoring, promotion, eviction)
+- Vault on 0G testnet (pure accounting: shares, totalAssets state variable, deposits, withdrawals, fee waterfall, epoch orchestration with totalAssets reconciliation, onlyMessenger + onlyAgentManager)
+- AgentManager on 0G testnet (agent lifecycle: registry, intents, totalDeployedVault counter, token bucket, recordClosure with source param, Sharpe scoring, promotion, eviction with ForceCloseRequested emission, onlyMessenger + onlyVault)
 - iNFT on 0G testnet (ERC-721 ownership deeds)
-- Satellite on Sepolia (deposits, Uniswap LP execution, fee reserves)
-- Relayer running (12 event routes across Vault + AgentManager + Satellite)
-- MCP server running (Uniswap subgraph data for agents)
+- Satellite on Sepolia (deposits, Uniswap LP execution via Universal Router + NonfungiblePositionManager, positionSource mapping, fee reserves split into reserveProtocolFees + reserveCommission, forceClose with source param)
+- Relayer running (event routes across Vault + AgentManager + Satellite, Uniswap Trading API POST integration, position cache, periodic triggerSettleEpoch)
+- MCP server running (Uniswap subgraph data + Uniswap Trading API GET proxying for agents)
 - 3 agents on fly.io (submitting intents to AgentManager)
 - Dashboard reading real data from both chains
 
 ---
 
-## 14-Hour Buffer: Testing, Integration, Demo Prep
+## 9-Hour Buffer: Testing, Integration, Demo Prep
 
-Everything below happens in the remaining ~14 hours. Order is flexible.
+Everything below happens in the remaining ~9 hours. **Parallelism is critical** — all 3 people work simultaneously at every phase. The stretch goal is cut.
 
-### Integration testing (Dev B leads, all help)
-- [ ] End-to-end: deposit -> register agent -> submit intent -> relayer -> satellite executes LP -> report values -> epoch settlement -> Sharpe update
-- [ ] Test promotion: proving agent meets `provingEpochsRequired` + `minPromotionSharpe` -> promoted
-- [ ] Test eviction: bad agent accumulates `zeroSharpeStreak` >= `EVICTION_EPOCHS` -> evicted
+### Phase 1: Integration testing + dashboard polish (hours 0-4, all parallel)
+
+Use the SAME deployed contracts from development for integration testing — don't fresh-deploy yet. Fix bugs as you find them.
+
+**Dev B — core flow testing (hours 0-4)**
+- [ ] End-to-end happy path: deposit → register agent → submit intent → relayer → satellite executes LP → report values → epoch settlement → Sharpe update
+- [ ] Test Uniswap Trading API integration: relayer POST calls return valid Universal Router calldata, satellite executes it successfully
 - [ ] Test withdrawal: Tier 1 instant + Tier 2 queued + force-close enforcement
-- [ ] Test commission claim: fee waterfall -> accrue -> claim on Sepolia -> satellite pays from commissionReserve
-- [ ] Test pause/unpause: iNFT owner pauses via satellite -> AgentManager rejects intents
-- [ ] Test withdraw-from-arena: force-close all positions, return capital, deregister
-- [ ] Fix bugs across all components
+- [ ] Test relayer position cache: verify agentId → tokenIds mapping stays accurate through opens, closes, and force-closes
+- [ ] Test recordClosure with `source` parameter: verify VAULT source decrements `totalDeployedVault`, PROVING source decrements `provingDeployed`, deregistered agent skips silently
+- [ ] Fix relayer/satellite bugs as found
 
-### Demo state preparation (Dev A leads)
-- [ ] Deploy FRESH AgentManager + Vault on 0G with demo-tuned params (short epochLength, low provingEpochsRequired, low EVICTION_EPOCHS)
+**Dev A — agent lifecycle testing (hours 0-4)**
+- [ ] Test promotion: proving agent meets `provingEpochsRequired` + `minPromotionSharpe` → promoted
+- [ ] Test eviction: bad agent accumulates `zeroSharpeStreak` >= `evictionEpochs` → evicted (vault agent drops to proving)
+- [ ] Test proving agent ejection: Sharpe clamped to 0 for `evictionEpochs` → immediate deregistration + ForceCloseRequested(agentId, PROVING) emitted
+- [ ] Test commission claim: fee waterfall → accrue → claim on Sepolia → satellite pays from commissionReserve
+- [ ] Test pause/unpause: iNFT owner pauses via satellite → AgentManager rejects intents
+- [ ] Test withdraw-from-arena: force-close all positions (both VAULT + PROVING tagged), return capital, immediate deregister, verify recordClosure works for deregistered agent
+- [ ] Fix AgentManager/agent bugs as found
+
+**PM — dashboard polish + verification (hours 0-4)**
+- [ ] Color coding for good/bad agents (green/red Sharpe indicators)
+- [ ] Responsive layout for presentation screen
+- [ ] Error states and loading indicators
+- [ ] Verify deposit/withdraw forms work end-to-end through real satellite
+- [ ] Verify agent performance view reads real AgentManager state correctly
+
+### Phase 2: Demo state preparation (hours 4-6, Dev A leads + Dev B assists)
+
+Only fresh-deploy if integration testing revealed contract bugs requiring redeployment. Otherwise reuse existing contracts and just reset agent state.
+
+**Dev A + Dev B**
+- [ ] Deploy FRESH AgentManager + Vault on 0G with demo-tuned params (short epochLength, low provingEpochsRequired, low evictionEpochs, maxPromotionShare, rampEpochs). Verify `maxExposureRatio + idleReserveRatio = 10000`
 - [ ] Call `AgentManager.setVault()` to link them
-- [ ] Deploy FRESH satellite on Sepolia with same messenger
+- [ ] Deploy FRESH satellite on Sepolia with same messenger (only if satellite bugs were found; otherwise reuse)
 - [ ] Reconfigure relayer + dashboard + agents to new addresses
 - [ ] Register 2 bad agents with proving capital, let them trade (build bad Sharpe)
-- [ ] Register good agent with proving capital, let it complete proving phase
-- [ ] Pause good agent one epoch before promotion threshold
+- [ ] Register good agent with proving capital, let it run through proving phase until `provingEpochsRequired - 1` epochs completed (running normally, NOT paused — next epoch settlement triggers automatic promotion live on stage)
 - [ ] Verify bad agents have zeroSharpeStreak near eviction threshold
 - [ ] Verify dashboard shows correct state for demo
 
-### Dashboard polish (PM leads)
-- [ ] Color coding for good/bad agents (green/red Sharpe indicators)
-- [ ] Visual capital flow animation (credits moving between agents)
-- [ ] Responsive layout for presentation screen
-- [ ] Error states and loading indicators
+**PM — while devs prep demo state**
+- [ ] Prepare pitch slides / talking points if needed
+- [ ] Final dashboard tweaks based on real demo data appearance
 
-### Demo rehearsal (all together)
+### Phase 3: Demo rehearsal (hours 6-7, all together — NON-NEGOTIABLE)
+
 - [ ] Run full 3-minute demo script:
   1. Show bad agents on dashboard (~30s)
   2. Show good agent's proving track record (~45s)
@@ -272,18 +310,20 @@ Everything below happens in the remaining ~14 hours. Order is flexible.
   5. Show bad agent eviction (~30s)
 - [ ] Time each section
 - [ ] Test relayer reliability under demo conditions
+- [ ] If anything fails: fix and re-rehearse (this is why we have 1 full hour)
 
-### Fallback preparation (Dev B leads)
+### Phase 4: Fallback preparation (hours 7-8, Dev B leads)
+
 - [ ] Set up Anvil fork of 0G testnet as backup
 - [ ] Verify contracts deploy and work on Anvil fork
-- [ ] Record fallback demo video
+- [ ] Record fallback demo video (screen recording of the full 3-minute flow)
 
-### Stretch goal: 0G Storage for epoch history (PM)
-- [ ] Listen for `EpochSettled` events on vault
-- [ ] Upload epoch snapshots to 0G decentralized storage
-- [ ] Store root hashes on-chain for auditability
-- [ ] Dashboard reads historical data from 0G storage for charts
-- **Skills**: `upload-file`, `storage-plus-chain`, `.0g-skills/patterns/STORAGE.md`, `merkle-verification`
+### Hour 8-9: Buffer for fires
+
+Unallocated hour for whatever went wrong. If nothing did: rest, review pitch, charge laptops.
+
+### CUT: 0G Storage stretch goal
+~~0G Storage for epoch history~~ — dropped due to 9-hour budget. Can mention as "future work" in the pitch if asked.
 
 ---
 
@@ -339,8 +379,11 @@ PM       [scaffold+fund] [pool+MCP server] [----------- dashboard (mock -> real)
                                MCP ready  vault ABIs             sat ABIs       AM ABIs + all
                               pool ready                        + deployed      deployed + relayer
 
-                     5:15 -------- 14 HOURS -------->
-                     [integration testing | demo prep | polish | fallbacks | 0G storage (stretch)]
+                     5:15 ---------- 9 HOURS ---------->
+                     [--- integration + polish (4h) ---][demo prep (2h)][rehearsal (1h)][fallback (1h)][buffer (1h)]
+                     Dev A: agent lifecycle tests        deploy+agents   all together    rest/fires
+                     Dev B: core flow tests              assist deploy   all together    Anvil+video
+                     PM:    dashboard polish+verify      pitch prep      all together    rest/fires
 ```
 
 **Critical path**: interfaces (0:30) -> AgentManager (1:15-3:45) -> strategies + deploy (3:45-5:15)
