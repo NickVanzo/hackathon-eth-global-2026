@@ -42,11 +42,11 @@
 Build the agent foundation that all 3 strategies will extend. **Mock**: agents log intents to console instead of submitting on-chain (vault doesn't exist yet).
 
 - [x] Set up OpenClaw agent project structure
-- [ ] Configure MCP connection interface (will connect to real MCP server later)
-- [ ] Implement base agent loop: read market data -> decide -> produce Intent struct -> log/queue intent
-- [ ] Define intent action types: OPEN_POSITION, CLOSE_POSITION, MODIFY_POSITION
-- [ ] Implement intent serialization matching the `Intent` struct from interfaces
-- [ ] Verify agent can produce well-formed intents with mock market data
+- [x] Configure MCP connection interface (cron-trigger.js MCP client + query-pool.mjs skill, tested against mock + live Firebase MCP)
+- [x] Implement base agent loop: read market data -> decide -> produce Intent struct -> log/queue intent (cron-trigger.js: tool-calling flow via 0G Compute Adapter pattern)
+- [x] Define intent action types: OPEN_POSITION, CLOSE_POSITION, MODIFY_POSITION (mapped to IShared.ActionType enum in cron-trigger.js + submit-intent.mjs)
+- [x] Implement intent serialization matching the `Intent` struct from interfaces (submit-intent.mjs ABI-encodes IntentParams: amountUSDC, tickLower, tickUpper)
+- [x] Verify agent can produce well-formed intents with mock market data (dry-run intents verified with mock + live MCP)
 - **Skills**: `.0g-skills/AGENTS.md`, `.0g-skills/patterns/COMPUTE.md`, `backend-developer`
 
 ### Dev B — Start satellite contract
@@ -207,14 +207,14 @@ Start with **mock data** (hardcoded agents, scores, positions). Wire to real con
 ### Dev A — Build 3 strategies + deploy agents (1.5 hours)
 AgentManager is done. Now build the strategies that use it.
 
-- [ ] Build 3 agent strategies (simple variations of the base loop):
-  - [ ] Aggressive (Agent A): tight range (2-3% of price), rebalance when drift > 2%
-  - [ ] Conservative (Agent B): wide range (10-20%), rebalance only when price exits range
-  - [ ] Bad (Agent C): random tick ranges, unnecessary rebalances
-- [ ] Wire agents to real MCP server endpoint (from PM)
-- [ ] Wire agents to submit intents to real AgentManager address on 0G
-- [ ] Deploy 3 OpenClaw instances to fly.io
-- [ ] Verify agents produce and submit well-formed intents
+- [x] Build 3 agent strategies (revised per design doc to match demo narrative):
+  - [x] Passive LP (Agent Alpha, bad): max tick range, never rebalance — Sharpe → 0 → evicted
+  - [x] Contrarian (Agent Beta, bad): range opposite to price direction every epoch — always out of range → evicted
+  - [x] Disciplined Rebalancer (Agent Gamma, good): ±200 tick range, hold unless drift >80% — stays in range → promoted
+- [x] Wire agents to real MCP server endpoint (cron-trigger.js calls live Firebase MCP at us-central1-subgraph-mcp.cloudfunctions.net/mcp)
+- [ ] Wire agents to submit intents to real AgentManager address on 0G (blocked: VAULT_ADDRESS/AGENT_MANAGER_ADDRESS not deployed yet)
+- [x] Deploy 3 OpenClaw instances to fly.io (running with DRY_RUN=true)
+- [x] Verify agents produce and submit well-formed intents (dry-run verified with mock + live MCP)
 - **Skills**: `.0g-skills/patterns/COMPUTE.md`, `liquidity-planner`, `backend-developer`
 
 ### Dev B — Deploy all 0G contracts + verify relayer
