@@ -529,7 +529,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
       style={{
         display: "grid",
         gridTemplateColumns:
-          "50px 3fr 2fr 80px 80px 100px 2fr",
+          "50px 200px 140px 80px 80px 100px 150px",
         padding: "20px 24px",
         backgroundColor: rowBg,
         borderLeft: `4px solid ${borderColor}`,
@@ -1238,8 +1238,8 @@ export default function AgentPerformance() {
                   role="row"
                   style={{
                     display: "grid",
-                    gridTemplateColumns: "50px 3fr 2fr 80px 80px 100px 2fr",
-                    minWidth: "600px",
+                    gridTemplateColumns: "50px 200px 140px 80px 80px 100px 150px",
+                    minWidth: "850px",
                     padding: "16px 24px",
                     backgroundColor: COLORS.surfaceContainerLow,
                     borderBottom: `1px solid rgba(59,73,76,0.2)`,
@@ -1263,7 +1263,7 @@ export default function AgentPerformance() {
                 <div
                   role="table"
                   aria-labelledby="leaderboard-heading"
-                  style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "600px", marginTop: "12px" }}
+                  style={{ display: "flex", flexDirection: "column", gap: "12px", minWidth: "850px", marginTop: "12px" }}
                 >
                   {isLoadingAgents
                     ? Array.from({ length: 3 }).map((_, i) => (
@@ -1271,7 +1271,7 @@ export default function AgentPerformance() {
                           key={i}
                           style={{
                             display: "grid",
-                            gridTemplateColumns: "50px 3fr 2fr 80px 80px 100px 2fr",
+                            gridTemplateColumns: "50px 200px 140px 80px 80px 100px 150px",
                             padding: "20px 24px",
                             backgroundColor: i % 2 === 0 ? COLORS.surfaceContainer : COLORS.surfaceContainerLow,
                             gap: "16px",
