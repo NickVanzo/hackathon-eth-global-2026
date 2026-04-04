@@ -12,10 +12,9 @@ export const VAULT_ADDRESS =
   (process.env.VAULT_ADDRESS as `0x${string}`) ||
   "0x5192fD3147D8e1a2392c8cBe7E33B8ec46e07628";
 
-// AgentManager is pending full deployment; placeholder = deployer address
 export const AGENT_MANAGER_ADDRESS =
   (process.env.AGENT_MANAGER_ADDRESS as `0x${string}`) ||
-  "0x0000000000000000000000000000000000000000";
+  "0x1c6e60F4DD431922Aa4E217e55a9238a96513a00";
 
 // ---------------------------------------------------------------------------
 // Token addresses (Sepolia)
