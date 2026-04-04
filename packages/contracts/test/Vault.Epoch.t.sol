@@ -352,10 +352,10 @@ contract VaultEpochTest is VaultTestBase {
     function test_settleEpoch_processesTier2WhenIdleFreed() public {
         // Deposit 1000, set idle to 0 (simulating all deployed)
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         // Alice queues a Tier-2 withdrawal for TEN_K_USDC / 2
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
         _processWithdraw(alice, TEN_K_USDC / 2);
 
         assertEq(vault.pendingUsersLength(), 1, "alice queued");
@@ -381,7 +381,7 @@ contract VaultEpochTest is VaultTestBase {
 
     function test_settleEpoch_partialTier2ProcessingCarriesOver() public {
         _seedVault(alice, 3 * TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         // Queue alice for 3 × TEN_K_USDC
         _processWithdraw(alice, 3 * TEN_K_USDC);
@@ -398,18 +398,18 @@ contract VaultEpochTest is VaultTestBase {
     }
 
     function test_settleEpoch_tier2MultipleFulfilled() public {
-        // Use addPendingUser to inject exact pending amounts without the share-burn
-        // arithmetic that would otherwise inflate tokenAmounts across users.
+        // Use addPendingUser to inject exact pending amounts without the
+        // processWithdraw flow. Mint locked shares to the vault to mirror
+        // the real Tier-2 path (shares transferred from user to vault).
         vault.setTrackedTotalAssets(2 * TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        vault.mintShares(address(vault), 2 * TEN_K_USDC); // locked shares
 
-        vault.addPendingUser(alice, TEN_K_USDC);
-        vault.addPendingUser(bob,   TEN_K_USDC);
+        vault.addPendingUser(alice, TEN_K_USDC, TEN_K_USDC);
+        vault.addPendingUser(bob,   TEN_K_USDC, TEN_K_USDC);
 
         assertEq(vault.pendingUsersLength(), 2, "two users queued");
 
-        // Free enough idle to satisfy both
-        vault.setTrackedIdleBalance(2 * TEN_K_USDC);
+        // idle = totalAssets - totalDeployedVault; with deployed=0 (default), idle = 2*TEN_K
         _forceSettle(_emptySettlement());
 
         assertEq(vault.pendingUsersLength(), 0, "both cleared");
@@ -419,13 +419,13 @@ contract VaultEpochTest is VaultTestBase {
 
     function test_settleEpoch_tier2_totalAssetsDecrementedOnFulfilment() public {
         _seedVault(alice, TEN_K_USDC);
-        vault.setTrackedIdleBalance(0);
+        _setIdle(0);
 
         _processWithdraw(alice, TEN_K_USDC);
 
         uint256 totalBefore = vault.trackedTotalAssets();
 
-        vault.setTrackedIdleBalance(TEN_K_USDC);
+        _setIdle(TEN_K_USDC);
         _forceSettle(_emptySettlement());
 
         assertEq(vault.trackedTotalAssets(), totalBefore - TEN_K_USDC, "totalAssets decremented");

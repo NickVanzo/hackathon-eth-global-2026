@@ -143,11 +143,18 @@ abstract contract VaultTestBase is Test {
     }
 
     /// @dev Convenience: deposit `amount` to `user` via the harness setters
-    ///      (sets both state and mints shares) without going through messenger.
-    ///      Useful for Tier-2 withdrawal setup.
+    ///      (sets totalAssets and mints shares) without going through messenger.
+    ///      With totalDeployedVault defaulting to 0 on the mock, idle = totalAssets.
     function _seedVault(address user, uint256 amount) internal {
         vault.setTrackedTotalAssets(vault.trackedTotalAssets() + amount);
-        vault.setTrackedIdleBalance(vault.trackedIdleBalance() + amount);
         vault.mintShares(user, amount);
+    }
+
+    /// @dev Set the idle balance by adjusting totalDeployedVault on the mock.
+    ///      idle = totalAssets - totalDeployedVault.
+    function _setIdle(uint256 idle) internal {
+        uint256 total = vault.trackedTotalAssets();
+        uint256 deployed = total > idle ? total - idle : 0;
+        agentMgr.setTotalDeployedVault(deployed);
     }
 }
