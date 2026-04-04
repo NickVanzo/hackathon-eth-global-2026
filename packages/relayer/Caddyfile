@@ -1,0 +1,12 @@
+{$CADDY_DOMAIN:localhost} {
+	reverse_proxy graphql-engine:8080
+
+	header {
+		Access-Control-Allow-Origin *
+		Access-Control-Allow-Methods "GET, POST, OPTIONS"
+		Access-Control-Allow-Headers "Content-Type, x-hasura-admin-secret, x-hasura-role"
+	}
+
+	@options method OPTIONS
+	respond @options 204
+}

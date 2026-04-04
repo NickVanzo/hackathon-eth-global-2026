@@ -45,7 +45,7 @@ import {
 
 async function relay(
   label: string,
-  fn: () => Promise<`0x${string}`>
+  fn: () => Promise<`0x${string}`>,
 ): Promise<void> {
   try {
     const hash = await fn();
@@ -88,7 +88,7 @@ Satellite.Deposited.handler(async ({ event, context }) => {
         abi: VAULT_ABI,
         functionName: "recordDeposit",
         args: [event.params.user as `0x${string}`, event.params.amount],
-      })
+      }),
   );
 });
 
@@ -123,20 +123,18 @@ Satellite.AgentRegistered.handler(async ({ event, context }) => {
     returnBps: 0,
   });
 
-  await relayTo0G(
-    `AgentRegistered(agentId=${event.params.agentId})`,
-    () =>
-      zgWalletClient.writeContract({
-        address: AGENT_MANAGER_ADDRESS,
-        abi: AGENT_MANAGER_ABI,
-        functionName: "recordRegistration",
-        args: [
-          event.params.agentId,
-          event.params.agentAddress as `0x${string}`,
-          event.params.deployer as `0x${string}`,
-          event.params.provingAmount,
-        ],
-      })
+  await relayTo0G(`AgentRegistered(agentId=${event.params.agentId})`, () =>
+    zgWalletClient.writeContract({
+      address: AGENT_MANAGER_ADDRESS,
+      abi: AGENT_MANAGER_ABI,
+      functionName: "recordRegistration",
+      args: [
+        event.params.agentId,
+        event.params.agentAddress as `0x${string}`,
+        event.params.deployer as `0x${string}`,
+        event.params.provingAmount,
+      ],
+    }),
   );
 });
 
@@ -180,7 +178,7 @@ Satellite.WithdrawRequested.handler(async ({ event, context }) => {
         functionName: "processWithdraw",
         args: [event.params.user as `0x${string}`, shares],
       });
-    }
+    },
   );
 });
 
@@ -209,7 +207,7 @@ Satellite.ClaimWithdrawRequested.handler(async ({ event, context }) => {
         abi: VAULT_ABI,
         functionName: "claimWithdraw",
         args: [event.params.user as `0x${string}`, event.params.tokenAmount],
-      })
+      }),
   );
 
   // Step 2: release tokens on satellite (Sepolia)
@@ -221,7 +219,7 @@ Satellite.ClaimWithdrawRequested.handler(async ({ event, context }) => {
         abi: SATELLITE_ABI,
         functionName: "releaseQueuedWithdraw",
         args: [event.params.user as `0x${string}`, event.params.tokenAmount],
-      })
+      }),
   );
 });
 
@@ -266,19 +264,17 @@ Satellite.ValuesReported.handler(async ({ event, context }) => {
     });
   }
 
-  await relayTo0G(
-    `ValuesReported(agentId=${event.params.agentId})`,
-    () =>
-      zgWalletClient.writeContract({
-        address: AGENT_MANAGER_ADDRESS,
-        abi: AGENT_MANAGER_ABI,
-        functionName: "reportValues",
-        args: [
-          event.params.agentId,
-          event.params.positionValue,
-          event.params.feesCollected,
-        ],
-      })
+  await relayTo0G(`ValuesReported(agentId=${event.params.agentId})`, () =>
+    zgWalletClient.writeContract({
+      address: AGENT_MANAGER_ADDRESS,
+      abi: AGENT_MANAGER_ABI,
+      functionName: "reportValues",
+      args: [
+        event.params.agentId,
+        event.params.positionValue,
+        event.params.feesCollected,
+      ],
+    }),
   );
 });
 
@@ -293,8 +289,8 @@ Satellite.PositionOpened.handler(async ({ event, context }) => {
     id: `${event.chainId}_${event.block.number}_${event.logIndex}`,
     agentId: event.params.agentId,
     tokenId: event.params.tokenId,
-    tickLower: event.params.tickLower,
-    tickUpper: event.params.tickUpper,
+    tickLower: Number(event.params.tickLower),
+    tickUpper: Number(event.params.tickUpper),
     liquidity: event.params.liquidity,
     amountUSDC: event.params.amountUSDC,
   };
@@ -305,8 +301,8 @@ Satellite.PositionOpened.handler(async ({ event, context }) => {
     id: `pos_${event.params.tokenId}`,
     agentId: event.params.agentId,
     tokenId: event.params.tokenId,
-    tickLower: event.params.tickLower,
-    tickUpper: event.params.tickUpper,
+    tickLower: Number(event.params.tickLower),
+    tickUpper: Number(event.params.tickUpper),
     liquidity: event.params.liquidity.toString(),
     feesCollected: "0",
     status: "active",
@@ -368,7 +364,8 @@ Satellite.PositionClosed.handler(async ({ event, context }) => {
       functionName: "agentPhase",
       args: [event.params.agentId],
     });
-    source = Number(phase) === 0 ? ForceCloseSource.PROVING : ForceCloseSource.VAULT;
+    source =
+      Number(phase) === 0 ? ForceCloseSource.PROVING : ForceCloseSource.VAULT;
   } catch {
     // Agent may be deregistered; default to VAULT (conservative — triggers
     // totalDeployedVault decrement, which is safer than skipping it)
@@ -383,7 +380,7 @@ Satellite.PositionClosed.handler(async ({ event, context }) => {
         abi: AGENT_MANAGER_ABI,
         functionName: "recordClosure",
         args: [event.params.agentId, event.params.recoveredAmount, source],
-      })
+      }),
   );
 
   // vault.recordRecovery — audit event
@@ -395,7 +392,7 @@ Satellite.PositionClosed.handler(async ({ event, context }) => {
         abi: VAULT_ABI,
         functionName: "recordRecovery",
         args: [event.params.agentId, event.params.recoveredAmount],
-      })
+      }),
   );
 });
 
@@ -423,7 +420,7 @@ Satellite.CommissionClaimRequested.handler(async ({ event, context }) => {
         abi: AGENT_MANAGER_ABI,
         functionName: "processCommissionClaim",
         args: [event.params.agentId, event.params.caller as `0x${string}`],
-      })
+      }),
   );
 });
 
@@ -454,7 +451,7 @@ Satellite.PauseRequested.handler(async ({ event, context }) => {
           event.params.caller as `0x${string}`,
           event.params.paused,
         ],
-      })
+      }),
   );
 });
 
@@ -483,7 +480,7 @@ Satellite.WithdrawFromArenaRequested.handler(async ({ event, context }) => {
         abi: AGENT_MANAGER_ABI,
         functionName: "processWithdrawFromArena",
         args: [event.params.agentId, event.params.caller as `0x${string}`],
-      })
+      }),
   );
 });
 
