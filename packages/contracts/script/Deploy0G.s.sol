@@ -110,37 +110,31 @@ contract Deploy0G is Script {
     // -------------------------------------------------------------------------
 
     function deployVaultOnly() external {
-        address deployer     = vm.envAddress("ADDRESS_DEPLOYER");
-        address messenger    = vm.envAddress("ADDRESS_RELAYER");
-        address agentManager = vm.envAddress("AGENT_MANAGER_ADDRESS");
-        address treasury     = deployer;
-
-        uint256 epochLength      = vm.envUint("EPOCH_LENGTH");
-        uint256 maxExposureRatio = vm.envUint("MAX_EXPOSURE_RATIO");
-        uint256 protocolFeeRate  = vm.envUint("PROTOCOL_FEE_RATE");
-        uint256 commissionRate   = vm.envUint("COMMISSION_RATE");
+        address deployer = vm.envAddress("ADDRESS_DEPLOYER");
 
         vm.startBroadcast(vm.envUint("PRIVATE_KEY_DEPLOYER"));
 
         Vault vault = new Vault(
-            agentManager,
-            epochLength,
-            maxExposureRatio,
-            protocolFeeRate,
-            treasury,
-            commissionRate,
-            messenger
+            vm.envAddress("AGENT_MANAGER_ADDRESS"),
+            vm.envUint("EPOCH_LENGTH"),
+            vm.envUint("MAX_EXPOSURE_RATIO"),
+            vm.envUint("PROTOCOL_FEE_RATE"),
+            deployer,                            // treasury = deployer
+            vm.envUint("COMMISSION_RATE"),
+            vm.envAddress("DEPOSIT_TOKEN"),
+            vm.envAddress("UNISWAP_POOL"),
+            vm.envAddress("ADDRESS_RELAYER")
         );
 
         vm.stopBroadcast();
 
         console.log("Vault deployed:       ", address(vault));
-        console.log("agentManager param:   ", agentManager);
-        console.log("epochLength:          ", epochLength);
-        console.log("maxExposureRatio:     ", maxExposureRatio);
-        console.log("protocolFeeRate:      ", protocolFeeRate);
-        console.log("commissionRate:       ", commissionRate);
-        console.log("messenger:            ", messenger);
+        console.log("agentManager param:   ", vault.agentManager());
+        console.log("epochLength:          ", vault.epochLength());
+        console.log("maxExposureRatio:     ", vault.maxExposureRatio());
+        console.log("protocolFeeRate:      ", vault.protocolFeeRate());
+        console.log("commissionRate:       ", vault.commissionRate());
+        console.log("messenger:            ", vault.messenger());
         console.log("\nAdd to .env:");
         console.log("VAULT_ADDRESS=", address(vault));
     }

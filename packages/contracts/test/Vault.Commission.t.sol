@@ -6,6 +6,9 @@ import {IVault} from "../src/interfaces/IVault.sol";
 import {IShared} from "../src/interfaces/IShared.sol";
 
 /// @notice Tests for Vault.approveCommissionRelease() — iNFT owner payouts.
+///         The function now takes (agentId, caller) — no amount param.
+///         Vault reads commissionsOwed[agentId] from its own state, zeroes it,
+///         and emits CommissionApproved(agentId, caller, amount).
 contract VaultCommissionTest is VaultTestBase {
 
     uint256 internal constant AGENT_ID   = 7;
@@ -23,11 +26,11 @@ contract VaultCommissionTest is VaultTestBase {
     // Happy-path — full claim
     // =========================================================================
 
-    function test_approveCommissionRelease_decrementsCommissionsOwed() public {
+    function test_approveCommissionRelease_zeroesCommissionsOwed() public {
         _setupCommission(AGENT_ID, COMMISSION);
 
         vm.prank(address(agentMgr));
-        vault.approveCommissionRelease(AGENT_ID, alice, COMMISSION);
+        vault.approveCommissionRelease(AGENT_ID, alice);
 
         assertEq(vault.commissionsOwed(AGENT_ID), 0, "fully drained");
     }
@@ -39,35 +42,7 @@ contract VaultCommissionTest is VaultTestBase {
         emit IVault.CommissionApproved(AGENT_ID, alice, COMMISSION);
 
         vm.prank(address(agentMgr));
-        vault.approveCommissionRelease(AGENT_ID, alice, COMMISSION);
-    }
-
-    // =========================================================================
-    // Partial claim
-    // =========================================================================
-
-    function test_approveCommissionRelease_partialClaim_leavesRemainder() public {
-        _setupCommission(AGENT_ID, COMMISSION);
-
-        uint256 partialAmt = COMMISSION / 4;
-
-        vm.prank(address(agentMgr));
-        vault.approveCommissionRelease(AGENT_ID, alice, partialAmt);
-
-        assertEq(vault.commissionsOwed(AGENT_ID), COMMISSION - partialAmt, "remainder correct");
-    }
-
-    function test_approveCommissionRelease_partialClaim_canClaimAgain() public {
-        _setupCommission(AGENT_ID, COMMISSION);
-
-        uint256 halfAmt = COMMISSION / 2;
-
-        vm.startPrank(address(agentMgr));
-        vault.approveCommissionRelease(AGENT_ID, alice, halfAmt);
-        vault.approveCommissionRelease(AGENT_ID, alice, halfAmt);
-        vm.stopPrank();
-
-        assertEq(vault.commissionsOwed(AGENT_ID), 0, "fully claimed in two steps");
+        vault.approveCommissionRelease(AGENT_ID, alice);
     }
 
     // =========================================================================
@@ -79,7 +54,7 @@ contract VaultCommissionTest is VaultTestBase {
         _setupCommission(2, COMMISSION * 2);
 
         vm.startPrank(address(agentMgr));
-        vault.approveCommissionRelease(1, alice, COMMISSION);
+        vault.approveCommissionRelease(1, alice);
         vm.stopPrank();
 
         assertEq(vault.commissionsOwed(1), 0,            "agent 1 fully claimed");
@@ -112,12 +87,11 @@ contract VaultCommissionTest is VaultTestBase {
     // Reverts
     // =========================================================================
 
-    function test_approveCommissionRelease_revertsOnZeroAmount() public {
-        _setupCommission(AGENT_ID, COMMISSION);
-
+    function test_approveCommissionRelease_revertsWhenNothingOwed() public {
+        // commissionsOwed[AGENT_ID] == 0 by default
         vm.prank(address(agentMgr));
-        vm.expectRevert("Vault: zero amount");
-        vault.approveCommissionRelease(AGENT_ID, alice, 0);
+        vm.expectRevert("Vault: no commission owed");
+        vault.approveCommissionRelease(AGENT_ID, alice);
     }
 
     function test_approveCommissionRelease_revertsOnZeroCaller() public {
@@ -125,40 +99,32 @@ contract VaultCommissionTest is VaultTestBase {
 
         vm.prank(address(agentMgr));
         vm.expectRevert("Vault: zero caller");
-        vault.approveCommissionRelease(AGENT_ID, address(0), COMMISSION);
+        vault.approveCommissionRelease(AGENT_ID, address(0));
     }
 
-    function test_approveCommissionRelease_revertsWhenExceedsOwed() public {
+    function test_approveCommissionRelease_revertsOnDoubleClaim() public {
         _setupCommission(AGENT_ID, COMMISSION);
 
-        vm.prank(address(agentMgr));
-        vm.expectRevert("Vault: exceeds owed");
-        vault.approveCommissionRelease(AGENT_ID, alice, COMMISSION + 1);
-    }
+        vm.startPrank(address(agentMgr));
+        vault.approveCommissionRelease(AGENT_ID, alice);
 
-    function test_approveCommissionRelease_revertsWhenNothingOwed() public {
-        // commissionsOwed[AGENT_ID] == 0 by default
-        vm.prank(address(agentMgr));
-        vm.expectRevert("Vault: exceeds owed");
-        vault.approveCommissionRelease(AGENT_ID, alice, 1);
+        vm.expectRevert("Vault: no commission owed");
+        vault.approveCommissionRelease(AGENT_ID, alice);
+        vm.stopPrank();
     }
 
     // =========================================================================
     // Fuzz
     // =========================================================================
 
-    function testFuzz_approveCommissionRelease_partialClaim(
-        uint128 total,
-        uint128 claim
-    ) public {
+    function testFuzz_approveCommissionRelease_claimsFullAmount(uint128 total) public {
         vm.assume(total > 0);
-        vm.assume(claim > 0 && claim <= total);
 
         _setupCommission(AGENT_ID, uint256(total));
 
         vm.prank(address(agentMgr));
-        vault.approveCommissionRelease(AGENT_ID, alice, uint256(claim));
+        vault.approveCommissionRelease(AGENT_ID, alice);
 
-        assertEq(vault.commissionsOwed(AGENT_ID), uint256(total) - uint256(claim));
+        assertEq(vault.commissionsOwed(AGENT_ID), 0);
     }
 }

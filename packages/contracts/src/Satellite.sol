@@ -86,21 +86,6 @@ interface INonfungiblePositionManager {
         );
 }
 
-interface ISwapRouter {
-    struct ExactInputSingleParams {
-        address tokenIn;
-        address tokenOut;
-        uint24 fee;
-        address recipient;
-        uint256 deadline;
-        uint256 amountIn;
-        uint256 amountOutMinimum;
-        uint160 sqrtPriceLimitX96;
-    }
-
-    function exactInputSingle(ExactInputSingleParams calldata params) external returns (uint256 amountOut);
-}
-
 // ---------------------------------------------------------------------------
 // Satellite
 // ---------------------------------------------------------------------------
@@ -110,13 +95,15 @@ interface ISwapRouter {
 ///         Holds ALL tokens (USDC.e), owns all Uniswap v3 LP position NFTs,
 ///         executes agent intents relayed from the 0G vault.
 ///
-/// Section 2.1 — Core (this file):
-///   deposit, registerAgent, requestWithdraw, claimWithdraw (stub),
-///   release, updateSharePrice, idle reserve tracking, onlyMessenger
+/// Section 2.1 — Core:
+///   deposit, registerAgent, requestWithdraw, claimWithdraw (emits ClaimWithdrawRequested),
+///   releaseQueuedWithdraw (messenger — actual Tier-2 token transfer), release,
+///   updateSharePrice, idle reserve tracking, onlyMessenger
 ///
 /// Section 2.2 — Uniswap execution: executeBatch (TODO)
-/// Section 2.3 — Fee reserves: reserveFees, claimProtocolFees, releaseCommission (TODO)
-/// Section 2.4 — Agent management: pauseAgent, unpauseAgent, withdrawFromArena (TODO)
+/// Section 2.3 — Fee reserves: reserveProtocolFees, reserveCommission, approveQueuedWithdraw,
+///   claimProtocolFees, releaseCommission
+/// Section 2.4 — Agent management: pauseAgent, unpauseAgent, withdrawFromArena
 /// Section 2.5 — Force-close: forceClose (TODO)
 contract Satellite is ISatellite, ReentrancyGuard {
     using SafeERC20 for IERC20;
@@ -134,8 +121,10 @@ contract Satellite is ISatellite, ReentrancyGuard {
     /// @notice NonfungiblePositionManager for LP position lifecycle.
     address public immutable positionManager;
 
-    /// @notice SwapRouter for zap-in / zap-out token swaps.
-    address public immutable swapRouter;
+    /// @notice Uniswap Universal Router — receives API-generated swap calldata.
+    ///         Replaces the legacy SwapRouter02; the Trading API's /swap endpoint
+    ///         generates calldata specifically for this contract.
+    address public immutable universalRouter;
 
     /// @notice Relayer EOA (hackathon) or permissionless relayer contract (production).
     ///         Only this address may call messenger-only functions.
@@ -143,6 +132,10 @@ contract Satellite is ISatellite, ReentrancyGuard {
 
     /// @notice Protocol treasury — receives protocol fee claims.
     address public immutable protocolTreasury;
+
+    /// @notice Target fraction of total assets to hold idle, in basis points (e.g. 2000 = 20%).
+    ///         Deployment invariant: idleReserveRatio + maxExposureRatio (Vault) == 10000.
+    uint256 public immutable idleReserveRatio;
 
     // -------------------------------------------------------------------------
     // Pool-derived constants — resolved once in constructor
@@ -160,7 +153,7 @@ contract Satellite is ISatellite, ReentrancyGuard {
     ///         Used to convert tokenAmount → shares in requestWithdraw().
     uint256 public cachedSharePrice;
 
-    /// @notice Protocol fees reserved (from reserveFees calls). NOT part of idle balance.
+    /// @notice Protocol fees reserved (from reserveProtocolFees calls). NOT part of idle balance.
     uint256 public protocolReserve;
 
     /// @notice Commission reserves per agent. NOT part of idle balance.
@@ -177,6 +170,15 @@ contract Satellite is ISatellite, ReentrancyGuard {
     uint256 internal _totalProvingCapital;
 
     // -------------------------------------------------------------------------
+    // State: position tracking
+    // -------------------------------------------------------------------------
+
+    /// @notice Source tag per Uniswap position NFT (PROVING or VAULT).
+    ///         Set at mint time in executeBatch using the intent's source field.
+    ///         Used by forceClose to selectively close only the intended class.
+    mapping(uint256 tokenId => IShared.ForceCloseSource source) public positionSource;
+
+    // -------------------------------------------------------------------------
     // State: agent registry
     // -------------------------------------------------------------------------
 
@@ -190,8 +192,9 @@ contract Satellite is ISatellite, ReentrancyGuard {
     // State: withdrawals
     // -------------------------------------------------------------------------
 
-    /// @notice Queued Tier-2 withdrawal amount per user (set by relayer after
-    ///         vault epoch settlement frees capital).
+    /// @notice Queued Tier-2 withdrawal amount per user.
+    ///         Set when vault epoch settlement approves a Tier-2 request.
+    ///         Cleared by claimWithdraw() when the user initiates the final claim.
     mapping(address user => uint256 tokenAmount) internal _pendingWithdrawals;
 
     // -------------------------------------------------------------------------
@@ -211,37 +214,42 @@ contract Satellite is ISatellite, ReentrancyGuard {
     /// @param _pool                Uniswap v3 pool address on Sepolia (USDC.e/WETH)
     /// @param _depositToken        USDC.e token address on Sepolia
     /// @param _positionManager     NonfungiblePositionManager address on Sepolia
-    /// @param _swapRouter          SwapRouter02 address on Sepolia
+    /// @param _universalRouter     Uniswap Universal Router address on Sepolia
     /// @param _messenger           Relayer EOA (hackathon) or relayer network contract
     /// @param _protocolTreasury    Address that receives protocol fee claims
+    /// @param _idleReserveRatio    Target idle fraction in bps (e.g. 2000 = 20%).
+    ///                             Must satisfy: _idleReserveRatio + Vault.maxExposureRatio == 10000.
     constructor(
         address _pool,
         address _depositToken,
         address _positionManager,
-        address _swapRouter,
+        address _universalRouter,
         address _messenger,
-        address _protocolTreasury
+        address _protocolTreasury,
+        uint256 _idleReserveRatio
     ) {
-        require(_pool != address(0), "zero pool");
-        require(_depositToken != address(0), "zero depositToken");
-        require(_positionManager != address(0), "zero positionManager");
-        require(_swapRouter != address(0), "zero swapRouter");
-        require(_messenger != address(0), "zero messenger");
+        require(_pool != address(0),             "zero pool");
+        require(_depositToken != address(0),     "zero depositToken");
+        require(_positionManager != address(0),  "zero positionManager");
+        require(_universalRouter != address(0),  "zero universalRouter");
+        require(_messenger != address(0),        "zero messenger");
         require(_protocolTreasury != address(0), "zero treasury");
+        require(_idleReserveRatio <= 10_000,     "idleReserveRatio > 100%");
 
-        pool = _pool;
-        depositToken = _depositToken;
-        positionManager = _positionManager;
-        swapRouter = _swapRouter;
-        messenger = _messenger;
+        pool             = _pool;
+        depositToken     = _depositToken;
+        positionManager  = _positionManager;
+        universalRouter  = _universalRouter;
+        messenger        = _messenger;
         protocolTreasury = _protocolTreasury;
+        idleReserveRatio = _idleReserveRatio;
 
         // Resolve pool constants once — avoids repeated external calls
-        token0 = IUniswapV3Pool(_pool).token0();
-        token1 = IUniswapV3Pool(_pool).token1();
+        token0  = IUniswapV3Pool(_pool).token0();
+        token1  = IUniswapV3Pool(_pool).token1();
         poolFee = IUniswapV3Pool(_pool).fee();
 
-        _nextAgentId = 1;
+        _nextAgentId     = 1;
         cachedSharePrice = 1e18; // 1:1 initial share price
     }
 
@@ -302,18 +310,38 @@ contract Satellite is ISatellite, ReentrancyGuard {
     }
 
     // -------------------------------------------------------------------------
-    // claimWithdraw() — stub for 2.1; full implementation in Hour 2:00 finish
+    // claimWithdraw() — Tier-2 user-initiated claim
     // -------------------------------------------------------------------------
 
-    /// @notice Claim a Tier-2 withdrawal after the vault has approved it.
-    ///         The relayer sets `_pendingWithdrawals[user]` via a future internal path;
-    ///         full implementation completed in Section 2.1 finish (Hour 2:00).
+    /// @notice Initiate a Tier-2 withdrawal claim.
+    ///         Reads the pending amount approved by the vault epoch settlement,
+    ///         clears it to prevent double-claiming, and emits ClaimWithdrawRequested.
+    ///         The relayer picks up the event, calls vault.claimWithdraw() on 0G
+    ///         (marks the vault entry processed, emits WithdrawReleased), then calls
+    ///         satellite.releaseQueuedWithdraw(user, tokenAmount) to transfer tokens.
     function claimWithdraw() external nonReentrant {
         uint256 amount = _pendingWithdrawals[msg.sender];
         require(amount > 0, "Satellite: nothing to claim");
         _pendingWithdrawals[msg.sender] = 0;
-        IERC20(depositToken).safeTransfer(msg.sender, amount);
-        emit WithdrawalCompleted(msg.sender, amount);
+        emit ClaimWithdrawRequested(msg.sender, amount);
+    }
+
+    // -------------------------------------------------------------------------
+    // releaseQueuedWithdraw() — messenger only
+    // -------------------------------------------------------------------------
+
+    /// @notice Complete a Tier-2 withdrawal after the user has claimed.
+    ///         Called by the relayer after vault.claimWithdraw() marks the entry processed.
+    ///         Transfers tokens to the user and emits WithdrawalCompleted.
+    function releaseQueuedWithdraw(address user, uint256 tokenAmount)
+        external
+        onlyMessenger
+        nonReentrant
+    {
+        require(user        != address(0), "Satellite: zero user");
+        require(tokenAmount >  0,          "Satellite: zero amount");
+        IERC20(depositToken).safeTransfer(user, tokenAmount);
+        emit WithdrawalCompleted(user, tokenAmount);
     }
 
     // -------------------------------------------------------------------------
@@ -342,19 +370,31 @@ contract Satellite is ISatellite, ReentrancyGuard {
     }
 
     // =========================================================================
-    // 2.3 stubs — fee reserves (full implementation in Hour 2:00–3:15)
+    // 2.3 — Fee reserves
     // =========================================================================
 
-    /// @notice Reserve fees from epoch settlement into separate pools.
-    ///         Called by relayer after ProtocolFeeAccrued + CommissionAccrued events.
-    function reserveFees(uint256 protocolFeeAmount, uint256 agentId, uint256 commissionAmount) external onlyMessenger {
-        if (protocolFeeAmount > 0) {
-            protocolReserve += protocolFeeAmount;
-        }
-        if (commissionAmount > 0) {
-            commissionReserve[agentId] += commissionAmount;
-            _totalCommissionReserves += commissionAmount;
-        }
+    /// @notice Reserve protocol fees from epoch settlement into the protocol reserve pool.
+    ///         Called by relayer after vault's ProtocolFeeAccrued event (once per epoch).
+    function reserveProtocolFees(uint256 amount) external onlyMessenger {
+        require(amount > 0, "Satellite: zero amount");
+        protocolReserve += amount;
+    }
+
+    /// @notice Reserve commission for an agent's iNFT owner into the commission reserve pool.
+    ///         Called by relayer after vault's CommissionAccrued event (once per agent per epoch).
+    function reserveCommission(uint256 agentId, uint256 amount) external onlyMessenger {
+        require(amount > 0, "Satellite: zero amount");
+        commissionReserve[agentId] += amount;
+        _totalCommissionReserves += amount;
+    }
+
+    /// @notice Record a Tier-2 withdrawal approval from vault epoch settlement.
+    ///         Called by relayer after vault's WithdrawApproved event for queued entries.
+    ///         Sets the pending amount so the user can call claimWithdraw().
+    function approveQueuedWithdraw(address user, uint256 tokenAmount) external onlyMessenger {
+        require(user        != address(0), "Satellite: zero user");
+        require(tokenAmount >  0,          "Satellite: zero amount");
+        _pendingWithdrawals[user] += tokenAmount;
     }
 
     /// @notice Protocol treasury claims accumulated protocol fees.
@@ -380,7 +420,7 @@ contract Satellite is ISatellite, ReentrancyGuard {
     }
 
     // =========================================================================
-    // 2.4 stubs — agent management (full implementation in Hour 2:00–3:15)
+    // 2.4 — Agent management
     // =========================================================================
 
     function pauseAgent(uint256 agentId) external {
@@ -396,20 +436,29 @@ contract Satellite is ISatellite, ReentrancyGuard {
     }
 
     // =========================================================================
-    // 2.2 stub — Uniswap execution (full implementation in Hour 2:00–3:15)
+    // 2.2 stub — Uniswap execution (full implementation in Section 2.2)
     // =========================================================================
 
     /// @notice Execute a batch of intents from the 0G intent queue.
-    ///         TODO: implement zap-in, NonfungiblePositionManager.mint, close, modify
+    ///         TODO: implement zap-in via Universal Router, NonfungiblePositionManager.mint, close, modify
     function executeBatch(IShared.Intent[] calldata /* intents */ ) external onlyMessenger {
         revert("Satellite: executeBatch not yet implemented");
     }
 
     // =========================================================================
-    // 2.5 stub — force-close (full implementation in Hour 2:00–3:15)
+    // 2.5 stub — force-close (full implementation in Section 2.5)
     // =========================================================================
 
-    function forceClose(uint256 /* agentId */ ) external onlyMessenger {
+    /// @notice Force-close positions for an agent filtered by source.
+    ///         positionIds: relayer-provided from its local agentId → tokenIds cache.
+    ///         source: PROVING closes only proving positions, VAULT closes only vault
+    ///                 positions, ALL closes everything (withdraw-from-arena).
+    ///         TODO: implement zap-out per position, PositionClosed events
+    function forceClose(
+        uint256 /* agentId */,
+        uint256[] calldata /* positionIds */,
+        IShared.ForceCloseSource /* source */
+    ) external onlyMessenger {
         revert("Satellite: forceClose not yet implemented");
     }
 
@@ -421,7 +470,7 @@ contract Satellite is ISatellite, ReentrancyGuard {
     ///         = total balance − protocol reserve − commission reserves − proving capital
     ///
     ///         This is the pool the vault's idleBalance accounting tracks.
-    ///         The 20% idle reserve target is enforced by the allocator at epoch settlement,
+    ///         The idleReserveRatio target is enforced by the allocator at epoch settlement,
     ///         not hardcoded here — idleBalance() just returns actual available balance.
     function idleBalance() public view returns (uint256) {
         uint256 total = IERC20(depositToken).balanceOf(address(this));

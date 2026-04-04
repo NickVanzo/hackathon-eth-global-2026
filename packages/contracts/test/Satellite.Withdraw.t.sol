@@ -3,8 +3,10 @@ pragma solidity ^0.8.24;
 
 import {SatelliteTestBase} from "./helpers/SatelliteTestBase.sol";
 import {ISatellite} from "../src/interfaces/ISatellite.sol";
+import {Vm} from "forge-std/Vm.sol";
 
-/// @notice Tests for requestWithdraw(), claimWithdraw(), release(), and updateSharePrice()
+/// @notice Tests for requestWithdraw(), claimWithdraw(), releaseQueuedWithdraw(),
+///         release(), and updateSharePrice()
 contract SatelliteWithdrawTest is SatelliteTestBase {
 
     // =========================================================================
@@ -162,41 +164,58 @@ contract SatelliteWithdrawTest is SatelliteTestBase {
     }
 
     // =========================================================================
-    // claimWithdraw() — Tier-2 queued withdrawal
+    // claimWithdraw() — Tier-2 user-initiated claim
+    //
+    // claimWithdraw() emits ClaimWithdrawRequested and clears the pending entry.
+    // It does NOT transfer tokens — that is done by releaseQueuedWithdraw().
     // =========================================================================
 
-    function test_claimWithdraw_transfersPendingToUser() public {
-        _fundSatellite(5_000e6);
-        satellite.setPendingWithdrawal(alice, 2_000e6);
+    function test_claimWithdraw_emitsClaimWithdrawRequested() public {
+        satellite.setPendingWithdrawal(alice, 1_500e6);
 
-        uint256 aliceBefore = usdc.balanceOf(alice);
+        vm.expectEmit(true, false, false, true, address(satellite));
+        emit ISatellite.ClaimWithdrawRequested(alice, 1_500e6);
 
         vm.prank(alice);
         satellite.claimWithdraw();
-
-        assertEq(usdc.balanceOf(alice),             aliceBefore + 2_000e6);
-        assertEq(usdc.balanceOf(address(satellite)), 3_000e6);
     }
 
     function test_claimWithdraw_clearsPendingAfterClaim() public {
-        _fundSatellite(1_000e6);
         satellite.setPendingWithdrawal(alice, 1_000e6);
 
         vm.prank(alice);
         satellite.claimWithdraw();
 
-        assertEq(satellite.pendingWithdrawal(alice), 0);
+        assertEq(satellite.pendingWithdrawal(alice), 0, "pending cleared");
     }
 
-    function test_claimWithdraw_emitsWithdrawalCompletedEvent() public {
-        _fundSatellite(3_000e6);
-        satellite.setPendingWithdrawal(alice, 1_500e6);
+    function test_claimWithdraw_doesNotTransferTokens() public {
+        _fundSatellite(5_000e6);
+        satellite.setPendingWithdrawal(alice, 2_000e6);
 
-        vm.expectEmit(true, false, false, true, address(satellite));
-        emit ISatellite.WithdrawalCompleted(alice, 1_500e6);
+        uint256 aliceBefore = usdc.balanceOf(alice);
+        uint256 satBefore   = usdc.balanceOf(address(satellite));
 
         vm.prank(alice);
         satellite.claimWithdraw();
+
+        // No tokens moved — transfer happens via releaseQueuedWithdraw
+        assertEq(usdc.balanceOf(alice),              aliceBefore, "alice balance unchanged");
+        assertEq(usdc.balanceOf(address(satellite)), satBefore,   "satellite balance unchanged");
+    }
+
+    function test_claimWithdraw_doesNotEmitWithdrawalCompleted() public {
+        satellite.setPendingWithdrawal(alice, 1_000e6);
+
+        vm.recordLogs();
+        vm.prank(alice);
+        satellite.claimWithdraw();
+
+        bytes32 completedSig = keccak256("WithdrawalCompleted(address,uint256)");
+        Vm.Log[] memory logs = vm.getRecordedLogs();
+        for (uint256 i = 0; i < logs.length; i++) {
+            assertTrue(logs[i].topics[0] != completedSig, "no WithdrawalCompleted event");
+        }
     }
 
     function test_claimWithdraw_revertsWhenNoPendingAmount() public {
@@ -206,35 +225,122 @@ contract SatelliteWithdrawTest is SatelliteTestBase {
     }
 
     function test_claimWithdraw_revertsOnDoubleClaim() public {
-        _fundSatellite(1_000e6);
         satellite.setPendingWithdrawal(alice, 500e6);
 
         vm.prank(alice);
-        satellite.claimWithdraw();
+        satellite.claimWithdraw(); // clears pending
 
         vm.prank(alice);
         vm.expectRevert("Satellite: nothing to claim");
         satellite.claimWithdraw();
     }
 
-    function test_claimWithdraw_twoUsersClaim_independently() public {
-        _fundSatellite(3_000e6);
+    function test_claimWithdraw_twoUsersClaimIndependently() public {
         satellite.setPendingWithdrawal(alice, 1_000e6);
         satellite.setPendingWithdrawal(bob,   2_000e6);
+
+        vm.expectEmit(true, false, false, true, address(satellite));
+        emit ISatellite.ClaimWithdrawRequested(alice, 1_000e6);
+        vm.prank(alice);
+        satellite.claimWithdraw();
+
+        vm.expectEmit(true, false, false, true, address(satellite));
+        emit ISatellite.ClaimWithdrawRequested(bob, 2_000e6);
+        vm.prank(bob);
+        satellite.claimWithdraw();
+
+        assertEq(satellite.pendingWithdrawal(alice), 0);
+        assertEq(satellite.pendingWithdrawal(bob),   0);
+    }
+
+    // =========================================================================
+    // releaseQueuedWithdraw() — messenger only — actual Tier-2 token transfer
+    // =========================================================================
+
+    function test_releaseQueuedWithdraw_transfersTokensToUser() public {
+        _fundSatellite(5_000e6);
+
+        uint256 aliceBefore = usdc.balanceOf(alice);
+
+        vm.prank(messenger);
+        satellite.releaseQueuedWithdraw(alice, 2_000e6);
+
+        assertEq(usdc.balanceOf(alice),              aliceBefore + 2_000e6);
+        assertEq(usdc.balanceOf(address(satellite)), 3_000e6);
+    }
+
+    function test_releaseQueuedWithdraw_emitsWithdrawalCompleted() public {
+        _fundSatellite(1_000e6);
+
+        vm.expectEmit(true, false, false, true, address(satellite));
+        emit ISatellite.WithdrawalCompleted(alice, 1_000e6);
+
+        vm.prank(messenger);
+        satellite.releaseQueuedWithdraw(alice, 1_000e6);
+    }
+
+    function test_releaseQueuedWithdraw_revertsForNonMessenger() public {
+        _fundSatellite(1_000e6);
+
+        vm.prank(alice);
+        vm.expectRevert("Satellite: not messenger");
+        satellite.releaseQueuedWithdraw(alice, 1_000e6);
+    }
+
+    function test_releaseQueuedWithdraw_revertsOnZeroUser() public {
+        _fundSatellite(1_000e6);
+
+        vm.prank(messenger);
+        vm.expectRevert("Satellite: zero user");
+        satellite.releaseQueuedWithdraw(address(0), 1_000e6);
+    }
+
+    function test_releaseQueuedWithdraw_revertsOnZeroAmount() public {
+        vm.prank(messenger);
+        vm.expectRevert("Satellite: zero amount");
+        satellite.releaseQueuedWithdraw(alice, 0);
+    }
+
+    function test_releaseQueuedWithdraw_twoUsers_independent() public {
+        _fundSatellite(3_000e6);
 
         uint256 aliceBefore = usdc.balanceOf(alice);
         uint256 bobBefore   = usdc.balanceOf(bob);
 
-        vm.prank(alice);
-        satellite.claimWithdraw();
+        vm.prank(messenger);
+        satellite.releaseQueuedWithdraw(alice, 1_000e6);
 
-        vm.prank(bob);
-        satellite.claimWithdraw();
+        vm.prank(messenger);
+        satellite.releaseQueuedWithdraw(bob, 2_000e6);
 
         assertEq(usdc.balanceOf(alice), aliceBefore + 1_000e6);
         assertEq(usdc.balanceOf(bob),   bobBefore   + 2_000e6);
-        assertEq(satellite.pendingWithdrawal(alice), 0);
-        assertEq(satellite.pendingWithdrawal(bob),   0);
+        assertEq(usdc.balanceOf(address(satellite)), 0);
+    }
+
+    // Full Tier-2 flow: user claims → relayer releases
+    function test_tier2_fullFlow_claimThenRelease() public {
+        _fundSatellite(5_000e6);
+        satellite.setPendingWithdrawal(alice, 2_000e6);
+
+        uint256 aliceBefore = usdc.balanceOf(alice);
+
+        // Step 1: user initiates claim — emits ClaimWithdrawRequested, no transfer
+        vm.expectEmit(true, false, false, true, address(satellite));
+        emit ISatellite.ClaimWithdrawRequested(alice, 2_000e6);
+        vm.prank(alice);
+        satellite.claimWithdraw();
+
+        assertEq(satellite.pendingWithdrawal(alice), 0,           "pending cleared");
+        assertEq(usdc.balanceOf(alice),              aliceBefore, "no transfer yet");
+
+        // Step 2: relayer completes transfer after vault.claimWithdraw() confirms
+        vm.expectEmit(true, false, false, true, address(satellite));
+        emit ISatellite.WithdrawalCompleted(alice, 2_000e6);
+        vm.prank(messenger);
+        satellite.releaseQueuedWithdraw(alice, 2_000e6);
+
+        assertEq(usdc.balanceOf(alice), aliceBefore + 2_000e6, "tokens received");
     }
 
     // =========================================================================
