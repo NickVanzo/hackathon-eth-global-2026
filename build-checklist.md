@@ -190,12 +190,12 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 Start with **mock data** (hardcoded agents, scores, positions). Wire to real contracts when ABIs arrive.
 
-- [ ] 6.1 - Scaffold: Next.js app, viem clients for both chains, wagmi wallet connection for Sepolia
-- [ ] 6.2 - Agent performance view: Sharpe scores, EMA returns, credit allocation, token bucket state (credits, maxCredits, refillRate), agent phase (proving/vault), zeroSharpeStreak, highlight starved vs rewarded agents
-- [ ] 6.3 - Position view: agent Uniswap positions (tick range, liquidity, current price), recent intents + execution status, fees collected per agent per epoch
-- [ ] 6.4 - Depositor view: share price, total assets, user share balance, deposit form (`satellite.deposit()`), withdraw form (`satellite.requestWithdraw()`), pending/claimable withdrawals
-- [ ] 6.5 - iNFT marketplace view: list iNFTs with track record (Sharpe, returns, commission yield), commission claim button (`satellite.claimCommissions()`), pause/unpause controls (`satellite.pauseAgent()`), withdraw-from-arena button (`satellite.withdrawFromArena()`)
-- [ ] 6.6 - Fee waterfall display: protocol fees accrued, commission pool, depositor yield, per-epoch breakdown
+- [x] 6.1 - Scaffold: Next.js app, viem clients for both chains, wagmi wallet connection for Sepolia
+- [x] 6.2 - Agent performance view: Sharpe scores, EMA returns, credit allocation, token bucket state (credits, maxCredits, refillRate), agent phase (proving/vault), zeroSharpeStreak, highlight starved vs rewarded agents
+- [x] 6.3 - Position view: agent Uniswap positions (tick range, liquidity, current price), recent intents + execution status, fees collected per agent per epoch
+- [x] 6.4 - Depositor view: share price, total assets, user share balance, deposit form (`satellite.deposit()`), withdraw form (`satellite.requestWithdraw()`), pending/claimable withdrawals
+- [x] 6.5 - iNFT marketplace view: list iNFTs with track record (Sharpe, returns, commission yield), commission claim button (`satellite.claimCommissions()`), pause/unpause controls (`satellite.pauseAgent()`), withdraw-from-arena button (`satellite.withdrawFromArena()`)
+- [x] 6.6 - Fee waterfall display: protocol fees accrued, commission pool, depositor yield, per-epoch breakdown
 - [ ] Wire all mock data to real contract reads when ABIs land in `shared/abis/` (~hour 3:15+)
 
 **Skills**: `frontend-dev`, `viem-integration`

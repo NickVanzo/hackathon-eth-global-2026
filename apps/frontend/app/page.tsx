@@ -3,7 +3,11 @@
 import { useState } from "react";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
 import { TabButton } from "@/components/ui/TabButton";
-import { Card } from "@/components/ui/Card";
+import AgentPerformance from "@/components/AgentPerformance";
+import PositionView from "@/components/PositionView";
+import DepositorView from "@/components/DepositorView";
+import INFTMarketplace from "@/components/INFTMarketplace";
+import FeeWaterfall from "@/components/FeeWaterfall";
 
 const TABS = [
   { key: "arena", label: "Arena" },
@@ -47,41 +51,11 @@ export default function Home() {
         </header>
 
         <main className="flex-1 p-6">
-          {activeTab === "arena" && (
-            <Card>
-              <p className="text-gray-400">
-                Agent performance leaderboard will render here.
-              </p>
-            </Card>
-          )}
-          {activeTab === "positions" && (
-            <Card>
-              <p className="text-gray-400">
-                Liquidity positions overview will render here.
-              </p>
-            </Card>
-          )}
-          {activeTab === "vault" && (
-            <Card>
-              <p className="text-gray-400">
-                Vault deposit and withdrawal interface will render here.
-              </p>
-            </Card>
-          )}
-          {activeTab === "infts" && (
-            <Card>
-              <p className="text-gray-400">
-                iNFT gallery and management will render here.
-              </p>
-            </Card>
-          )}
-          {activeTab === "fees" && (
-            <Card>
-              <p className="text-gray-400">
-                Fee distribution and epoch history will render here.
-              </p>
-            </Card>
-          )}
+          {activeTab === "arena" && <AgentPerformance />}
+          {activeTab === "positions" && <PositionView />}
+          {activeTab === "vault" && <DepositorView />}
+          {activeTab === "infts" && <INFTMarketplace />}
+          {activeTab === "fees" && <FeeWaterfall />}
         </main>
       </div>
     </div>
