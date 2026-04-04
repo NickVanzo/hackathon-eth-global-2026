@@ -391,6 +391,17 @@ async function getPoolState(agentId) {
 }
 
 // ---------------------------------------------------------------------------
+// Intent action type mapping — agent strings → IShared.ActionType enum values
+// See packages/contracts/src/interfaces/IShared.sol
+// ---------------------------------------------------------------------------
+
+const ACTION_TYPE = {
+  OPEN_POSITION: 0,
+  CLOSE_POSITION: 1,
+  MODIFY_POSITION: 2,
+};
+
+// ---------------------------------------------------------------------------
 // Decision parsing
 // ---------------------------------------------------------------------------
 
@@ -414,18 +425,24 @@ function parseDecision(reply) {
 // Intent submission
 // ---------------------------------------------------------------------------
 
-function submitIntent(agentId, action, params = {}) {
+/** Map enum value back to name for logging/filenames */
+const ACTION_NAMES = ["OPEN_POSITION", "CLOSE_POSITION", "MODIFY_POSITION"];
+
+function submitIntent(agentId, actionType, params = {}) {
+  const actionName = ACTION_NAMES[actionType] ?? `UNKNOWN(${actionType})`;
+
   if (DRY_RUN) {
     const intentsDir = join(STATE_DIR, "intents");
     mkdirSync(intentsDir, { recursive: true });
-    const filename = `${agentId}-${action}-${Date.now()}.json`;
-    const intent = { agentId, action, params, timestamp: new Date().toISOString() };
+    const filename = `${agentId}-${actionName}-${Date.now()}.json`;
+    const intent = { agentId, actionType, actionName, params, timestamp: new Date().toISOString() };
     writeFileSync(join(intentsDir, filename), JSON.stringify(intent, null, 2));
     console.log(`[${agentId}] dry-run: wrote ${filename}`);
     return;
   }
 
   // TODO: call submit-intent.mjs once vault is deployed
+  // submit-intent.mjs expects: node submit-intent.mjs <actionType:uint8> <paramsJson>
   console.warn(`[${agentId}] non-dry-run submit not yet implemented`);
 }
 
@@ -506,7 +523,7 @@ async function runAgentEpoch(agentId) {
   // Step 6: Update tracked position BEFORE submitting intent
   updatePosition(agentId, decision);
 
-  // Step 7: Submit intent
+  // Step 7: Submit intent — map agent decision to IShared.ActionType enum
   try {
     if (decision.action === "hold") {
       console.log(`[${agentId}] holding — no intent submitted`);
@@ -514,8 +531,8 @@ async function runAgentEpoch(agentId) {
     }
 
     if (decision.action === "rebalance") {
-      submitIntent(agentId, "close", {});
-      submitIntent(agentId, "open", {
+      // MODIFY_POSITION (2) = close existing + re-open at new ticks (single intent)
+      submitIntent(agentId, ACTION_TYPE.MODIFY_POSITION, {
         tickLower: decision.tickLower,
         tickUpper: decision.tickUpper,
         amountUSDC: decision.amountUSDC ?? 1000,
@@ -524,7 +541,7 @@ async function runAgentEpoch(agentId) {
     }
 
     if (decision.action === "open") {
-      submitIntent(agentId, "open", {
+      submitIntent(agentId, ACTION_TYPE.OPEN_POSITION, {
         tickLower: decision.tickLower,
         tickUpper: decision.tickUpper,
         amountUSDC: decision.amountUSDC ?? 1000,
@@ -533,7 +550,7 @@ async function runAgentEpoch(agentId) {
     }
 
     if (decision.action === "close") {
-      submitIntent(agentId, "close", {});
+      submitIntent(agentId, ACTION_TYPE.CLOSE_POSITION, {});
       return;
     }
 
