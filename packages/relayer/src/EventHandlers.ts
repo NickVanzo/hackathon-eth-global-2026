@@ -50,5 +50,9 @@ import "./handlers/satelliteHandlers";
 // Register all Vault event handlers
 import "./handlers/vaultHandlers";
 
-// Register all AgentManager event handlers (uncomment AgentManager in config.yaml first)
-import "./handlers/agentManagerHandlers";
+// Register all AgentManager event handlers
+// Uncomment AFTER:
+//   1. Deploying AgentManager to 0G
+//   2. Uncommenting AgentManager in config.yaml
+//   3. Running `pnpm codegen` to regenerate types
+// import "./handlers/agentManagerHandlers";

@@ -67,7 +67,7 @@ async function getSwapCalldata(
     amount: amount.toString(),
     type: "EXACT_INPUT",
     slippageTolerance: 1.0, // 1 % — generous for hackathon
-    routingPreference: "CLASSIC", // force AMM routing — satellite can't sign UniswapX orders
+    routingPreference: "BEST_PRICE", // satellite is a contract — we filter for CLASSIC in the response
     protocols: ["V3"],
   };
 
@@ -85,9 +85,10 @@ async function getSwapCalldata(
     return "0x";
   }
 
-  const quoteResponse = await quoteRes.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const quoteResponse = await quoteRes.json() as any;
 
-  // Safety: even with routingPreference=CLASSIC, verify the routing type
+  // Safety: even with routingPreference=BEST_PRICE, verify we got AMM routing
   if (quoteResponse.routing !== "CLASSIC") {
     console.warn(`[uniswap] ${label}: got non-CLASSIC routing "${quoteResponse.routing}" — skipping`);
     return "0x";
@@ -99,7 +100,11 @@ async function getSwapCalldata(
   // Spread quote response into body, strip permitData/permitTransaction per API spec.
   // For CLASSIC routes executed by a contract (no Permit2 signing), we omit both
   // signature and permitData entirely.
-  const { permitData, permitTransaction, ...cleanQuote } = quoteResponse;
+  const { permitData, permitTransaction, ...cleanQuote } = quoteResponse as {
+    permitData?: unknown;
+    permitTransaction?: unknown;
+    [key: string]: unknown;
+  };
 
   const swapRes = await fetchWithRetry(`${UNISWAP_API_URL}/swap`, {
     method: "POST",
@@ -113,7 +118,8 @@ async function getSwapCalldata(
     return "0x";
   }
 
-  const swapData = await swapRes.json();
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const swapData = await swapRes.json() as any;
   const calldata = swapData?.swap?.data;
 
   // Validate calldata before returning
@@ -192,7 +198,8 @@ export async function checkApproval(
     });
 
     if (!res.ok) return { needed: false };
-    const data = await res.json();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const data = await res.json() as any;
     if (data.approval) {
       console.warn(`[uniswap] approval needed for ${token} — satellite may need pre-approval`);
       return { needed: true, approvalTx: data.approval };

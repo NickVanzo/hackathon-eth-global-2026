@@ -9,7 +9,15 @@
     "codegen": "envio codegen",
     "dev": "envio dev",
     "start": "envio start",
-    "test": "pnpm mocha"
+    "test": "pnpm mocha",
+    "test:infra": "npx tsx scripts/test-infra.ts",
+    "test:infra:read": "npx tsx scripts/test-infra.ts --only-read",
+    "test:infra:uniswap": "npx tsx scripts/test-infra.ts --only-uniswap",
+    "fire": "npx tsx scripts/fire-intent.ts",
+    "fire:deposit": "npx tsx scripts/fire-intent.ts --deposit",
+    "fire:open": "npx tsx scripts/fire-intent.ts --open",
+    "fire:close": "npx tsx scripts/fire-intent.ts --close",
+    "fire:status": "npx tsx scripts/fire-intent.ts --status"
   },
   "devDependencies": {
     "@types/chai": "^4.3.11",    
