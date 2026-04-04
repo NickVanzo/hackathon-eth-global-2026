@@ -15,20 +15,26 @@ A single vault where users deposit funds. Multiple AI agents, each running on 0G
 ## Architecture
 
 ```
-0G Testnet (accounting only)                        Ethereum Sepolia (all tokens)
-+-----------------------------+                     +------------------------------+
-| Vault (share token +        |                     | Satellite Contract           |
-|   accounting layer)         |     Relayer         | - holds ALL tokens (USDC.e)  |
-| - token bucket allocator    |  (JS script for     | - holds idle reserve (20%)   |
-| - Sharpe scoring / EMAs     |<-- hackathon;    -->| - owns all LP positions      |
-| - iNFT contract             |   permissionless    | - executes Uniswap calls     |
-| - agent registry            |   network for prod) | - zap-in/out (swap for pairs)|
-| - intent queue              |                     | - reports position values    |
-| - commission ledger         |                     | - handles deposits/withdraws |
-+----------+------------------+                     +------------------------------+
-           |
-           | submitIntent(agentId, action, params)
-           |
+0G Testnet (accounting only)                              Ethereum Sepolia (all tokens)
++------------------------------------------------------+  +------------------------------+
+| Vault (pure accounting)  | AgentManager (lifecycle)   |  | Satellite Contract           |
+| - share token (ERC20)    | - agent registry           |  | - holds ALL tokens (USDC.e)  |
+| - totalAssets, sharePrice | - iNFT contract (ERC721)  |  | - holds idle reserve (20%)   |
+| - deposits/withdrawals   | - intent queue + validation|  | - owns all LP positions      |
+| - fee waterfall          | - token bucket allocator   |  | - executes Uniswap calls     |
+| - commission ledger      | - Sharpe scoring / EMAs    |  | - zap-in/out (swap for pairs)|
+| - epochCheck + settle    | - promotion / eviction     |  | - reports position values    |
+|                          | - pause mechanism          |  | - handles deposits/withdraws |
++-----------+--------------+-----------+----------------+  +------------------------------+
+            |                          |
+  Vault calls AgentManager       Relayer (JS script for
+  for scores during epoch        hackathon; permissionless
+  settlement. AgentManager       network for prod)
+  calls Vault for idleBalance.   <--------- connects --------->
+                                 both sides via events
+            |
+            | submitIntent(agentId, action, params)
+            |          (on AgentManager)
   +-----------+-----------+
   |           |           |
 Agent A     Agent B     Agent C
@@ -46,9 +52,43 @@ Users deposit/withdraw directly on Sepolia via satellite
 Proving agents deposit on Sepolia via satellite
 ```
 
+### Contract Split: Vault vs AgentManager
+
+The 0G-side logic is split into two contracts to stay under the 24KB Solidity contract size limit and for clarity:
+
+**Vault** (pure accounting) — owns shares, money flow, and epoch orchestration:
+- Share token (ERC20 mint/burn), `totalAssets()`, `sharePrice()`
+- `recordDeposit()`, `processWithdraw()`, `claimWithdraw()` — all `onlyMessenger`
+- Withdrawal queue (Tier 1 instant, Tier 2 queued)
+- Fee waterfall computation (`protocolFeesAccrued`, `commissionsOwed`)
+- `approveCommissionRelease(agentId, amount)` — called by AgentManager after ownership verification, zeroes `commissionsOwed` and emits `CommissionApproved`
+- `epochCheck` modifier + `_settleEpoch()` orchestration (calls AgentManager for agent data)
+- `onlyMessenger` modifier
+
+**AgentManager** (agent lifecycle) — owns agents, intents, scoring:
+- Agent registry (phase, provingBalance, provingDeployed, agentAddress)
+- iNFT contract (ERC-721, minted on registration)
+- `submitIntent()` — entry point for agents, validates credits/cooldown/pause, calls Vault's `idleBalance()` for vault agents, emits `IntentQueued`
+- Token bucket (credits, refillRate, maxCredits per agent)
+- `reportValues()` — stores `positionValue`, `feesCollected`, `lastReportedBlock` per agent
+- Sharpe scoring: EMA updates, variance, sqrt, MIN_VARIANCE floor, negative clamping, all-zero fallback
+- Score-to-credit allocation, promotion ramp
+- Promotion check (`provingEpochsRequired` + `minPromotionSharpe`)
+- Eviction (`zeroSharpeStreak`, skip paused, `EVICTION_EPOCHS`)
+- `processPause()` with iNFT ownership check
+- `processCommissionClaim()` — checks iNFT ownership, then calls `Vault.approveCommissionRelease()`
+- Withdraw-from-arena (deregister, clear state, free slot)
+
+**Cross-contract calls:**
+- `_settleEpoch()` (on Vault) calls `AgentManager.settleAgents()` which returns per-agent scores, fees collected, and eviction/promotion results
+- `submitIntent()` (on AgentManager) calls `Vault.idleBalance()` to check available capital for vault agents
+- `processCommissionClaim()` (on AgentManager) calls `Vault.approveCommissionRelease()` after verifying iNFT ownership
+- `epochCheck` modifier (on AgentManager) calls `Vault.triggerSettleEpoch()` to trigger epoch settlement if due
+- All three contracts (Vault, AgentManager, Satellite) share the `messenger` address for relayer authorization
+
 ### Cross-Chain Architecture
 
-The vault lives on **0G testnet** (required for 0G prize track) as an **accounting-only layer** -- it tracks shares, credits, EMAs, and Sharpe scores but **never holds tokens**. All tokens live on **Ethereum Sepolia** in the satellite contract, which handles deposits, withdrawals, LP positions, and the idle reserve.
+The Vault and AgentManager live on **0G testnet** (required for 0G prize track) as an **accounting-only layer** -- the Vault tracks shares and money flow, the AgentManager tracks agent credits, EMAs, and Sharpe scores. Neither contract **holds tokens**. All tokens live on **Ethereum Sepolia** in the satellite contract, which handles deposits, withdrawals, LP positions, and the idle reserve.
 
 **No tokens ever cross chains.** Only messages (intents, values, deposit/withdrawal notifications) cross via the relayer. This completely eliminates bridging complexity.
 
@@ -59,7 +99,7 @@ The vault lives on **0G testnet** (required for 0G prize track) as an **accounti
 Users **only interact with the satellite on Sepolia** -- they never need to touch 0G directly. The vault on 0G handles accounting internally; agents are the only actors who interact with 0G (to submit intents).
 
 - **Deposits**: user calls `satellite.deposit(amount)` on Sepolia -> satellite holds USDC.e -> emits `Deposited` event -> relayer calls `vault.recordDeposit(user, amount)` on 0G -> vault mints shares
-- **Agent registration (includes proving deposit)**: deployer calls `satellite.registerAgent(agentAddress, provingAmount)` on Sepolia -> funds earmarked per agent -> relayer notifies vault -> vault registers agent + mints iNFT (see Agent Registration section)
+- **Agent registration (includes proving deposit)**: deployer calls `satellite.registerAgent(agentAddress, provingAmount)` on Sepolia -> funds earmarked per agent -> relayer calls `agentManager.recordRegistration()` on 0G -> AgentManager registers agent + mints iNFT (see Agent Registration section)
 - **Withdrawals**: user calls `satellite.requestWithdraw(tokenAmount)` on Sepolia -> satellite emits `WithdrawRequested` event -> relayer calls `vault.processWithdraw(user, shares)` on 0G -> vault burns shares and emits `WithdrawApproved` -> relayer calls `satellite.release(user, tokenAmount)` on Sepolia
 - **Idle reserve**: satellite keeps 20% of total assets idle on Sepolia, instantly accessible for withdrawals without any cross-chain delay
 
@@ -78,11 +118,13 @@ A simple **Node.js relayer script** (~100 lines) bridges the two chains for the 
 Sepolia                       Relayer Script              0G Testnet
 +-----------+  Deposited         +------+  recordDeposit()   +----------+
 | Satellite | -- event --------> |  JS  | -- tx -----------> |  Vault   |
-|           |                    |      |                     |          |
-|           |  executeBatch() <--|      |<-- IntentQueued --- |          |
-|           | -- ValuesReported->|      |-- reportValues() ->|          |
+|           |                    |      |                     +----------+
+|           |  executeBatch() <--|      |<-- IntentQueued --- +----------+
+|           | -- ValuesReported->|      |-- reportValues() ->| AgentMgr |
 +-----------+                    +------+                     +----------+
 ```
+
+The relayer routes messages to the correct 0G contract: deposits/withdrawals go to Vault, intents/values/registration go to AgentManager.
 
 The relayer watches events on one chain and submits transactions on the other. Both contracts have a `messenger` address: set to relayer EOA for hackathon, swap to the permissionless relayer network contract for production.
 
@@ -109,24 +151,24 @@ Source chain event --> Relayer submits message --> Challenge window (10 blocks)
 
 **Challenge window latency**: the challenge period adds a small delay (seconds to minutes depending on block time), but this fits naturally within the epoch cadence -- intents are already batched, not real-time.
 
-The `messenger` interface on both contracts remains unchanged -- the vault and satellite don't care who the messenger is, only that the messages are valid. The upgrade from hackathon relayer to permissionless network requires no contract modifications.
+The `messenger` interface on all three contracts (Vault, AgentManager, Satellite) remains unchanged -- they don't care who the messenger is, only that the messages are valid. The upgrade from hackathon relayer to permissionless network requires no contract modifications.
 
 ### Execution Model: Intent-Based with Batch Settlement
 
-Since the vault (0G) and Uniswap (Sepolia) are on different chains, agents cannot get instant execution. Instead, agents submit **intents** to the vault, which are batched and relayed cross-chain.
+Since the 0G contracts and Uniswap (Sepolia) are on different chains, agents cannot get instant execution. Instead, agents submit **intents** to the AgentManager, which are batched and relayed cross-chain.
 
 #### Flow
 
-1. **Submit**: Agent calls `vault.submitIntent(agentId, actionType, params)` on 0G -- e.g., "open position on ETH/USDC, ticks 200000-201000, amount 5000 USDC"
-2. **Validate**: Vault verifies: agent is registered, not paused, passes cooldown check, and has sufficient capital (token bucket credits for vault agents, `provingBalance` for proving agents). Credits are deducted immediately. Intent is queued and an `IntentQueued` event is emitted
+1. **Submit**: Agent calls `agentManager.submitIntent(agentId, actionType, params)` on 0G -- e.g., "open position on ETH/USDC, ticks 200000-201000, amount 5000 USDC"
+2. **Validate**: AgentManager verifies: agent is registered, not paused, passes cooldown check, and has sufficient capital (token bucket credits for vault agents, `provingBalance` for proving agents). For vault agents, calls `Vault.idleBalance()` to check available capital. Credits are deducted immediately. Intent is queued and an `IntentQueued` event is emitted
 3. **Relay**: Relayer picks up queued intents and calls `satellite.executeBatch(intents)` on Sepolia
 4. **Execute**: For each intent, the satellite executes the full sequence: zap-in (swap half USDC.e for paired token via SwapRouter), open/modify/close LP position via NonfungiblePositionManager, and on close, zap-out (swap back to USDC.e). The satellite holds the tokens and owns the position NFTs
-5. **Report**: Satellite emits `ValuesReported` with updated position valuations. Relayer calls `vault.reportValues(agentId, positionValue, feesCollected)` on 0G
-6. **Settle**: Vault uses reported values for EMA updates and Sharpe recomputation at epoch settlement
+5. **Report**: Satellite emits `ValuesReported` with updated position valuations. Relayer calls `agentManager.reportValues(agentId, positionValue, feesCollected)` on 0G
+6. **Settle**: Vault orchestrates epoch settlement, calling `AgentManager.settleAgents()` for scoring and allocation updates
 
 This intent-based model is actually **better than direct execution**: all agents' actions for an epoch are known before execution, eliminating race conditions. If total requested deployment exceeds available capital, intents can be scaled down proportionally.
 
-Each agent's positions are tracked separately (mapped by `agentId`) on both chains -- the vault tracks credits and performance on 0G, the satellite tracks actual Uniswap position NFTs on Sepolia.
+Each agent's positions are tracked separately (mapped by `agentId`) on both chains -- the AgentManager tracks credits and performance on 0G, the satellite tracks actual Uniswap position NFTs on Sepolia.
 
 ### Subgraph MCP (Agent Read Layer)
 
@@ -220,7 +262,7 @@ Where `epochReturn = (positionValue_end - positionValue_start + feesCollected) /
 
 At epoch reporting time, the satellite calls `collect()` on each position to realize accrued fees, then reports both values separately. The formula then correctly captures: change in LP principal (which includes impermanent loss) + earned fee income.
 
-These values are reported back to the vault on 0G via the relayer (production: permissionless relayer network). The vault doesn't need to do LP math -- it just receives the valuations.
+These values are reported back to the AgentManager on 0G via the relayer (production: permissionless relayer network). The AgentManager stores them per agent and uses them at epoch settlement. No LP math needed on the 0G side -- it just receives the valuations.
 
 ##### Sharpe score computation
 
@@ -279,27 +321,40 @@ effectiveMaxCredits[agent] = min(
 
 This creates a natural flywheel: good performance -> higher Sharpe -> more credits -> more capital -> more opportunity to earn -> higher commissions.
 
-### Vault Constructor Parameters
+### Constructor Parameters
 
-The vault is deployer-configurable -- all key parameters are set at deployment via constructor arguments, making each vault instance a self-contained arena with its own tuning.
+Both 0G-side contracts are deployer-configurable via constructor arguments, making each vault instance a self-contained arena with its own tuning. The AgentManager is deployed first, then the Vault (which receives the AgentManager address).
+
+#### Vault constructor
 
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `alpha` | `uint256` | EMA decay factor for performance tracking (scaled, e.g., 3000 = 0.3). Higher alpha = more weight on recent epochs |
-| `maxAgents` | `uint256` | Maximum number of agents eligible for live token buckets (bounds the epoch rebalancing loop) |
-| `totalRefillBudget` | `uint256` | Total credits distributed across all agents per epoch -- controls overall vault deployment speed |
-| `maxExposureRatio` | `uint256` | Max fraction of vault value that can be deployed across all agents (scaled, e.g., 8000 = 80%) |
+| `agentManager` | `address` | Address of the deployed AgentManager contract |
 | `epochLength` | `uint256` | Number of blocks per epoch -- how often bucket parameters are recalculated |
+| `maxExposureRatio` | `uint256` | Max fraction of vault value that can be deployed across all agents (scaled, e.g., 8000 = 80%) |
 | `protocolFeeRate` | `uint256` | Protocol's cut of collected fees before agent commissions (scaled, e.g., 500 = 5%) |
 | `protocolTreasury` | `address` | Address that receives protocol fees on Sepolia |
 | `commissionRate` | `uint256` | Percentage of remaining fees (after protocol cut) directed to iNFT owner (scaled, e.g., 1000 = 10%) |
-| `provingEpochsRequired` | `uint256` | Minimum number of epochs an agent must trade with its own funds before becoming eligible for vault capital |
-| `minPromotionSharpe` | `uint256` | Minimum Sharpe score required for promotion from proving to vault allocation (scaled) |
-| `minActionInterval` | `uint256` | Minimum number of blocks between consecutive actions by the same agent (anti-churn cooldown) |
 | `depositToken` | `address` | The ERC-20 token accepted for deposits (USDC.e -- used on Sepolia satellite side) |
-| `pool` | `address` | The Uniswap v3 pool all agents trade on (e.g., ETH/USDC). Single-pool per vault for the hackathon. Metadata on vault side; the satellite also receives this as its own constructor parameter since it executes the actual Uniswap calls |
-| `messenger` | `address` | Relayer EOA (hackathon) or permissionless relayer network contract (production) -- authorized to relay cross-chain messages |
+| `pool` | `address` | The Uniswap v3 pool all agents trade on (e.g., ETH/USDC). Metadata on vault side; the satellite also receives this as its own constructor parameter |
+| `messenger` | `address` | Relayer EOA (hackathon) or permissionless relayer network contract (production) |
 | `satellite` | `address` | Address of the satellite contract on Sepolia |
+
+#### AgentManager constructor
+
+| Parameter | Type | Description |
+|-----------|------|-------------|
+| `alpha` | `uint256` | EMA decay factor for performance tracking (scaled, e.g., 3000 = 0.3) |
+| `maxAgents` | `uint256` | Maximum number of agents eligible for live token buckets (bounds the epoch loop) |
+| `totalRefillBudget` | `uint256` | Total credits distributed across all agents per epoch |
+| `provingEpochsRequired` | `uint256` | Minimum proving epochs before vault allocation eligibility |
+| `minPromotionSharpe` | `uint256` | Minimum Sharpe score required for promotion (scaled) |
+| `minActionInterval` | `uint256` | Minimum blocks between consecutive actions (anti-churn cooldown) |
+| `messenger` | `address` | Same relayer/messenger as Vault |
+
+**Post-deployment**: call `AgentManager.setVault(vaultAddress)` to link the two contracts. This is a one-time initialization — `setVault` reverts if already set.
+
+**Deployment order**: AgentManager first (no vault address needed) -> Vault second (passes AgentManager address in constructor) -> call `AgentManager.setVault(vaultAddress)` to complete the circular reference.
 
 All ratio/percentage parameters use basis-point scaling (10000 = 100%) for fixed-point precision without floating point.
 
@@ -348,7 +403,7 @@ modifier epochCheck() {
 }
 ```
 
-Every state-changing vault function (`recordDeposit`, `processWithdraw`, `submitIntent`, `reportValues`, `recordRegistration`) carries the `epochCheck` modifier. Whoever calls first pays the gas for settlement.
+Every state-changing function on both contracts (`recordDeposit`, `processWithdraw` on Vault; `submitIntent`, `reportValues`, `recordRegistration` on AgentManager) carries the `epochCheck` modifier. Whoever calls first pays the gas for settlement. The AgentManager's `epochCheck` calls `Vault.triggerSettleEpoch()` (a public function that checks the epoch boundary and runs `_settleEpoch()` if due).
 
 In practice, agents are actively submitting intents every epoch, so one of them will naturally trigger settlement. No external keeper infrastructure, no Chainlink Automation, no missed epochs. This is the same pattern used by Compound, Aave, and most major DeFi protocols for rate/state updates.
 
@@ -356,16 +411,19 @@ In practice, agents are actively submitting intents every epoch, so one of them 
 
 **Async settlement**: `_settleEpoch()` uses the **last reported values** from the satellite, not real-time cross-chain queries. The relayer reports position valuations at least once per epoch (it runs locally -- trivially reliable). If a value hasn't been reported for the current epoch, the vault uses the last known value. A `lastReportedBlock[agentId]` timestamp tracks freshness.
 
-`_settleEpoch()` performs:
-1. Compute per-agent `epochReturn` (using last reported position valuations from satellite + fees collected) and update EMAs (`emaReturn`, `emaReturnSq`)
-2. Recalculate Sharpe scores (with `MIN_VARIANCE` floor, negative clamping, all-zero fallback)
-3. **Eviction check**: skip paused agents entirely (eviction timer frozen, EMAs unchanged -- owner made a deliberate choice). For active agents: increment `zeroSharpeStreak` for those with Sharpe == 0, reset for others. Evict agents whose streak reaches `EVICTION_EPOCHS` (force-close positions, free `maxAgents` slot)
-4. **Promotion check**: for proving agents with `epochsCompleted >= provingEpochsRequired` and `sharpe >= minPromotionSharpe`, promote to vault allocation (initialize token bucket with promotion ramp)
-5. Rebalance bucket parameters (`refillRate`, `maxCredits`) with promotion ramp applied for recently promoted agents
-6. Apply fee waterfall for agents with `feesCollected > 0`: compute `protocolFee` (protocol cut first), then `agentCommission` from remainder. Accrue to `protocolFeesAccrued` and `commissionsOwed[agentId]`. Emit `ProtocolFeeAccrued` and `CommissionAccrued` for satellite to reserve
-7. Account for pending queued withdrawals: reduce agent allocations proportionally, and if idle balance still insufficient, queue force-close intents for lowest-Sharpe agents (relayed to satellite)
-8. Emit `EpochSettled(sharePrice, totalShares, totalAssets)` for satellite share price sync
-9. Advance `lastEpochBlock` to current block
+`_settleEpoch()` on Vault orchestrates, calling AgentManager for agent-specific work:
+
+1. Vault calls `AgentManager.settleAgents()` which internally:
+   - Computes per-agent `epochReturn` (using last reported values + fees) and updates EMAs
+   - Recalculates Sharpe scores (MIN_VARIANCE floor, negative clamping, all-zero fallback)
+   - **Eviction check**: skips paused agents, increments/resets `zeroSharpeStreak`, evicts at `EVICTION_EPOCHS`
+   - **Promotion check**: promotes proving agents meeting `provingEpochsRequired` + `minPromotionSharpe`
+   - Rebalances bucket parameters (`refillRate`, `maxCredits`) with promotion ramp
+   - Returns: per-agent `feesCollected`, eviction list, force-close intents
+2. Vault applies fee waterfall using returned `feesCollected`: `protocolFee` first, then `agentCommission`. Accrues to `protocolFeesAccrued` and `commissionsOwed[agentId]`. Emits `ProtocolFeeAccrued` and `CommissionAccrued`
+3. Vault accounts for pending queued withdrawals: reduces agent allocations (via AgentManager), queues force-close intents if idle balance insufficient
+4. Vault emits `EpochSettled(sharePrice, totalShares, totalAssets)` for satellite share price sync
+5. Vault advances `lastEpochBlock`
 
 ---
 
@@ -377,15 +435,15 @@ Registration is a single transaction on Sepolia that bootstraps the full agent:
 
 1. Deployer calls `satellite.registerAgent(agentAddress, provingAmount)` on Sepolia with USDC.e approval
 2. Satellite transfers `provingAmount` from deployer, earmarks it for the new agent, emits `AgentRegistered(agentId, agentAddress, deployer, provingAmount)`
-3. Relayer calls `vault.recordRegistration(agentId, agentAddress, deployer, provingAmount)` on 0G
-4. Vault registers the agent (maps `agentId -> agentAddress`), records `provingBalance[agentId]`, and **mints an iNFT** to the deployer's address
+3. Relayer calls `agentManager.recordRegistration(agentId, agentAddress, deployer, provingAmount)` on 0G
+4. AgentManager registers the agent (maps `agentId -> agentAddress`), records `provingBalance[agentId]`, and **mints an iNFT** to the deployer's address
 
 `agentId` is assigned sequentially by the satellite. `agentAddress` is the EOA that the OpenClaw agent will use to submit intents on 0G. Registration is permissionless -- anyone can deploy an agent.
 
 ### Phase 1 - Proving (Own Capital)
 - Proving funds are deposited during registration (see above) -- **earmarked** per agent, segregated from depositor funds
-- The relayer notifies the vault on 0G, which records the proving balance in `provingBalance[agentId]`
-- The agent submits intents via the same `vault.submitIntent()` path as vault agents, but its capital comes from `provingBalance` instead of the token bucket (see code branching in token bucket section)
+- The relayer notifies the AgentManager on 0G, which records the proving balance in `provingBalance[agentId]`
+- The agent submits intents via `agentManager.submitIntent()`, but its capital comes from `provingBalance` instead of the token bucket (see code branching in token bucket section)
 - This reuses the entire execution pipeline: same intent queue, same relayer, same Uniswap calls via satellite, same performance measurement
 - Performance (returns, variance) is tracked on-chain via the same EMA mechanism used for vault agents
 - The agent builds a **verifiable, real-money track record** visible to the entire network
@@ -469,7 +527,7 @@ The iNFT owner claims commissions on **Sepolia** (same chain as deposits -- no 0
 
 1. Owner calls `satellite.claimCommissions(agentId)` on Sepolia
 2. Satellite emits `CommissionClaimRequested(agentId, caller)` event
-3. Relayer calls `vault.processCommissionClaim(agentId, caller)` on 0G -- vault checks `iNFT.ownerOf(agentId) == caller`, zeroes `commissionsOwed`, emits `CommissionApproved(agentId, caller, amount)`
+3. Relayer calls `agentManager.processCommissionClaim(agentId, caller)` on 0G -- AgentManager checks `iNFT.ownerOf(agentId) == caller`, then calls `vault.approveCommissionRelease(agentId, amount)` which zeroes `commissionsOwed` and emits `CommissionApproved(agentId, caller, amount)`
 4. Relayer calls `satellite.releaseCommission(caller, amount)` on Sepolia -- satellite pays from `commissionReserve`
 
 Commissions are denominated in the deposit token (USDC.e). The only actors who interact with 0G directly are agents (submitting intents) and the relayer.
@@ -489,22 +547,22 @@ This ensures the 20% idle reserve remains fully available for depositor withdraw
 
 ### iNFT Pause Mechanism
 
-The vault maintains a `paused` flag per agent. The iNFT owner pauses/unpauses via **Sepolia** (consistent with all other iNFT owner actions):
+The AgentManager maintains a `paused` flag per agent. The iNFT owner pauses/unpauses via **Sepolia** (consistent with all other iNFT owner actions):
 
 1. Owner calls `satellite.pauseAgent(agentId)` or `satellite.unpauseAgent(agentId)` on Sepolia
 2. Satellite emits `PauseRequested(agentId, caller, paused)` event
-3. Relayer calls `vault.processPause(agentId, caller, paused)` on 0G -- vault checks `iNFT.ownerOf(agentId) == caller`, updates the flag
+3. Relayer calls `agentManager.processPause(agentId, caller, paused)` on 0G -- AgentManager checks `iNFT.ownerOf(agentId) == caller`, updates the flag
 
-`submitIntent()` checks `require(!paused[agentId])` before processing. The OpenClaw agent can attempt to submit intents, but the vault rejects them. Existing positions remain open until the agent is unpaused or the iNFT owner triggers a withdrawal from the arena.
+`submitIntent()` checks `require(!paused[agentId])` before processing. The OpenClaw agent can attempt to submit intents, but the AgentManager rejects them. Existing positions remain open until the agent is unpaused or the iNFT owner triggers a withdrawal from the arena.
 
 ### Withdraw from Arena
 
-The iNFT owner can permanently remove their agent from the vault by calling `satellite.withdrawFromArena(agentId)` on Sepolia (relayed to vault):
+The iNFT owner can permanently remove their agent by calling `satellite.withdrawFromArena(agentId)` on Sepolia (relayed to AgentManager):
 
-1. **Verify ownership**: relayer calls vault, vault checks `iNFT.ownerOf(agentId) == caller` -- rejects if not owner
-2. **Pause**: agent is immediately paused (prevents new intents)
-3. **Force-close**: vault queues force-close intents for all of the agent's open positions -- both vault-funded and proving-funded (relayed to satellite, which zaps out to USDC.e). Vault-funded capital returns to vault idle; proving capital is returned to the deployer's address on Sepolia
-4. **Deregister**: agent is removed from the vault -- frees `maxAgents` slot, clears token bucket, clears EMAs
+1. **Verify ownership**: relayer calls AgentManager, which checks `iNFT.ownerOf(agentId) == caller` -- rejects if not owner
+2. **Pause**: agent is immediately paused on AgentManager (prevents new intents)
+3. **Force-close**: AgentManager queues force-close intents for all of the agent's open positions (relayed to satellite, which zaps out to USDC.e). Vault-funded capital returns to vault idle; proving capital is returned to the deployer's address on Sepolia
+4. **Deregister**: agent is removed from the AgentManager -- frees `maxAgents` slot, clears token bucket, clears EMAs
 
 The iNFT remains after withdrawal -- it's now an NFT with a historical track record but no active agent. Any unclaimed commissions remain claimable.
 
@@ -569,13 +627,13 @@ Total potential: **$25,000 across 2 sponsors**
 
 | Priority | Component | Chain | Notes |
 |----------|-----------|-------|-------|
-| 1 | Vault contract | 0G testnet | Share token + accounting: intent queue, token buckets, Sharpe scoring |
-| 2 | Satellite contract (fund custodian + Uniswap executor) | Sepolia | Holds all tokens, owns LP positions, executes Uniswap calls, zap-in/out, deposits/withdrawals |
-| 3 | Relayer script | Off-chain (JS) | Watches events, relays intents/values/deposits/withdrawals between chains |
-| 4 | Uniswap integration | Sepolia (via satellite) | Open/close/modify positions programmatically with zap-in/out |
-| 5 | Subgraph MCP server | Off-chain | MCP-compatible interface to Uniswap subgraph on Sepolia |
-| 6 | OpenClaw agent | Sandboxed on fly.io | Even with simple strategy (rebalance when price exits X% of range) |
-| 7 | iNFT contract | 0G testnet | Mint on deploy, commission claim with ownerOf, pause/unpause |
+| 1 | Vault contract | 0G testnet | Share token + pure accounting: deposits, withdrawals, fee waterfall, epoch orchestration |
+| 2 | AgentManager contract | 0G testnet | Agent lifecycle: registry, intent queue, token buckets, Sharpe scoring, promotion, eviction |
+| 3 | iNFT contract | 0G testnet | ERC-721, minted by AgentManager on registration, ownerOf for auth |
+| 4 | Satellite contract (fund custodian + Uniswap executor) | Sepolia | Holds all tokens, owns LP positions, executes Uniswap calls, zap-in/out, deposits/withdrawals |
+| 5 | Relayer script | Off-chain (JS) | Watches events, routes to correct 0G contract (Vault or AgentManager) and Satellite |
+| 6 | Subgraph MCP server | Off-chain | MCP-compatible interface to Uniswap subgraph on Sepolia |
+| 7 | OpenClaw agent | Sandboxed on fly.io | Even with simple strategy (rebalance when price exits X% of range) |
 | 8 | Dashboard | Off-chain | Real-time view of agent decisions, performance leaderboard |
 | 9 | Strategy sophistication | -- | Only if time remains |
 

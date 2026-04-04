@@ -1,8 +1,5 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 900" font-family="Inter, system-ui, sans-serif">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1300 950" font-family="Inter, system-ui, sans-serif">
   <defs>
-    <marker id="arrow" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
-      <polygon points="0 0, 10 3.5, 0 7" fill="#64748b"/>
-    </marker>
     <marker id="arrow-blue" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#3b82f6"/>
     </marker>
@@ -15,257 +12,288 @@
     <marker id="arrow-purple" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
       <polygon points="0 0, 10 3.5, 0 7" fill="#a855f7"/>
     </marker>
+    <marker id="arrow-red" markerWidth="10" markerHeight="7" refX="10" refY="3.5" orient="auto">
+      <polygon points="0 0, 10 3.5, 0 7" fill="#ef4444"/>
+    </marker>
     <filter id="shadow" x="-4%" y="-4%" width="108%" height="108%">
       <feDropShadow dx="0" dy="2" stdDeviation="4" flood-opacity="0.1"/>
     </filter>
-    <linearGradient id="bg" x1="0" y1="0" x2="1200" y2="900" gradientUnits="userSpaceOnUse">
+    <linearGradient id="bg" x1="0" y1="0" x2="1300" y2="950" gradientUnits="userSpaceOnUse">
       <stop offset="0%" stop-color="#f8fafc"/>
       <stop offset="100%" stop-color="#f1f5f9"/>
     </linearGradient>
   </defs>
 
   <!-- Background -->
-  <rect width="1200" height="900" fill="url(#bg)" rx="12"/>
+  <rect width="1300" height="950" fill="url(#bg)" rx="12"/>
 
   <!-- Title -->
-  <text x="600" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#0f172a">Agent Arena Architecture</text>
-  <text x="600" y="62" text-anchor="middle" font-size="13" fill="#64748b">Competitive AI Liquidity Management on Uniswap</text>
+  <text x="650" y="40" text-anchor="middle" font-size="24" font-weight="700" fill="#0f172a">Agent Arena Architecture</text>
+  <text x="650" y="62" text-anchor="middle" font-size="13" fill="#64748b">Competitive AI Liquidity Management on Uniswap</text>
 
   <!-- ==================== 0G TESTNET ZONE ==================== -->
-  <rect x="30" y="85" width="430" height="460" rx="16" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="245" y="112" text-anchor="middle" font-size="14" font-weight="600" fill="#1e40af">0G Testnet (accounting only)</text>
+  <rect x="30" y="85" width="520" height="480" rx="16" fill="#eff6ff" stroke="#bfdbfe" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="290" y="112" text-anchor="middle" font-size="14" font-weight="600" fill="#1e40af">0G Testnet (accounting only -- no tokens)</text>
 
   <!-- Vault -->
-  <rect x="60" y="130" width="370" height="220" rx="12" fill="white" stroke="#93c5fd" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="245" y="155" text-anchor="middle" font-size="16" font-weight="700" fill="#1e40af">Vault</text>
-  <text x="245" y="173" text-anchor="middle" font-size="11" fill="#64748b">Share Token + Accounting Layer</text>
+  <rect x="50" y="130" width="230" height="210" rx="12" fill="white" stroke="#93c5fd" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="165" y="155" text-anchor="middle" font-size="15" font-weight="700" fill="#1e40af">Vault</text>
+  <text x="165" y="171" text-anchor="middle" font-size="10" fill="#64748b">Pure Accounting</text>
 
-  <text x="80" y="198" font-size="11" fill="#334155">Token Bucket Allocator</text>
-  <text x="80" y="216" font-size="11" fill="#334155">Sharpe Scoring / EMAs</text>
-  <text x="80" y="234" font-size="11" fill="#334155">Intent Queue</text>
-  <text x="80" y="252" font-size="11" fill="#334155">Agent Registry</text>
+  <text x="65" y="193" font-size="10" fill="#334155">Share token (ERC20)</text>
+  <text x="65" y="208" font-size="10" fill="#334155">totalAssets, sharePrice</text>
+  <text x="65" y="223" font-size="10" fill="#334155">recordDeposit (messenger)</text>
+  <text x="65" y="238" font-size="10" fill="#334155">processWithdraw (messenger)</text>
+  <text x="65" y="253" font-size="10" fill="#334155">Withdrawal queue (T1+T2)</text>
+  <text x="65" y="268" font-size="10" fill="#334155">Fee waterfall computation</text>
+  <text x="65" y="283" font-size="10" fill="#334155">Commission ledger</text>
+  <text x="65" y="298" font-size="10" fill="#334155">epochCheck + _settleEpoch</text>
+  <text x="65" y="313" font-size="10" fill="#334155">triggerSettleEpoch (public)</text>
+  <text x="65" y="328" font-size="10" fill="#334155">approveCommissionRelease</text>
 
-  <text x="260" y="198" font-size="11" fill="#334155">Commission Ledger</text>
-  <text x="260" y="216" font-size="11" fill="#334155">Protocol Fee Tracking</text>
-  <text x="260" y="234" font-size="11" fill="#334155">Epoch Settlement (lazy)</text>
-  <text x="260" y="252" font-size="11" fill="#334155">Withdrawal Processing</text>
+  <!-- AgentManager -->
+  <rect x="300" y="130" width="235" height="260" rx="12" fill="white" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="417" y="155" text-anchor="middle" font-size="15" font-weight="700" fill="#7c3aed">AgentManager</text>
+  <text x="417" y="171" text-anchor="middle" font-size="10" fill="#64748b">Agent Lifecycle</text>
 
-  <!-- Epoch settlement detail -->
-  <rect x="70" y="268" width="350" height="70" rx="8" fill="#f0f9ff" stroke="#bfdbfe" stroke-width="1"/>
-  <text x="245" y="285" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">_settleEpoch() - 9 steps</text>
-  <text x="80" y="300" font-size="9" fill="#475569">1. Update EMAs  2. Sharpe scores  3. Eviction check</text>
-  <text x="80" y="313" font-size="9" fill="#475569">4. Promotion check  5. Rebalance buckets  6. Fee waterfall</text>
-  <text x="80" y="326" font-size="9" fill="#475569">7. Handle withdrawals  8. Emit EpochSettled  9. Advance epoch</text>
+  <text x="315" y="193" font-size="10" fill="#334155">Agent registry (state, phase)</text>
+  <text x="315" y="208" font-size="10" fill="#334155">iNFT contract (ERC-721)</text>
+  <text x="315" y="223" font-size="10" fill="#334155">submitIntent (agent entry)</text>
+  <text x="315" y="238" font-size="10" fill="#334155">Token bucket (credits)</text>
+  <text x="315" y="253" font-size="10" fill="#334155">reportValues (messenger)</text>
+  <text x="315" y="268" font-size="10" fill="#334155">Sharpe scoring / EMAs</text>
+  <text x="315" y="283" font-size="10" fill="#334155">settleAgents (called by Vault)</text>
+  <text x="315" y="298" font-size="10" fill="#334155">Promotion / Eviction</text>
+  <text x="315" y="313" font-size="10" fill="#334155">processPause (iNFT auth)</text>
+  <text x="315" y="328" font-size="10" fill="#334155">processCommissionClaim</text>
+  <text x="315" y="343" font-size="10" fill="#334155">Withdraw-from-arena</text>
+  <text x="315" y="358" font-size="10" fill="#334155">recordRegistration + mint</text>
+  <text x="315" y="373" font-size="10" fill="#334155">setVault (one-time init)</text>
 
-  <!-- iNFT Contract -->
-  <rect x="60" y="365" width="170" height="60" rx="10" fill="white" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="145" y="390" text-anchor="middle" font-size="13" font-weight="600" fill="#7c3aed">iNFT Contract</text>
-  <text x="145" y="407" text-anchor="middle" font-size="10" fill="#64748b">ERC-721 ownership deeds</text>
+  <!-- Cross-contract arrow: Vault -> AgentManager -->
+  <line x1="280" y1="280" x2="298" y2="280" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="289" y="275" text-anchor="middle" font-size="7" fill="#ef4444">settleAgents()</text>
+
+  <!-- Cross-contract arrow: AgentManager -> Vault -->
+  <line x1="300" y1="240" x2="282" y2="240" stroke="#ef4444" stroke-width="1.5" marker-end="url(#arrow-red)"/>
+  <text x="289" y="235" text-anchor="middle" font-size="7" fill="#ef4444">idleBalance()</text>
+
+  <!-- Cross-contract label -->
+  <rect x="100" y="350" width="200" height="40" rx="6" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="200" y="367" text-anchor="middle" font-size="9" font-weight="600" fill="#dc2626">Cross-contract calls</text>
+  <text x="200" y="381" text-anchor="middle" font-size="8" fill="#64748b">settleAgents, idleBalance, approveCommission, triggerSettle</text>
+
+  <!-- iNFT badge -->
+  <rect x="320" y="400" width="200" height="50" rx="10" fill="white" stroke="#c4b5fd" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="420" y="422" text-anchor="middle" font-size="12" font-weight="600" fill="#7c3aed">iNFT Contract (ERC-721)</text>
+  <text x="420" y="437" text-anchor="middle" font-size="9" fill="#64748b">Ownership deeds, minted by AgentManager</text>
 
   <!-- Constructor params badge -->
-  <rect x="250" y="365" width="180" height="60" rx="10" fill="white" stroke="#94a3b8" stroke-width="1" filter="url(#shadow)"/>
-  <text x="340" y="387" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">Constructor Params</text>
-  <text x="340" y="402" text-anchor="middle" font-size="9" fill="#64748b">alpha, maxAgents, epochLength</text>
-  <text x="340" y="414" text-anchor="middle" font-size="9" fill="#64748b">protocolFeeRate, commissionRate...</text>
+  <rect x="50" y="400" width="250" height="50" rx="10" fill="white" stroke="#94a3b8" stroke-width="1" filter="url(#shadow)"/>
+  <text x="175" y="418" text-anchor="middle" font-size="10" font-weight="600" fill="#334155">Deploy: AgentManager -> Vault -> setVault()</text>
+  <text x="175" y="433" text-anchor="middle" font-size="8" fill="#64748b">Vault params: epochLength, fees, exposure | AM params: alpha, maxAgents, Sharpe</text>
 
   <!-- ==================== SEPOLIA ZONE ==================== -->
-  <rect x="740" y="85" width="430" height="460" rx="16" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="955" y="112" text-anchor="middle" font-size="14" font-weight="600" fill="#166534">Ethereum Sepolia (all tokens)</text>
+  <rect x="830" y="85" width="440" height="480" rx="16" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="112" text-anchor="middle" font-size="14" font-weight="600" fill="#166534">Ethereum Sepolia (all tokens)</text>
 
   <!-- Satellite -->
-  <rect x="770" y="130" width="370" height="220" rx="12" fill="white" stroke="#86efac" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="955" y="155" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">Satellite</text>
-  <text x="955" y="173" text-anchor="middle" font-size="11" fill="#64748b">Fund Custodian + Uniswap Executor</text>
+  <rect x="860" y="130" width="380" height="230" rx="12" fill="white" stroke="#86efac" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1050" y="155" text-anchor="middle" font-size="16" font-weight="700" fill="#166534">Satellite</text>
+  <text x="1050" y="173" text-anchor="middle" font-size="11" fill="#64748b">Fund Custodian + Uniswap Executor</text>
 
-  <text x="790" y="198" font-size="11" fill="#334155">Holds ALL tokens (USDC.e)</text>
-  <text x="790" y="216" font-size="11" fill="#334155">Owns all LP positions</text>
-  <text x="790" y="234" font-size="11" fill="#334155">Zap-in/out (SwapRouter)</text>
-  <text x="790" y="252" font-size="11" fill="#334155">Deposits / Withdrawals</text>
+  <text x="880" y="198" font-size="10" fill="#334155">Holds ALL tokens (USDC.e)</text>
+  <text x="880" y="213" font-size="10" fill="#334155">Owns all LP positions (NFTs)</text>
+  <text x="880" y="228" font-size="10" fill="#334155">Zap-in/out (SwapRouter)</text>
+  <text x="880" y="243" font-size="10" fill="#334155">deposit, registerAgent</text>
+  <text x="880" y="258" font-size="10" fill="#334155">requestWithdraw, claimWithdraw</text>
 
-  <text x="980" y="198" font-size="11" fill="#334155">Idle reserve (20%)</text>
-  <text x="980" y="216" font-size="11" fill="#334155">Commission reserve</text>
-  <text x="980" y="234" font-size="11" fill="#334155">Protocol reserve</text>
-  <text x="980" y="252" font-size="11" fill="#334155">Reports position values</text>
+  <text x="1060" y="198" font-size="10" fill="#334155">Idle reserve (20%)</text>
+  <text x="1060" y="213" font-size="10" fill="#334155">Commission reserve</text>
+  <text x="1060" y="228" font-size="10" fill="#334155">Protocol reserve</text>
+  <text x="1060" y="243" font-size="10" fill="#334155">executeBatch (messenger)</text>
+  <text x="1060" y="258" font-size="10" fill="#334155">forceClose (messenger)</text>
 
-  <!-- Uniswap integration -->
-  <rect x="780" y="268" width="350" height="70" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
-  <text x="955" y="285" text-anchor="middle" font-size="10" font-weight="600" fill="#166534">Uniswap v3 Integration</text>
-  <text x="790" y="300" font-size="9" fill="#475569">NonfungiblePositionManager - open/close/modify LP</text>
-  <text x="790" y="313" font-size="9" fill="#475569">SwapRouter - zap-in (USDC->ETH) / zap-out (ETH->USDC)</text>
-  <text x="790" y="326" font-size="9" fill="#475569">collect() - realize accrued fees at epoch reporting</text>
+  <!-- Uniswap integration detail -->
+  <rect x="870" y="275" width="360" height="70" rx="8" fill="#f0fdf4" stroke="#bbf7d0" stroke-width="1"/>
+  <text x="1050" y="292" text-anchor="middle" font-size="10" font-weight="600" fill="#166534">Uniswap v3 Integration</text>
+  <text x="880" y="307" font-size="9" fill="#475569">NonfungiblePositionManager - open/close/modify LP</text>
+  <text x="880" y="320" font-size="9" fill="#475569">SwapRouter - zap-in (USDC->ETH) / zap-out (ETH->USDC)</text>
+  <text x="880" y="333" font-size="9" fill="#475569">collect() - realize fees | slot0() - position valuation</text>
 
   <!-- Uniswap Pool -->
-  <rect x="770" y="365" width="170" height="60" rx="10" fill="#ff007a" fill-opacity="0.08" stroke="#ff007a" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="855" y="390" text-anchor="middle" font-size="13" font-weight="600" fill="#ff007a">Uniswap Pool</text>
-  <text x="855" y="407" text-anchor="middle" font-size="10" fill="#64748b">e.g., ETH/USDC on Sepolia</text>
+  <rect x="860" y="370" width="170" height="55" rx="10" fill="#ff007a" fill-opacity="0.08" stroke="#ff007a" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="945" y="393" text-anchor="middle" font-size="12" font-weight="600" fill="#ff007a">Uniswap Pool</text>
+  <text x="945" y="410" text-anchor="middle" font-size="9" fill="#64748b">e.g., ETH/USDC on Sepolia</text>
 
   <!-- User interaction badge -->
-  <rect x="960" y="365" width="180" height="60" rx="10" fill="white" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" filter="url(#shadow)"/>
-  <text x="1050" y="387" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Users interact HERE</text>
-  <text x="1050" y="402" text-anchor="middle" font-size="9" fill="#64748b">deposit, withdraw, register,</text>
-  <text x="1050" y="414" text-anchor="middle" font-size="9" fill="#64748b">claim commissions, pause</text>
+  <rect x="1050" y="370" width="190" height="55" rx="10" fill="white" stroke="#22c55e" stroke-width="1.5" stroke-dasharray="4 2" filter="url(#shadow)"/>
+  <text x="1145" y="392" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Users interact HERE</text>
+  <text x="1145" y="407" text-anchor="middle" font-size="9" fill="#64748b">deposit, withdraw, register,</text>
+  <text x="1145" y="420" text-anchor="middle" font-size="9" fill="#64748b">claim, pause (all on Sepolia)</text>
 
   <!-- ==================== RELAYER ==================== -->
-  <rect x="490" y="140" width="220" height="130" rx="14" fill="white" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
-  <text x="600" y="168" text-anchor="middle" font-size="15" font-weight="700" fill="#ea580c">Relayer</text>
-  <text x="600" y="186" text-anchor="middle" font-size="10" fill="#64748b">Node.js script (~100 lines)</text>
-  <text x="510" y="210" font-size="10" fill="#475569">Hackathon: centralized</text>
-  <text x="510" y="226" font-size="10" fill="#475569">Production: permissionless</text>
-  <text x="510" y="242" font-size="10" fill="#475569">network (bonds + fraud proofs)</text>
-  <text x="510" y="258" font-size="10" fill="#475569">Relay fees from protocol rev.</text>
+  <rect x="580" y="130" width="220" height="145" rx="14" fill="white" stroke="#f97316" stroke-width="2" filter="url(#shadow)"/>
+  <text x="690" y="158" text-anchor="middle" font-size="15" font-weight="700" fill="#ea580c">Relayer</text>
+  <text x="690" y="176" text-anchor="middle" font-size="10" fill="#64748b">Node.js (hackathon)</text>
+  <text x="690" y="190" text-anchor="middle" font-size="10" fill="#64748b">Permissionless network (prod)</text>
+  <text x="600" y="212" font-size="9" fill="#475569">Routes to correct 0G contract:</text>
+  <text x="600" y="226" font-size="9" fill="#1e40af">Vault: deposits, withdrawals</text>
+  <text x="600" y="240" font-size="9" fill="#7c3aed">AgentMgr: intents, values, reg</text>
+  <text x="600" y="254" font-size="9" fill="#166534">Satellite: execute, release, fees</text>
+  <text x="600" y="268" font-size="9" fill="#475569">12 event routes total</text>
 
-  <!-- Relayer arrows -->
-  <!-- Vault to Relayer -->
-  <line x1="430" y1="180" x2="488" y2="180" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="455" y="174" text-anchor="middle" font-size="8" fill="#f97316">IntentQueued</text>
+  <!-- Relayer arrows to Vault -->
+  <line x1="580" y1="170" x2="282" y2="170" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="430" y="164" text-anchor="middle" font-size="8" fill="#f97316">recordDeposit, processWithdraw</text>
 
-  <!-- Relayer to Vault -->
-  <line x1="488" y1="220" x2="430" y2="220" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="455" y="214" text-anchor="middle" font-size="8" fill="#f97316">reportValues</text>
+  <!-- Relayer arrows to AgentManager -->
+  <line x1="580" y1="200" x2="537" y2="200" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="555" y="194" text-anchor="middle" font-size="8" fill="#f97316">intents, values</text>
 
-  <!-- Relayer to Satellite -->
-  <line x1="712" y1="180" x2="768" y2="180" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="742" y="174" text-anchor="middle" font-size="8" fill="#f97316">executeBatch</text>
+  <!-- Relayer arrows to Satellite -->
+  <line x1="800" y1="170" x2="858" y2="170" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="830" y="164" text-anchor="middle" font-size="8" fill="#f97316">executeBatch</text>
 
   <!-- Satellite to Relayer -->
-  <line x1="768" y1="220" x2="712" y2="220" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
-  <text x="742" y="214" text-anchor="middle" font-size="8" fill="#f97316">ValuesReported</text>
+  <line x1="858" y1="200" x2="800" y2="200" stroke="#f97316" stroke-width="1.5" marker-end="url(#arrow-orange)"/>
+  <text x="830" y="214" text-anchor="middle" font-size="8" fill="#f97316">ValuesReported</text>
 
   <!-- ==================== AGENTS ==================== -->
-  <rect x="120" y="560" width="340" height="160" rx="14" fill="white" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="290" y="585" text-anchor="middle" font-size="14" font-weight="700" fill="#7c3aed">OpenClaw Agents (fly.io)</text>
-  <text x="290" y="602" text-anchor="middle" font-size="10" fill="#64748b">Sandboxed AI strategies | TEE-ready for production</text>
+  <rect x="150" y="580" width="370" height="160" rx="14" fill="white" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="335" y="605" text-anchor="middle" font-size="14" font-weight="700" fill="#7c3aed">OpenClaw Agents (fly.io)</text>
+  <text x="335" y="622" text-anchor="middle" font-size="10" fill="#64748b">Sandboxed AI strategies | TEE-ready for production</text>
 
   <!-- Agent boxes -->
-  <rect x="140" y="618" width="88" height="85" rx="8" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
-  <text x="184" y="638" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">Agent A</text>
-  <text x="184" y="653" text-anchor="middle" font-size="9" fill="#64748b">iNFT #1</text>
-  <text x="184" y="668" text-anchor="middle" font-size="9" fill="#64748b">[bucket]</text>
-  <text x="184" y="683" text-anchor="middle" font-size="8" fill="#a78bfa">Aggressive</text>
-  <text x="184" y="695" text-anchor="middle" font-size="8" fill="#a78bfa">tight ranges</text>
+  <rect x="170" y="638" width="95" height="85" rx="8" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="217" y="658" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">Agent A</text>
+  <text x="217" y="673" text-anchor="middle" font-size="9" fill="#64748b">iNFT #1</text>
+  <text x="217" y="688" text-anchor="middle" font-size="9" fill="#64748b">[bucket]</text>
+  <text x="217" y="703" text-anchor="middle" font-size="8" fill="#a78bfa">Aggressive</text>
+  <text x="217" y="715" text-anchor="middle" font-size="8" fill="#a78bfa">tight ranges</text>
 
-  <rect x="246" y="618" width="88" height="85" rx="8" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
-  <text x="290" y="638" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">Agent B</text>
-  <text x="290" y="653" text-anchor="middle" font-size="9" fill="#64748b">iNFT #2</text>
-  <text x="290" y="668" text-anchor="middle" font-size="9" fill="#64748b">[bucket]</text>
-  <text x="290" y="683" text-anchor="middle" font-size="8" fill="#a78bfa">Conservative</text>
-  <text x="290" y="695" text-anchor="middle" font-size="8" fill="#a78bfa">wide ranges</text>
+  <rect x="280" y="638" width="95" height="85" rx="8" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="327" y="658" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">Agent B</text>
+  <text x="327" y="673" text-anchor="middle" font-size="9" fill="#64748b">iNFT #2</text>
+  <text x="327" y="688" text-anchor="middle" font-size="9" fill="#64748b">[bucket]</text>
+  <text x="327" y="703" text-anchor="middle" font-size="8" fill="#a78bfa">Conservative</text>
+  <text x="327" y="715" text-anchor="middle" font-size="8" fill="#a78bfa">wide ranges</text>
 
-  <rect x="352" y="618" width="88" height="85" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
-  <text x="396" y="638" text-anchor="middle" font-size="11" font-weight="600" fill="#dc2626">Agent C</text>
-  <text x="396" y="653" text-anchor="middle" font-size="9" fill="#64748b">iNFT #3</text>
-  <text x="396" y="668" text-anchor="middle" font-size="9" fill="#64748b">[bucket]</text>
-  <text x="396" y="683" text-anchor="middle" font-size="8" fill="#ef4444">Bad strategy</text>
-  <text x="396" y="695" text-anchor="middle" font-size="8" fill="#ef4444">gets evicted</text>
+  <rect x="390" y="638" width="95" height="85" rx="8" fill="#fef2f2" stroke="#fca5a5" stroke-width="1"/>
+  <text x="437" y="658" text-anchor="middle" font-size="11" font-weight="600" fill="#dc2626">Agent C</text>
+  <text x="437" y="673" text-anchor="middle" font-size="9" fill="#64748b">iNFT #3</text>
+  <text x="437" y="688" text-anchor="middle" font-size="9" fill="#64748b">[bucket]</text>
+  <text x="437" y="703" text-anchor="middle" font-size="8" fill="#ef4444">Bad strategy</text>
+  <text x="437" y="715" text-anchor="middle" font-size="8" fill="#ef4444">gets evicted</text>
 
-  <!-- Agent to Vault arrow -->
-  <line x1="290" y1="558" x2="245" y2="442" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
-  <text x="248" y="500" font-size="9" fill="#7c3aed" transform="rotate(-55, 248, 500)">submitIntent()</text>
+  <!-- Agent to AgentManager arrow -->
+  <line x1="400" y1="578" x2="417" y2="455" stroke="#8b5cf6" stroke-width="1.5" marker-end="url(#arrow-purple)"/>
+  <text x="425" y="520" font-size="9" fill="#7c3aed" transform="rotate(-78, 425, 520)">submitIntent()</text>
 
   <!-- ==================== SUBGRAPH MCP ==================== -->
-  <rect x="520" y="600" width="200" height="100" rx="12" fill="white" stroke="#0ea5e9" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="620" y="628" text-anchor="middle" font-size="14" font-weight="700" fill="#0369a1">Subgraph MCP</text>
-  <text x="620" y="645" text-anchor="middle" font-size="10" fill="#64748b">TheGraph + MCP interface</text>
-  <text x="620" y="665" text-anchor="middle" font-size="9" fill="#475569">Pool prices, volume, ticks</text>
-  <text x="620" y="679" text-anchor="middle" font-size="9" fill="#475569">Liquidity distribution, fees</text>
-  <text x="620" y="693" text-anchor="middle" font-size="9" fill="#475569">Agent's "eyes" into the market</text>
+  <rect x="580" y="620" width="210" height="100" rx="12" fill="white" stroke="#0ea5e9" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="685" y="648" text-anchor="middle" font-size="14" font-weight="700" fill="#0369a1">Subgraph MCP</text>
+  <text x="685" y="665" text-anchor="middle" font-size="10" fill="#64748b">TheGraph + MCP interface</text>
+  <text x="685" y="685" text-anchor="middle" font-size="9" fill="#475569">Pool prices, volume, ticks</text>
+  <text x="685" y="699" text-anchor="middle" font-size="9" fill="#475569">Liquidity distribution, fees</text>
+  <text x="685" y="713" text-anchor="middle" font-size="9" fill="#475569">Agent's "eyes" into the market</text>
 
   <!-- Agent to Subgraph arrow -->
-  <line x1="462" y1="660" x2="518" y2="650" stroke="#0ea5e9" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
-  <text x="490" y="645" text-anchor="middle" font-size="8" fill="#0ea5e9">query</text>
+  <line x1="522" y1="680" x2="578" y2="670" stroke="#0ea5e9" stroke-width="1.5" marker-end="url(#arrow-blue)"/>
+  <text x="550" y="665" text-anchor="middle" font-size="8" fill="#0ea5e9">query</text>
 
   <!-- Subgraph reads Sepolia -->
-  <line x1="720" y1="640" x2="955" y2="440" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-blue)"/>
-  <text x="860" y="530" font-size="8" fill="#0ea5e9" transform="rotate(-40, 860, 530)">reads Sepolia chain data</text>
+  <line x1="790" y1="660" x2="1050" y2="450" stroke="#0ea5e9" stroke-width="1" stroke-dasharray="4 3" marker-end="url(#arrow-blue)"/>
+  <text x="940" y="545" font-size="8" fill="#0ea5e9" transform="rotate(-40, 940, 545)">reads Sepolia chain data</text>
 
   <!-- ==================== DASHBOARD ==================== -->
-  <rect x="800" y="570" width="190" height="100" rx="12" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="895" y="598" text-anchor="middle" font-size="14" font-weight="700" fill="#334155">Dashboard</text>
-  <text x="895" y="615" text-anchor="middle" font-size="10" fill="#64748b">Web frontend</text>
-  <text x="895" y="635" text-anchor="middle" font-size="9" fill="#475569">Sharpe scores, allocations</text>
-  <text x="895" y="649" text-anchor="middle" font-size="9" fill="#475569">Agent positions, commissions</text>
-  <text x="895" y="663" text-anchor="middle" font-size="9" fill="#475569">iNFT marketplace view</text>
+  <rect x="870" y="580" width="200" height="100" rx="12" fill="white" stroke="#64748b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="970" y="608" text-anchor="middle" font-size="14" font-weight="700" fill="#334155">Dashboard</text>
+  <text x="970" y="625" text-anchor="middle" font-size="10" fill="#64748b">Web frontend</text>
+  <text x="970" y="645" text-anchor="middle" font-size="9" fill="#475569">Sharpe scores, allocations</text>
+  <text x="970" y="659" text-anchor="middle" font-size="9" fill="#475569">Agent positions, commissions</text>
+  <text x="970" y="673" text-anchor="middle" font-size="9" fill="#475569">iNFT marketplace view</text>
 
   <!-- ==================== FEE WATERFALL ==================== -->
-  <rect x="30" y="760" width="540" height="120" rx="14" fill="white" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="300" y="785" text-anchor="middle" font-size="14" font-weight="700" fill="#b45309">Fee Waterfall (per epoch, from collected Uniswap fees)</text>
+  <rect x="30" y="790" width="580" height="130" rx="14" fill="white" stroke="#f59e0b" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="320" y="815" text-anchor="middle" font-size="14" font-weight="700" fill="#b45309">Fee Waterfall (per epoch, from collected Uniswap fees)</text>
+  <text x="320" y="833" text-anchor="middle" font-size="10" fill="#64748b">Vault computes using feesCollected returned by AgentManager.settleAgents()</text>
 
-  <rect x="50" y="800" width="150" height="35" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
-  <text x="125" y="822" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Protocol Fee (5%)</text>
+  <rect x="50" y="848" width="155" height="35" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
+  <text x="127" y="870" text-anchor="middle" font-size="11" font-weight="600" fill="#92400e">Protocol Fee (5%)</text>
 
-  <text x="215" y="822" text-anchor="middle" font-size="16" fill="#64748b">-></text>
+  <text x="220" y="870" text-anchor="middle" font-size="16" fill="#64748b">-></text>
 
-  <rect x="230" y="800" width="150" height="35" rx="6" fill="#f3e8ff" stroke="#a855f7" stroke-width="1"/>
-  <text x="305" y="822" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">Agent Comm (10%)</text>
+  <rect x="235" y="848" width="155" height="35" rx="6" fill="#f3e8ff" stroke="#a855f7" stroke-width="1"/>
+  <text x="312" y="870" text-anchor="middle" font-size="11" font-weight="600" fill="#7c3aed">Agent Comm (10%)</text>
 
-  <text x="395" y="822" text-anchor="middle" font-size="16" fill="#64748b">-></text>
+  <text x="405" y="870" text-anchor="middle" font-size="16" fill="#64748b">-></text>
 
-  <rect x="410" y="800" width="150" height="35" rx="6" fill="#ecfdf5" stroke="#22c55e" stroke-width="1"/>
-  <text x="485" y="822" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Depositor Yield</text>
+  <rect x="420" y="848" width="155" height="35" rx="6" fill="#ecfdf5" stroke="#22c55e" stroke-width="1"/>
+  <text x="497" y="870" text-anchor="middle" font-size="11" font-weight="600" fill="#166534">Depositor Yield</text>
 
-  <text x="125" y="855" text-anchor="middle" font-size="9" fill="#64748b">Protocol treasury</text>
-  <text x="305" y="855" text-anchor="middle" font-size="9" fill="#64748b">iNFT owner</text>
-  <text x="485" y="855" text-anchor="middle" font-size="9" fill="#64748b">Share value increase</text>
+  <text x="127" y="903" text-anchor="middle" font-size="9" fill="#64748b">Protocol treasury</text>
+  <text x="312" y="903" text-anchor="middle" font-size="9" fill="#64748b">iNFT owner (via AgentMgr)</text>
+  <text x="497" y="903" text-anchor="middle" font-size="9" fill="#64748b">Share value increase</text>
 
   <!-- ==================== AGENT LIFECYCLE ==================== -->
-  <rect x="610" y="760" width="560" height="120" rx="14" fill="white" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="890" y="785" text-anchor="middle" font-size="14" font-weight="700" fill="#7c3aed">Agent Lifecycle</text>
+  <rect x="650" y="790" width="620" height="130" rx="14" fill="white" stroke="#8b5cf6" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="960" y="815" text-anchor="middle" font-size="14" font-weight="700" fill="#7c3aed">Agent Lifecycle (managed by AgentManager)</text>
 
-  <rect x="630" y="800" width="90" height="35" rx="6" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
-  <text x="675" y="822" text-anchor="middle" font-size="10" font-weight="600" fill="#7c3aed">Register</text>
+  <rect x="670" y="840" width="90" height="35" rx="6" fill="#f5f3ff" stroke="#c4b5fd" stroke-width="1"/>
+  <text x="715" y="862" text-anchor="middle" font-size="10" font-weight="600" fill="#7c3aed">Register</text>
 
-  <text x="730" y="822" text-anchor="middle" font-size="14" fill="#64748b">-></text>
+  <text x="770" y="862" text-anchor="middle" font-size="14" fill="#64748b">-></text>
 
-  <rect x="740" y="800" width="90" height="35" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
-  <text x="785" y="822" text-anchor="middle" font-size="10" font-weight="600" fill="#92400e">Prove</text>
+  <rect x="780" y="840" width="90" height="35" rx="6" fill="#fef3c7" stroke="#f59e0b" stroke-width="1"/>
+  <text x="825" y="862" text-anchor="middle" font-size="10" font-weight="600" fill="#92400e">Prove</text>
 
-  <text x="840" y="822" text-anchor="middle" font-size="14" fill="#64748b">-></text>
+  <text x="880" y="862" text-anchor="middle" font-size="14" fill="#64748b">-></text>
 
-  <rect x="850" y="800" width="90" height="35" rx="6" fill="#ecfdf5" stroke="#22c55e" stroke-width="1"/>
-  <text x="895" y="822" text-anchor="middle" font-size="10" font-weight="600" fill="#166534">Promote</text>
+  <rect x="890" y="840" width="90" height="35" rx="6" fill="#ecfdf5" stroke="#22c55e" stroke-width="1"/>
+  <text x="935" y="862" text-anchor="middle" font-size="10" font-weight="600" fill="#166534">Promote</text>
 
-  <text x="950" y="822" text-anchor="middle" font-size="14" fill="#64748b">-></text>
+  <text x="990" y="862" text-anchor="middle" font-size="14" fill="#64748b">-></text>
 
-  <rect x="960" y="800" width="90" height="35" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>
-  <text x="1005" y="822" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Earn</text>
+  <rect x="1000" y="840" width="90" height="35" rx="6" fill="#eff6ff" stroke="#3b82f6" stroke-width="1"/>
+  <text x="1045" y="862" text-anchor="middle" font-size="10" font-weight="600" fill="#1e40af">Earn</text>
 
-  <text x="1060" y="822" text-anchor="middle" font-size="14" fill="#64748b">-></text>
+  <text x="1100" y="862" text-anchor="middle" font-size="14" fill="#64748b">-></text>
 
-  <rect x="1070" y="800" width="90" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1"/>
-  <text x="1115" y="822" text-anchor="middle" font-size="10" font-weight="600" fill="#dc2626">Evict</text>
+  <rect x="1110" y="840" width="90" height="35" rx="6" fill="#fef2f2" stroke="#ef4444" stroke-width="1"/>
+  <text x="1155" y="862" text-anchor="middle" font-size="10" font-weight="600" fill="#dc2626">Evict</text>
 
-  <text x="675" y="855" text-anchor="middle" font-size="8" fill="#64748b">own capital</text>
-  <text x="785" y="855" text-anchor="middle" font-size="8" fill="#64748b">Sharpe track</text>
-  <text x="895" y="855" text-anchor="middle" font-size="8" fill="#64748b">token bucket</text>
-  <text x="1005" y="855" text-anchor="middle" font-size="8" fill="#64748b">commissions</text>
-  <text x="1115" y="855" text-anchor="middle" font-size="8" fill="#64748b">if bad Sharpe</text>
+  <text x="715" y="896" text-anchor="middle" font-size="8" fill="#64748b">own capital</text>
+  <text x="825" y="896" text-anchor="middle" font-size="8" fill="#64748b">Sharpe track</text>
+  <text x="935" y="896" text-anchor="middle" font-size="8" fill="#64748b">token bucket</text>
+  <text x="1045" y="896" text-anchor="middle" font-size="8" fill="#64748b">commissions</text>
+  <text x="1155" y="896" text-anchor="middle" font-size="8" fill="#64748b">if bad Sharpe</text>
 
   <!-- ==================== USERS ==================== -->
-  <!-- User icon area -->
-  <rect x="1010" y="475" width="140" height="70" rx="10" fill="white" stroke="#22c55e" stroke-width="1.5" filter="url(#shadow)"/>
-  <text x="1080" y="500" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Users</text>
-  <text x="1080" y="516" text-anchor="middle" font-size="9" fill="#64748b">Deposit / Withdraw</text>
-  <text x="1080" y="530" text-anchor="middle" font-size="9" fill="#64748b">Sepolia only</text>
+  <rect x="1100" y="490" width="140" height="65" rx="10" fill="white" stroke="#22c55e" stroke-width="1.5" filter="url(#shadow)"/>
+  <text x="1170" y="515" text-anchor="middle" font-size="13" font-weight="700" fill="#166534">Users</text>
+  <text x="1170" y="531" text-anchor="middle" font-size="9" fill="#64748b">Deposit / Withdraw</text>
+  <text x="1170" y="545" text-anchor="middle" font-size="9" fill="#64748b">Sepolia only</text>
 
   <!-- User to Satellite arrow -->
-  <line x1="1080" y1="473" x2="1050" y2="427" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow-green)"/>
+  <line x1="1170" y1="488" x2="1145" y2="427" stroke="#22c55e" stroke-width="1.5" marker-end="url(#arrow-green)"/>
 
   <!-- ==================== LEGEND ==================== -->
-  <rect x="490" y="290" width="220" height="130" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
-  <text x="600" y="312" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">Legend</text>
+  <rect x="580" y="300" width="220" height="145" rx="10" fill="white" stroke="#e2e8f0" stroke-width="1" filter="url(#shadow)"/>
+  <text x="690" y="322" text-anchor="middle" font-size="11" font-weight="600" fill="#334155">Legend</text>
 
-  <line x1="510" y1="330" x2="540" y2="330" stroke="#f97316" stroke-width="2"/>
-  <text x="550" y="334" font-size="10" fill="#475569">Relayer messages</text>
+  <line x1="600" y1="340" x2="630" y2="340" stroke="#f97316" stroke-width="2"/>
+  <text x="640" y="344" font-size="10" fill="#475569">Relayer messages</text>
 
-  <line x1="510" y1="350" x2="540" y2="350" stroke="#8b5cf6" stroke-width="2"/>
-  <text x="550" y="354" font-size="10" fill="#475569">Agent intents</text>
+  <line x1="600" y1="360" x2="630" y2="360" stroke="#8b5cf6" stroke-width="2"/>
+  <text x="640" y="364" font-size="10" fill="#475569">Agent intents (to AgentMgr)</text>
 
-  <line x1="510" y1="370" x2="540" y2="370" stroke="#22c55e" stroke-width="2"/>
-  <text x="550" y="374" font-size="10" fill="#475569">User interactions</text>
+  <line x1="600" y1="380" x2="630" y2="380" stroke="#22c55e" stroke-width="2"/>
+  <text x="640" y="384" font-size="10" fill="#475569">User interactions (Sepolia)</text>
 
-  <line x1="510" y1="390" x2="540" y2="390" stroke="#0ea5e9" stroke-width="2"/>
-  <text x="550" y="394" font-size="10" fill="#475569">Data reads (Subgraph)</text>
+  <line x1="600" y1="400" x2="630" y2="400" stroke="#0ea5e9" stroke-width="2"/>
+  <text x="640" y="404" font-size="10" fill="#475569">Data reads (Subgraph)</text>
 
-  <line x1="510" y1="410" x2="540" y2="410" stroke="#64748b" stroke-width="1" stroke-dasharray="4 3"/>
-  <text x="550" y="414" font-size="10" fill="#475569">Indirect / async</text>
+  <line x1="600" y1="420" x2="630" y2="420" stroke="#ef4444" stroke-width="2"/>
+  <text x="640" y="424" font-size="10" fill="#475569">Cross-contract (Vault<->AM)</text>
 </svg>

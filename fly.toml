@@ -1,0 +1,35 @@
+# fly.toml app configuration file for OpenClaw
+#
+# See https://fly.io/docs/reference/configuration/ for information about how to use this file.
+#
+
+app = 'hackathon-eth-global-2026-thrumming-cherry-7051'
+primary_region = 'cdg'
+
+[build]
+  image = 'ghcr.io/openclaw/openclaw:latest'
+
+[env]
+  NODE_ENV = "production"
+  OPENCLAW_STATE_DIR = "/data"
+  NODE_OPTIONS = "--max-old-space-size=1536"
+  DRY_RUN = "true"
+
+[processes]
+  app = "sh -c 'node openclaw.mjs config set gateway.controlUi.dangerouslyAllowHostHeaderOriginFallback true && OPENCLAW_STATE_DIR=/data EPOCH_INTERVAL_MS=120000 node /data/cron-trigger.js & exec node openclaw.mjs gateway --allow-unconfigured --port 3000 --bind lan'"
+
+[http_service]
+  internal_port = 3000
+  force_https = true
+  auto_stop_machines = false
+  auto_start_machines = true
+  min_machines_running = 1
+  processes = ["app"]
+
+[[vm]]
+  size = "shared-cpu-2x"
+  memory = "2048mb"
+
+[mounts]
+  source = 'openclaw_data'
+  destination = '/data'

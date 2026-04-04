@@ -1,0 +1,39 @@
+{
+  "gateway": {
+    "controlUi": { "dangerouslyAllowHostHeaderOriginFallback": true },
+    "auth": { "mode": "token" },
+    "http": { "endpoints": { "chatCompletions": { "enabled": true } } }
+  },
+  "models": {
+    "providers": {
+      "0g": {
+        "baseUrl": "https://compute-network-6.integratenetwork.work/v1/proxy",
+        "apiKey": { "source": "env", "provider": "default", "id": "OPENCLAW_API_KEY" },
+        "api": "openai-completions",
+        "models": [{ "id": "qwen/qwen-2.5-7b-instruct", "name": "Qwen 2.5 7B", "compat": { "supportsTools": false } }]
+      }
+    }
+  },
+  "agents": {
+    "defaults": {
+      "model": { "primary": "0g/qwen/qwen-2.5-7b-instruct" }
+    },
+    "list": [
+      {
+        "id": "agent-alpha",
+        "workspace": "/data/workspaces/agent-alpha",
+        "agentDir": "/data/agents/agent-alpha"
+      },
+      {
+        "id": "agent-beta",
+        "workspace": "/data/workspaces/agent-beta",
+        "agentDir": "/data/agents/agent-beta"
+      },
+      {
+        "id": "agent-gamma",
+        "workspace": "/data/workspaces/agent-gamma",
+        "agentDir": "/data/agents/agent-gamma"
+      }
+    ]
+  }
+}

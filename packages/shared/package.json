@@ -1,0 +1,15 @@
+{
+  "name": "@agent-arena/shared",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "main": "dist/types/index.js",
+  "types": "dist/types/index.d.ts",
+  "scripts": {
+    "build": "tsc"
+  },
+  "devDependencies": {
+    "@types/node": "^20.0.0",
+    "typescript": "^5.0.0"
+  }
+}
