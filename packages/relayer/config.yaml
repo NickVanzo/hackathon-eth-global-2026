@@ -20,6 +20,18 @@ networks:
     - event: Transfer(address indexed from, address indexed to, uint256 value)
     - event: WithdrawApproved(address indexed user, uint256 tokenAmount)
     - event: WithdrawReleased(address indexed user, uint256 tokenAmount)
+  # AgentManager — uncomment and set address once deployed on 0G
+  # After deployment: replace 0x000... with the real AgentManager address,
+  # then run `pnpm codegen` to regenerate types for the new events.
+  # - name: AgentManager
+  #   address:
+  #   - 0x0000000000000000000000000000000000000000
+  #   handler: src/EventHandlers.ts
+  #   events:
+  #   - event: IntentQueued(uint256 indexed agentId, uint8 actionType, bytes params, uint256 blockNumber)
+  #   - event: AgentPromoted(uint256 indexed agentId)
+  #   - event: AgentEvicted(uint256 indexed agentId, bool fullEviction)
+  #   - event: ForceCloseRequested(uint256 indexed agentId, uint8 source)
 - id: 11155111
   start_block: 10587000
   rpc: https://ethereum-sepolia.publicnode.com

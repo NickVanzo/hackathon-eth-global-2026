@@ -21,7 +21,9 @@
     "mocha": "10.2.0"
   },
   "dependencies": {
-    "envio": "2.32.12"
+    "dotenv": "^16.4.5",
+    "envio": "2.32.12",
+    "viem": "^2.21.0"
   },
   "optionalDependencies": {
     "generated": "./generated"
