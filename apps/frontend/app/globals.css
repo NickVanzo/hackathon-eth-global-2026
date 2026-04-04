@@ -1,31 +1,190 @@
 @import "tailwindcss";
 
-:root {
-  --cyber-cyan: #00E5FF;
-  --cyber-orange: #FF5722;
-  --cyber-purple: #7000FF;
-  --surface-0: #0D0D0D;
-  --surface-1: #111111;
-  --surface-2: #1c1b1b;
-  --text-primary: #E5E2E1;
-  --text-secondary: #787776;
+/* ── Stitch Design System: Color Tokens ─────────────────────────────────── */
 
-  /* Legacy aliases kept for Tailwind compatibility */
-  --background: #0D0D0D;
-  --foreground: #E5E2E1;
+:root {
+  /* Surface scale */
+  --color-surface-container-lowest: #0e0e0e;
+  --color-surface-container-low: #1c1b1b;
+  --color-surface-container: #201f1f;
+  --color-surface-container-high: #2a2a2a;
+  --color-surface-container-highest: #353534;
+  --color-surface: #131313;
+  --color-surface-dim: #131313;
+  --color-surface-bright: #3a3939;
+  --color-surface-variant: #353534;
+  --color-background: #131313;
+
+  /* Primary — cyan */
+  --color-primary: #c3f5ff;
+  --color-primary-fixed: #9cf0ff;
+  --color-primary-fixed-dim: #00daf3;
+  --color-primary-container: #00e5ff;
+  --color-on-primary: #00363d;
+  --color-on-primary-fixed: #001f24;
+  --color-on-primary-fixed-variant: #004f58;
+  --color-on-primary-container: #00626e;
+  --color-inverse-primary: #006875;
+  --color-surface-tint: #00daf3;
+
+  /* Secondary — orange/coral */
+  --color-secondary: #ffb5a0;
+  --color-secondary-fixed: #ffdbd1;
+  --color-secondary-fixed-dim: #ffb5a0;
+  --color-secondary-container: #d73b00;
+  --color-on-secondary: #5f1500;
+  --color-on-secondary-fixed: #3b0900;
+  --color-on-secondary-fixed-variant: #862200;
+  --color-on-secondary-container: #fffbff;
+
+  /* Tertiary — purple */
+  --color-tertiary: #f2e9ff;
+  --color-tertiary-fixed: #e9ddff;
+  --color-tertiary-fixed-dim: #d1bcff;
+  --color-tertiary-container: #d9c8ff;
+  --color-on-tertiary: #3c0090;
+  --color-on-tertiary-fixed: #23005b;
+  --color-on-tertiary-fixed-variant: #5700c9;
+  --color-on-tertiary-container: #6c00f7;
+
+  /* Surface text */
+  --color-on-background: #e5e2e1;
+  --color-on-surface: #e5e2e1;
+  --color-on-surface-variant: #bac9cc;
+  --color-inverse-surface: #e5e2e1;
+  --color-inverse-on-surface: #313030;
+
+  /* Error */
+  --color-error: #ffb4ab;
+  --color-error-container: #93000a;
+  --color-on-error: #690005;
+  --color-on-error-container: #ffdad6;
+
+  /* Outline */
+  --color-outline: #849396;
+  --color-outline-variant: #3b494c;
+
+  /* Legacy aliases (used in older component classes) */
+  --background: #131313;
+  --foreground: #e5e2e1;
 }
+
+/* ── Tailwind v4 theme mapping ──────────────────────────────────────────── */
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Map Stitch tokens into Tailwind color utilities */
+  --color-surface-container-lowest: var(--color-surface-container-lowest);
+  --color-surface-container-low: var(--color-surface-container-low);
+  --color-surface-container: var(--color-surface-container);
+  --color-surface-container-high: var(--color-surface-container-high);
+  --color-surface-container-highest: var(--color-surface-container-highest);
+  --color-surface: var(--color-surface);
+  --color-surface-dim: var(--color-surface-dim);
+  --color-surface-bright: var(--color-surface-bright);
+  --color-surface-variant: var(--color-surface-variant);
+  --color-background: var(--color-background);
+
+  --color-primary: var(--color-primary);
+  --color-primary-fixed: var(--color-primary-fixed);
+  --color-primary-fixed-dim: var(--color-primary-fixed-dim);
+  --color-primary-container: var(--color-primary-container);
+  --color-on-primary: var(--color-on-primary);
+  --color-on-primary-fixed: var(--color-on-primary-fixed);
+  --color-on-primary-container: var(--color-on-primary-container);
+  --color-inverse-primary: var(--color-inverse-primary);
+  --color-surface-tint: var(--color-surface-tint);
+
+  --color-secondary: var(--color-secondary);
+  --color-secondary-fixed: var(--color-secondary-fixed);
+  --color-secondary-fixed-dim: var(--color-secondary-fixed-dim);
+  --color-secondary-container: var(--color-secondary-container);
+  --color-on-secondary: var(--color-on-secondary);
+  --color-on-secondary-container: var(--color-on-secondary-container);
+
+  --color-tertiary: var(--color-tertiary);
+  --color-tertiary-fixed: var(--color-tertiary-fixed);
+  --color-tertiary-fixed-dim: var(--color-tertiary-fixed-dim);
+  --color-tertiary-container: var(--color-tertiary-container);
+  --color-on-tertiary: var(--color-on-tertiary);
+  --color-on-tertiary-container: var(--color-on-tertiary-container);
+
+  --color-on-background: var(--color-on-background);
+  --color-on-surface: var(--color-on-surface);
+  --color-on-surface-variant: var(--color-on-surface-variant);
+  --color-inverse-surface: var(--color-inverse-surface);
+  --color-inverse-on-surface: var(--color-inverse-on-surface);
+
+  --color-error: var(--color-error);
+  --color-error-container: var(--color-error-container);
+  --color-on-error: var(--color-on-error);
+  --color-on-error-container: var(--color-on-error-container);
+
+  --color-outline: var(--color-outline);
+  --color-outline-variant: var(--color-outline-variant);
+
+  /* Fonts */
+  --font-headline: "Space Grotesk", sans-serif;
+  --font-body: "Manrope", sans-serif;
+  --font-label: "Space Grotesk", sans-serif;
+
+  /* Border radius */
+  --radius-DEFAULT: 0.125rem;
+  --radius-lg: 0.25rem;
+  --radius-xl: 0.5rem;
+  --radius-full: 0.75rem;
 }
 
+/* ── Base styles ────────────────────────────────────────────────────────── */
+
 body {
-  background: var(--surface-0);
-  color: var(--text-primary);
-  font-family: var(--font-sans), system-ui, sans-serif;
+  background: var(--color-surface-container-lowest);
+  color: var(--color-on-surface);
+  font-family: var(--font-body);
+}
+
+::selection {
+  background-color: var(--color-primary-container);
+  color: var(--color-on-primary);
+}
+
+/* ── Material Symbols icon font settings ────────────────────────────────── */
+
+.material-symbols-outlined {
+  font-variation-settings: "FILL" 0, "wght" 300, "GRAD" 0, "opsz" 24;
+  vertical-align: middle;
+}
+
+/* ── Shared layout utilities ────────────────────────────────────────────── */
+
+/* Dot-grid background — used on main canvas areas */
+.bg-grid {
+  background-image: linear-gradient(
+      to right,
+      rgba(59, 73, 76, 0.05) 1px,
+      transparent 1px
+    ),
+    linear-gradient(
+      to bottom,
+      rgba(59, 73, 76, 0.05) 1px,
+      transparent 1px
+    );
+  background-size: 24px 24px;
+}
+
+/* Dot-grid radial variant */
+.custom-grid {
+  background-image: radial-gradient(
+    circle at 2px 2px,
+    rgba(59, 73, 76, 0.05) 1px,
+    transparent 0
+  );
+  background-size: 24px 24px;
+}
+
+/* Frosted-glass panel */
+.glass-panel {
+  backdrop-filter: blur(20px);
+  background: rgba(19, 19, 19, 0.7);
 }
 
 /* ── Glow utilities ─────────────────────────────────────────────────────── */
@@ -41,4 +200,9 @@ body {
 .border-glow-cyan {
   border-color: rgba(0, 229, 255, 0.4);
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.12);
+}
+
+/* Header glow shadow */
+.shadow-header {
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.08);
 }
