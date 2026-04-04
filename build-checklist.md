@@ -41,7 +41,7 @@
 ### Dev A — Agent base loop + intent format
 Build the agent foundation that all 3 strategies will extend. **Mock**: agents log intents to console instead of submitting on-chain (vault doesn't exist yet).
 
-- [ ] Set up OpenClaw agent project structure
+- [x] Set up OpenClaw agent project structure
 - [ ] Configure MCP connection interface (will connect to real MCP server later)
 - [ ] Implement base agent loop: read market data -> decide -> produce Intent struct -> log/queue intent
 - [ ] Define intent action types: OPEN_POSITION, CLOSE_POSITION, MODIFY_POSITION
