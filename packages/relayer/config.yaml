@@ -7,7 +7,7 @@ networks:
   contracts:
   - name: Vault
     address:
-    - 0x8c7799b6E70b8Ef5Ba89eAA04cC4a82B944F839f
+    - 0x5192fD3147D8e1a2392c8cBe7E33B8ec46e07628
     handler: src/EventHandlers.ts
     events:
     - event: Approval(address indexed owner, address indexed spender, uint256 value)

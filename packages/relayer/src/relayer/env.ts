@@ -10,7 +10,7 @@ export const SATELLITE_ADDRESS =
 
 export const VAULT_ADDRESS =
   (process.env.VAULT_ADDRESS as `0x${string}`) ||
-  "0x8c7799b6E70b8Ef5Ba89eAA04cC4a82B944F839f";
+  "0x5192fD3147D8e1a2392c8cBe7E33B8ec46e07628";
 
 // AgentManager is pending full deployment; placeholder = deployer address
 export const AGENT_MANAGER_ADDRESS =
