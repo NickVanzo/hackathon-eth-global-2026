@@ -98,33 +98,36 @@ export const MOCK_POSITIONS = [
   },
 ];
 
+// Use a fixed base timestamp to avoid SSR/client hydration mismatch from Date.now()
+const MOCK_BASE_TS = 1743782400000; // 2025-04-04T16:00:00Z
+
 export const MOCK_INTENTS = [
   {
     agentId: 1,
     actionType: "OPEN_POSITION",
     status: "executed",
-    timestamp: Date.now() - 300000,
+    timestamp: MOCK_BASE_TS - 300000,
     txHash: "0xabc...123",
   },
   {
     agentId: 1,
     actionType: "MODIFY_POSITION",
     status: "pending",
-    timestamp: Date.now() - 60000,
+    timestamp: MOCK_BASE_TS - 60000,
     txHash: null,
   },
   {
     agentId: 2,
     actionType: "CLOSE_POSITION",
     status: "executed",
-    timestamp: Date.now() - 600000,
+    timestamp: MOCK_BASE_TS - 600000,
     txHash: "0xdef...456",
   },
   {
     agentId: 3,
     actionType: "OPEN_POSITION",
     status: "failed",
-    timestamp: Date.now() - 120000,
+    timestamp: MOCK_BASE_TS - 120000,
     txHash: null,
   },
 ];

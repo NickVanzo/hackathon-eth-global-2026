@@ -276,11 +276,11 @@ Use the SAME deployed contracts from development for integration testing — don
 - [ ] Fix AgentManager/agent bugs as found
 
 **PM — dashboard polish + verification (hours 0-4)**
-- [ ] Color coding for good/bad agents (green/red Sharpe indicators)
-- [ ] Responsive layout for presentation screen
-- [ ] Error states and loading indicators
-- [ ] Verify deposit/withdraw forms work end-to-end through real satellite
-- [ ] Verify agent performance view reads real AgentManager state correctly
+- [x] Color coding for good/bad agents (green/red Sharpe indicators)
+- [x] Responsive layout for presentation screen
+- [x] Error states and loading indicators
+- [x] Verify deposit/withdraw forms work end-to-end through real satellite
+- [x] Verify agent performance view reads real AgentManager state correctly
 
 ### Phase 2: Demo state preparation (hours 4-6, Dev A leads + Dev B assists)
 
