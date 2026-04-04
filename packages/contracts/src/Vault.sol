@@ -259,6 +259,32 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         }
     }
 
+    /// @notice Called by relayer after satellite emits ClaimWithdrawRequested.
+    ///         Marks the Tier-2 queued withdrawal as processed and emits WithdrawReleased
+    ///         so the off-chain system has a confirmation event for audit.
+    ///         The internal _pendingWithdrawals entry was already cleared by
+    ///         _processPendingWithdrawals() at epoch settlement time.
+    function claimWithdraw(address user, uint256 tokenAmount)
+        external
+        onlyMessenger
+    {
+        require(user        != address(0), "Vault: zero user");
+        require(tokenAmount >  0,          "Vault: zero amount");
+        emit WithdrawReleased(user, tokenAmount);
+    }
+
+    /// @notice Called by relayer after a force-close settles on Sepolia.
+    ///         Does NOT update totalAssets — the next epoch's settleAgents() reconciliation
+    ///         handles that via reported position values.
+    ///         Records the recovery event for audit.
+    function recordRecovery(uint256 agentId, uint256 recoveredAmount)
+        external
+        onlyMessenger
+    {
+        require(recoveredAmount > 0, "Vault: zero amount");
+        emit RecoveryRecorded(agentId, recoveredAmount);
+    }
+
     /// @notice Called by AgentManager after verifying iNFT ownership on-chain.
     ///         Decrements commissionsOwed and emits CommissionApproved so the
     ///         relayer can call satellite.releaseCommission(caller, amount).
@@ -278,9 +304,11 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     // 3.4 — EPOCH SETTLEMENT
     // =========================================================================
 
-    /// @notice Called by AgentManager's epochCheck modifier when it fires before
-    ///         any on-chain agent action.  Triggers settlement if due.
-    function triggerSettleEpoch() external onlyAgentManager {
+    /// @notice Trigger epoch settlement when due.
+    ///         Called by the relayer once per epoch in its main loop, or by anyone.
+    ///         Also fires lazily via epochCheck on recordDeposit / processWithdraw.
+    ///         No-op if the epoch boundary has not elapsed or settlement is in progress.
+    function triggerSettleEpoch() external {
         if (!_settling && block.number >= lastEpochBlock + epochLength) {
             _settleEpoch();
         }

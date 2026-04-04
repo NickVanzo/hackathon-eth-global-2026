@@ -9,11 +9,20 @@ contract SatelliteHarness is Satellite {
         address _pool,
         address _depositToken,
         address _positionManager,
-        address _swapRouter,
+        address _universalRouter,
         address _messenger,
-        address _protocolTreasury
+        address _protocolTreasury,
+        uint256 _idleReserveRatio
     )
-        Satellite(_pool, _depositToken, _positionManager, _swapRouter, _messenger, _protocolTreasury)
+        Satellite(
+            _pool,
+            _depositToken,
+            _positionManager,
+            _universalRouter,
+            _messenger,
+            _protocolTreasury,
+            _idleReserveRatio
+        )
     {}
 
     // -------------------------------------------------------------------------
