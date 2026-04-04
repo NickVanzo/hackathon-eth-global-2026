@@ -12,7 +12,8 @@ import {IShared} from "./IShared.sol";
 ///   users               — deposit, registerAgent, requestWithdraw, claimWithdraw,
 ///                         claimCommissions, pauseAgent, unpauseAgent, withdrawFromArena
 ///   messenger (relayer) — executeBatch, release, releaseQueuedWithdraw, updateSharePrice,
-///                         reserveFees, releaseCommission, forceClose
+///                         reserveProtocolFees, reserveCommission, approveQueuedWithdraw,
+///                         releaseCommission, forceClose
 interface ISatellite {
     // -------------------------------------------------------------------------
     // Events — emitted on Sepolia, watched by relayer → relayed to 0G
@@ -115,10 +116,18 @@ interface ISatellite {
     ///         Used by requestWithdraw() to convert token amounts to shares.
     function updateSharePrice(uint256 sharePrice) external;
 
-    /// @notice Set aside fees into separate reserve pools so they don't mix with
-    ///         the idle reserve or agent allocations.
-    ///         Triggered by vault's ProtocolFeeAccrued + CommissionAccrued events.
-    function reserveFees(uint256 protocolFeeAmount, uint256 agentId, uint256 commissionAmount) external;
+    /// @notice Reserve protocol fees from epoch settlement into the protocol reserve pool.
+    ///         Triggered by vault's ProtocolFeeAccrued event (once per epoch).
+    function reserveProtocolFees(uint256 amount) external;
+
+    /// @notice Reserve commission for an agent's iNFT owner into the commission reserve pool.
+    ///         Triggered by vault's CommissionAccrued event (once per agent per epoch).
+    function reserveCommission(uint256 agentId, uint256 amount) external;
+
+    /// @notice Record a Tier-2 withdrawal approval from vault epoch settlement.
+    ///         Called by relayer after vault's WithdrawApproved event for queued entries.
+    ///         Sets the pending amount so the user can call claimWithdraw().
+    function approveQueuedWithdraw(address user, uint256 tokenAmount) external;
 
     /// @notice Pay commission to iNFT owner from commissionReserve.
     ///         Triggered by vault's CommissionApproved event.

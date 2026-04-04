@@ -54,6 +54,12 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     ///         in basis points (e.g. 8000 = 80 %).
     uint256 public immutable maxExposureRatio;
 
+    /// @notice Deposit token address (stored for dashboard reads; Vault never calls it).
+    address public immutable depositToken;
+
+    /// @notice Pool address (stored for dashboard reads; Vault never calls it).
+    address public immutable pool;
+
     // -------------------------------------------------------------------------
     // State: accounting
     // -------------------------------------------------------------------------
@@ -136,6 +142,8 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     /// @param _protocolFeeRate    Protocol cut of collected fees (bps, e.g. 500 = 5 %).
     /// @param _protocolTreasury   Address that receives protocol fee signals on Sepolia.
     /// @param _commissionRate     Agent iNFT owner cut of remaining fees (bps, e.g. 1000 = 10 %).
+    /// @param _depositToken       USDC.e address (stored for dashboard reads; Vault never calls it).
+    /// @param _pool               Uniswap pool address (stored for dashboard reads only).
     /// @param _messenger          Trusted relayer address.
     constructor(
         address _agentManager,
@@ -144,11 +152,15 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 _protocolFeeRate,
         address _protocolTreasury,
         uint256 _commissionRate,
+        address _depositToken,
+        address _pool,
         address _messenger
     ) ERC20("Agent Arena Shares", "AAS") {
         require(_agentManager     != address(0), "Vault: zero agentManager");
         require(_protocolTreasury != address(0), "Vault: zero treasury");
         require(_messenger        != address(0), "Vault: zero messenger");
+        require(_depositToken     != address(0), "Vault: zero depositToken");
+        require(_pool             != address(0), "Vault: zero pool");
         require(_epochLength      >  0,          "Vault: zero epochLength");
         require(_protocolFeeRate  <= 10_000,     "Vault: protocolFeeRate > 100%");
         require(_commissionRate   <= 10_000,     "Vault: commissionRate > 100%");
@@ -160,6 +172,8 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         protocolFeeRate  = _protocolFeeRate;
         protocolTreasury = _protocolTreasury;
         commissionRate   = _commissionRate;
+        depositToken     = _depositToken;
+        pool             = _pool;
         messenger        = _messenger;
 
         lastEpochBlock = block.number;
@@ -286,17 +300,18 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     }
 
     /// @notice Called by AgentManager after verifying iNFT ownership on-chain.
-    ///         Decrements commissionsOwed and emits CommissionApproved so the
-    ///         relayer can call satellite.releaseCommission(caller, amount).
-    function approveCommissionRelease(uint256 agentId, address caller, uint256 amount)
+    ///         Reads commissionsOwed[agentId] from its own state, zeroes it,
+    ///         and emits CommissionApproved so the relayer can call
+    ///         satellite.releaseCommission(caller, amount).
+    function approveCommissionRelease(uint256 agentId, address caller)
         external
         onlyAgentManager
     {
-        require(amount > 0,                         "Vault: zero amount");
-        require(caller != address(0),               "Vault: zero caller");
-        require(commissionsOwed[agentId] >= amount, "Vault: exceeds owed");
+        require(caller != address(0), "Vault: zero caller");
+        uint256 amount = commissionsOwed[agentId];
+        require(amount > 0, "Vault: no commission owed");
 
-        commissionsOwed[agentId] -= amount;
+        commissionsOwed[agentId] = 0;
         emit CommissionApproved(agentId, caller, amount);
     }
 
@@ -347,8 +362,8 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     ///
     ///   Order of operations:
     ///     1. settleAgents()         — EMA, Sharpe, promotion, eviction
-    ///     2. fee waterfall          — protocolFee → commission → depositorReturn
-    ///     3. Tier-2 queue           — process pending withdrawals if idle allows
+    ///     2. totalAssets reconciliation + fee waterfall
+    ///     3. Tier-2 queue           — process pending withdrawals, force-close if needed
     ///     4. EpochSettled event     — relayer syncs satellite share price
     ///     5. advance epoch counter
     function _settleEpoch() internal {
@@ -356,11 +371,12 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
 
         // ── Step 1: settle agents ─────────────────────────────────────────────
         // AgentManager updates EMAs, Sharpe scores, promotion ramp, evictions,
-        // and returns per-agent settlement data for the fee waterfall.
-        IShared.AgentSettlementData[] memory data =
-            IAgentManager(agentManager).settleAgents();
+        // and returns per-agent settlement data (Sharpe-sorted, lowest first)
+        // plus aggregate vault-agent position value for totalAssets reconciliation.
+        (IShared.AgentSettlementData[] memory data, uint256 aggregateVaultPositionValue) =
+            IAgentManager(agentManager).settleAgents(_trackedTotalAssets, maxExposureRatio);
 
-        // ── Step 2: fee waterfall ─────────────────────────────────────────────
+        // ── Step 2: fee waterfall + totalAssets reconciliation ─────────────────
         // For each agent with collected fees:
         //   protocolFee     = feesCollected × protocolFeeRate / 10000
         //   agentCommission = (feesCollected − protocolFee) × commissionRate / 10000
@@ -370,6 +386,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         // relayer processes ProtocolFeeAccrued / CommissionAccrued events.
         // depositorReturn stays in _trackedTotalAssets — it increases share value.
         uint256 totalProtocolFee;
+        uint256 totalDepositorReturn;
 
         for (uint256 i = 0; i < data.length; i++) {
             IShared.AgentSettlementData memory d = data[i];
@@ -390,12 +407,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
                 emit CommissionAccrued(d.agentId, commission);
             }
 
-            // Depositor share stays in vault equity: both total and idle increase
-            // (the fees were collected back to idle on the Satellite).
-            if (depositorReturn > 0) {
-                _trackedTotalAssets += depositorReturn;
-                _trackedIdleBalance += depositorReturn;
-            }
+            totalDepositorReturn += depositorReturn;
         }
 
         // Single ProtocolFeeAccrued per epoch — relayer batches the satellite call.
@@ -403,8 +415,19 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
             emit ProtocolFeeAccrued(totalProtocolFee);
         }
 
+        // Reconcile totalAssets: position values from settleAgents + idle + depositor fees.
+        // idle = _trackedTotalAssets - deployed (approximated by what's NOT in positions).
+        // Reconciliation formula: totalAssets = aggregateVaultPositionValue + idle + depositorReturn
+        uint256 idle = _trackedTotalAssets > aggregateVaultPositionValue
+            ? _trackedTotalAssets - aggregateVaultPositionValue
+            : 0;
+        _trackedTotalAssets = aggregateVaultPositionValue + idle + totalDepositorReturn;
+        _trackedIdleBalance = idle + totalDepositorReturn;
+
         // ── Step 3: process Tier-2 withdrawal queue ───────────────────────────
-        _processPendingWithdrawals();
+        // If idle is insufficient, emit ForceCloseRequested for lowest-Sharpe
+        // vault agents (data is already sorted lowest-first by AgentManager).
+        _processPendingWithdrawals(data);
 
         // ── Step 4: emit EpochSettled ─────────────────────────────────────────
         // Relayer calls satellite.updateSharePrice(sharePrice) on Sepolia so
@@ -421,15 +444,18 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     /// @dev FIFO processing of queued Tier-2 withdrawals.
     ///      Iterates _pendingUsers, fulfils any entry that fits within current
     ///      idle balance, and compacts the queue for the next epoch.
+    ///      If idle is insufficient after processing, emits ForceCloseRequested
+    ///      for lowest-Sharpe vault agents (data is Sharpe-sorted, lowest first).
     ///
-    ///      Gas bound: O(n) over _pendingUsers length.  Safe for demo scale
-    ///      (maxAgents ≤ 20, realistic depositor count ≤ hundreds).
-    function _processPendingWithdrawals() internal {
+    ///      Gas bound: O(n) over _pendingUsers length + O(m) over agents for
+    ///      force-close targeting. Safe for demo scale.
+    function _processPendingWithdrawals(IShared.AgentSettlementData[] memory data) internal {
         uint256 len = _pendingUsers.length;
         if (len == 0) return;
 
         address[] memory remaining = new address[](len);
         uint256 remainingCount;
+        uint256 unfulfilledTotal;
 
         for (uint256 i = 0; i < len; i++) {
             address user   = _pendingUsers[i];
@@ -451,6 +477,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
             } else {
                 // Insufficient idle — carry over to next epoch
                 remaining[remainingCount++] = user;
+                unfulfilledTotal += amount;
             }
         }
 
@@ -458,6 +485,20 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         delete _pendingUsers;
         for (uint256 i = 0; i < remainingCount; i++) {
             _pendingUsers.push(remaining[i]);
+        }
+
+        // If withdrawals remain unfulfilled, emit ForceCloseRequested for
+        // lowest-Sharpe vault agents until projected recovery covers the shortfall.
+        // data is Sharpe-sorted lowest-first by AgentManager.
+        if (unfulfilledTotal > 0) {
+            uint256 projectedRecovery;
+            for (uint256 i = 0; i < data.length && projectedRecovery < unfulfilledTotal; i++) {
+                IShared.AgentSettlementData memory d = data[i];
+                // Only target vault agents with open positions
+                if (d.positionValue == 0) continue;
+                emit ForceCloseRequested(d.agentId, IShared.ForceCloseSource.VAULT);
+                projectedRecovery += d.positionValue;
+            }
         }
     }
 }

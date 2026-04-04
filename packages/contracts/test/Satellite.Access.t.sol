@@ -37,10 +37,22 @@ contract SatelliteAccessTest is SatelliteTestBase {
         satellite.updateSharePrice(2e18);
     }
 
-    function test_reserveFees_onlyMessenger() public {
+    function test_reserveProtocolFees_onlyMessenger() public {
         vm.prank(alice);
         vm.expectRevert("Satellite: not messenger");
-        satellite.reserveFees(100e6, 0, 0);
+        satellite.reserveProtocolFees(100e6);
+    }
+
+    function test_reserveCommission_onlyMessenger() public {
+        vm.prank(alice);
+        vm.expectRevert("Satellite: not messenger");
+        satellite.reserveCommission(1, 100e6);
+    }
+
+    function test_approveQueuedWithdraw_onlyMessenger() public {
+        vm.prank(alice);
+        vm.expectRevert("Satellite: not messenger");
+        satellite.approveQueuedWithdraw(alice, 100e6);
     }
 
     function test_releaseCommission_onlyMessenger() public {
@@ -85,14 +97,24 @@ contract SatelliteAccessTest is SatelliteTestBase {
         satellite.updateSharePrice(1.5e18); // should not revert
     }
 
-    function test_reserveFees_messengerCanCall() public {
+    function test_reserveProtocolFees_messengerCanCall() public {
         vm.prank(messenger);
-        satellite.reserveFees(0, 0, 0); // should not revert (no-op)
+        satellite.reserveProtocolFees(100e6); // should not revert
+    }
+
+    function test_reserveCommission_messengerCanCall() public {
+        vm.prank(messenger);
+        satellite.reserveCommission(1, 100e6); // should not revert
+    }
+
+    function test_approveQueuedWithdraw_messengerCanCall() public {
+        vm.prank(messenger);
+        satellite.approveQueuedWithdraw(alice, 100e6); // should not revert
     }
 
     function test_releaseCommission_messengerCanCall_withReserves() public {
         _fundSatellite(500e6);
-        _reserveFees(0, 0, 500e6);
+        _reserveCommission(0, 500e6);
 
         vm.prank(messenger);
         satellite.releaseCommission(alice, 500e6); // should not revert

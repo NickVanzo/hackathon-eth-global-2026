@@ -17,7 +17,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero agentManager");
         new VaultHarness(
             address(0), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -25,7 +25,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero treasury");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, address(0), COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, address(0), COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -33,7 +33,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero messenger");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, address(0)
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, address(0)
         );
     }
 
@@ -41,7 +41,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: zero epochLength");
         new VaultHarness(
             address(agentMgr), 0, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -53,7 +53,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: protocolFeeRate > 100%");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            10_001, treasury, COMMISSION_RATE, messenger
+            10_001, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -61,7 +61,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: commissionRate > 100%");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, 10_001, messenger
+            PROTOCOL_FEE_RATE, treasury, 10_001, depositToken, pool_, messenger
         );
     }
 
@@ -69,7 +69,7 @@ contract VaultAccessTest is VaultTestBase {
         vm.expectRevert("Vault: maxExposureRatio > 100%");
         new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, 10_001,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
     }
 
@@ -80,7 +80,7 @@ contract VaultAccessTest is VaultTestBase {
     function test_constructor_acceptsMaxRates() public {
         VaultHarness v = new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, 10_000,
-            10_000, treasury, 10_000, messenger
+            10_000, treasury, 10_000, depositToken, pool_, messenger
         );
         assertEq(v.maxExposureRatio(), 10_000);
         assertEq(v.protocolFeeRate(),  10_000);
@@ -105,7 +105,7 @@ contract VaultAccessTest is VaultTestBase {
         uint256 deployBlock = block.number;
         VaultHarness v = new VaultHarness(
             address(agentMgr), EPOCH_LENGTH, MAX_EXPOSURE_RATIO,
-            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, messenger
+            PROTOCOL_FEE_RATE, treasury, COMMISSION_RATE, depositToken, pool_, messenger
         );
         assertEq(v.lastEpochBlock(), deployBlock);
     }
@@ -237,7 +237,7 @@ contract VaultAccessTest is VaultTestBase {
 
         vm.prank(alice);
         vm.expectRevert("Vault: not agentManager");
-        vault.approveCommissionRelease(1, alice, 500);
+        vault.approveCommissionRelease(1, alice);
     }
 
     // =========================================================================

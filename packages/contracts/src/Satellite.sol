@@ -101,7 +101,8 @@ interface INonfungiblePositionManager {
 ///   updateSharePrice, idle reserve tracking, onlyMessenger
 ///
 /// Section 2.2 — Uniswap execution: executeBatch (TODO)
-/// Section 2.3 — Fee reserves: reserveFees, claimProtocolFees, releaseCommission
+/// Section 2.3 — Fee reserves: reserveProtocolFees, reserveCommission, approveQueuedWithdraw,
+///   claimProtocolFees, releaseCommission
 /// Section 2.4 — Agent management: pauseAgent, unpauseAgent, withdrawFromArena
 /// Section 2.5 — Force-close: forceClose (TODO)
 contract Satellite is ISatellite, ReentrancyGuard {
@@ -152,7 +153,7 @@ contract Satellite is ISatellite, ReentrancyGuard {
     ///         Used to convert tokenAmount → shares in requestWithdraw().
     uint256 public cachedSharePrice;
 
-    /// @notice Protocol fees reserved (from reserveFees calls). NOT part of idle balance.
+    /// @notice Protocol fees reserved (from reserveProtocolFees calls). NOT part of idle balance.
     uint256 public protocolReserve;
 
     /// @notice Commission reserves per agent. NOT part of idle balance.
@@ -167,6 +168,15 @@ contract Satellite is ISatellite, ReentrancyGuard {
 
     /// @notice Running total of all proving capital across all agents.
     uint256 internal _totalProvingCapital;
+
+    // -------------------------------------------------------------------------
+    // State: position tracking
+    // -------------------------------------------------------------------------
+
+    /// @notice Source tag per Uniswap position NFT (PROVING or VAULT).
+    ///         Set at mint time in executeBatch using the intent's source field.
+    ///         Used by forceClose to selectively close only the intended class.
+    mapping(uint256 tokenId => IShared.ForceCloseSource source) public positionSource;
 
     // -------------------------------------------------------------------------
     // State: agent registry
@@ -363,16 +373,28 @@ contract Satellite is ISatellite, ReentrancyGuard {
     // 2.3 — Fee reserves
     // =========================================================================
 
-    /// @notice Reserve fees from epoch settlement into separate pools.
-    ///         Called by relayer after ProtocolFeeAccrued + CommissionAccrued events.
-    function reserveFees(uint256 protocolFeeAmount, uint256 agentId, uint256 commissionAmount) external onlyMessenger {
-        if (protocolFeeAmount > 0) {
-            protocolReserve += protocolFeeAmount;
-        }
-        if (commissionAmount > 0) {
-            commissionReserve[agentId] += commissionAmount;
-            _totalCommissionReserves += commissionAmount;
-        }
+    /// @notice Reserve protocol fees from epoch settlement into the protocol reserve pool.
+    ///         Called by relayer after vault's ProtocolFeeAccrued event (once per epoch).
+    function reserveProtocolFees(uint256 amount) external onlyMessenger {
+        require(amount > 0, "Satellite: zero amount");
+        protocolReserve += amount;
+    }
+
+    /// @notice Reserve commission for an agent's iNFT owner into the commission reserve pool.
+    ///         Called by relayer after vault's CommissionAccrued event (once per agent per epoch).
+    function reserveCommission(uint256 agentId, uint256 amount) external onlyMessenger {
+        require(amount > 0, "Satellite: zero amount");
+        commissionReserve[agentId] += amount;
+        _totalCommissionReserves += amount;
+    }
+
+    /// @notice Record a Tier-2 withdrawal approval from vault epoch settlement.
+    ///         Called by relayer after vault's WithdrawApproved event for queued entries.
+    ///         Sets the pending amount so the user can call claimWithdraw().
+    function approveQueuedWithdraw(address user, uint256 tokenAmount) external onlyMessenger {
+        require(user        != address(0), "Satellite: zero user");
+        require(tokenAmount >  0,          "Satellite: zero amount");
+        _pendingWithdrawals[user] += tokenAmount;
     }
 
     /// @notice Protocol treasury claims accumulated protocol fees.
