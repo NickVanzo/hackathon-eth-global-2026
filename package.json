@@ -1,6 +1,7 @@
 {
   "name": "agent-arena",
   "private": true,
+  "type": "module",
   "workspaces": [
     "apps/*",
     "packages/*"

@@ -50,7 +50,10 @@ interface IVault {
 
     /// @notice Called by AgentManager after verifying iNFT ownership.
     ///         Zeroes commissionsOwed and emits CommissionApproved.
-    function approveCommissionRelease(uint256 agentId, uint256 amount) external;
+    /// @param agentId  The agent whose commission is being released.
+    /// @param caller   The iNFT owner who initiated the claim (for the event).
+    /// @param amount   Token amount to release.
+    function approveCommissionRelease(uint256 agentId, address caller, uint256 amount) external;
 
     // -------------------------------------------------------------------------
     // AgentManager-only functions
