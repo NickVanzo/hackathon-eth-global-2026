@@ -36,7 +36,12 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     address public immutable messenger;
 
     /// @notice AgentManager contract on 0G — called during epoch settlement.
-    address public immutable agentManager;
+    ///         Mutable so it can be pointed at a redeployed AgentManager without
+    ///         redeploying the Vault. Only the deployer can update it.
+    address public agentManager;
+
+    /// @notice Original deployer — only address allowed to call setAgentManager().
+    address public immutable deployer;
 
     /// @notice Address that receives protocol fee notifications (on Sepolia via relayer).
     address public immutable protocolTreasury;
@@ -125,6 +130,11 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         _;
     }
 
+    modifier onlyDeployer() {
+        require(msg.sender == deployer, "Vault: not deployer");
+        _;
+    }
+
     /// @dev Lazily triggers epoch settlement when the epoch window has elapsed.
     ///      Guarded by _settling to prevent re-entrancy from AgentManager callbacks.
     modifier epochCheck() {
@@ -168,6 +178,7 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         require(_commissionRate   <= 10_000,     "Vault: commissionRate > 100%");
         require(_maxExposureRatio <= 10_000,     "Vault: maxExposureRatio > 100%");
 
+        deployer         = msg.sender;
         agentManager     = _agentManager;
         epochLength      = _epochLength;
         maxExposureRatio = _maxExposureRatio;
@@ -336,6 +347,14 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     function idleBalance() external view returns (uint256) { return _idleBalance(); }
     function pendingWithdrawal(address user) external view returns (uint256) {
         return _pendingWithdrawals[user];
+    }
+
+    /// @notice Point the Vault at a new AgentManager contract.
+    ///         Only callable by the original deployer.
+    ///         Use after deploying/redeploying AgentManager without redeploying Vault.
+    function setAgentManager(address _agentManager) external onlyDeployer {
+        require(_agentManager != address(0), "Vault: zero agentManager");
+        agentManager = _agentManager;
     }
 
     function _idleBalance() internal view returns (uint256) {
