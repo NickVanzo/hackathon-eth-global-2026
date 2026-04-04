@@ -40,12 +40,14 @@ import {
 async function relayToSepolia(
   label: string,
   fn: () => Promise<`0x${string}`>
-): Promise<void> {
+): Promise<{ hash: string | null; error: boolean }> {
   try {
     const hash = await fn();
     console.log(`[relay] ${label} -> Sepolia tx: ${hash}`);
+    return { hash, error: false };
   } catch (err) {
     console.error(`[relay] ${label} failed:`, err);
+    return { hash: null, error: true };
   }
 }
 
@@ -90,7 +92,7 @@ AgentManager.IntentQueued.handler(async ({ event, context }) => {
   const actionType = Number(event.params.actionType);
   const rawParams = event.params.params as `0x${string}`;
 
-  await relayToSepolia(
+  const relayResult = await relayToSepolia(
     `IntentQueued(agentId=${agentId}, action=${actionType})`,
     async () => {
       let enrichedParams: `0x${string}` = rawParams;
@@ -162,6 +164,13 @@ AgentManager.IntentQueued.handler(async ({ event, context }) => {
       });
     }
   );
+
+  // Update IndexedIntent status based on relay result
+  context.IndexedIntent.set({
+    ...indexedIntent,
+    status: relayResult.error ? "failed" : "executed",
+    txHash: relayResult.hash ?? "",
+  });
 });
 
 // ---------------------------------------------------------------------------

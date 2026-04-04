@@ -36,9 +36,9 @@ const externalRelayer = args.includes("--relayer");
 const ZG_RPC = "https://evmrpc-testnet.0g.ai";
 const SEPOLIA_RPC = "https://ethereum-sepolia.publicnode.com";
 
-const AGENT_MANAGER_ADDR = "0xC346168268af5f69D318C50661592370fdb0ba32"; // 0G
-const VAULT_ADDR = "0x904588f5074F9C75325906AD3613A3f7a98a4D02"; // 0G
-const SATELLITE_ADDR = "0x03a1125a9746fa5fc70411A3235eb8b9D18bc24E"; // Sepolia
+const AGENT_MANAGER_ADDR = "0x3dc17aa7ea09e1e359e0d12c1bff25b5b2133aad"; // 0G
+const VAULT_ADDR = "0x734daed39ae73cf1fe195d512c43d5819ce7ed18"; // 0G
+const SATELLITE_ADDR = "0x58eb63577f409bb638628abe8e55f0553032e8dc"; // Sepolia
 
 const RELAYER_KEY = "0x03fd9c5a6a4d37e488f1c6806182d14a7d0c1cd90c405fee2b20002ee70e778a";
 
