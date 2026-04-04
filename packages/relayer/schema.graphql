@@ -63,6 +63,31 @@ type Satellite_WithdrawalCompleted {
   tokenAmount: BigInt!
 }
 
+type AgentManager_IntentQueued {
+  id: ID!
+  agentId: BigInt!
+  actionType: BigInt!
+  params: String!
+  blockNumber: BigInt!
+}
+
+type AgentManager_ForceCloseRequested {
+  id: ID!
+  agentId: BigInt!
+  source: BigInt!
+}
+
+type AgentManager_AgentPromoted {
+  id: ID!
+  agentId: BigInt!
+}
+
+type AgentManager_AgentEvicted {
+  id: ID!
+  agentId: BigInt!
+  fullEviction: Boolean!
+}
+
 type Vault_Approval {
   id: ID!
   owner: String!
