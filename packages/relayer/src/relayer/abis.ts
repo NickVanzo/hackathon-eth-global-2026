@@ -49,6 +49,14 @@ export const VAULT_ABI = [
     ],
     outputs: [],
   },
+  // Epoch trigger (callable by anyone)
+  {
+    name: "triggerSettleEpoch",
+    type: "function",
+    stateMutability: "nonpayable",
+    inputs: [],
+    outputs: [],
+  },
   // Views
   {
     name: "sharePrice",
@@ -59,6 +67,20 @@ export const VAULT_ABI = [
   },
   {
     name: "totalAssets",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "epochLength",
+    type: "function",
+    stateMutability: "view",
+    inputs: [],
+    outputs: [{ name: "", type: "uint256" }],
+  },
+  {
+    name: "lastEpochBlock",
     type: "function",
     stateMutability: "view",
     inputs: [],
