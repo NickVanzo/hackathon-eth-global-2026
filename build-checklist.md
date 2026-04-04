@@ -57,10 +57,10 @@ Begin satellite immediately using shared interfaces from Dev A.
 
 ### PM — Pool setup + start MCP server
 - [ ] Finish funding wallets
-- [ ] Deploy or identify test USDC.e token on Sepolia
-- [ ] Deploy or identify Uniswap v3 pool on Sepolia (e.g., USDC.e/WETH)
-- [ ] Seed pool with initial liquidity
-- [ ] Record pool address, token addresses, fee tier in `.env`
+- [x] Deploy or identify test USDC.e token on Sepolia
+- [x] Deploy or identify Uniswap v3 pool on Sepolia (e.g., USDC.e/WETH)
+- [x] Seed pool with initial liquidity
+- [x] Record pool address, token addresses, fee tier in `.env`
 - [ ] Start MCP server: set up Node.js project with @modelcontextprotocol/sdk
 - **Skills**: `liquidity-planner`, `swap-integration`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 

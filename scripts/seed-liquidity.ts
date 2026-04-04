@@ -27,8 +27,8 @@ const POSITION_MANAGER_ADDRESS =
 
 // ─── Amounts ─────────────────────────────────────────────────────────────────
 
-const USDC_E_AMOUNT = ethers.parseUnits('10000', 6);   // 10,000 USDC.e (6 decimals)
-const WETH_AMOUNT   = ethers.parseUnits('0.01',  18);  // 0.01 WETH   (18 decimals)
+const USDC_E_AMOUNT = ethers.parseUnits('10', 6);     // 10 USDC.e (6 decimals)
+const WETH_AMOUNT   = ethers.parseUnits('0.001', 18); // 0.001 WETH (18 decimals)
 
 // Full-range ticks for fee tier 3000 (tickSpacing 60)
 const TICK_LOWER = -887220;
