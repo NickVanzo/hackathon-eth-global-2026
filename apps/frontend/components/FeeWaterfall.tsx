@@ -32,10 +32,8 @@ interface SummaryCardProps {
 
 function SummaryCard({ label, value, accentClass }: SummaryCardProps) {
   return (
-    <Card>
-      <p className="text-xs font-medium uppercase tracking-wider text-gray-400">
-        {label}
-      </p>
+    <Card className="bg-[#111111] border border-[#1c1b1b]">
+      <p className="text-xs font-medium uppercase tracking-wider text-[#787776]">{label}</p>
       <p className={`mt-2 text-2xl font-bold ${accentClass}`}>{value}</p>
     </Card>
   );
@@ -46,32 +44,23 @@ function SummaryCard({ label, value, accentClass }: SummaryCardProps) {
 interface WaterfallBarProps {
   label: string;
   percentage: number;
-  colorClass: string;
+  barColor: string;
   description: string;
 }
 
-function WaterfallBar({
-  label,
-  percentage,
-  colorClass,
-  description,
-}: WaterfallBarProps) {
+function WaterfallBar({ label, percentage, barColor, description }: WaterfallBarProps) {
   return (
     <div className="flex items-center gap-4">
-      <span className="w-36 shrink-0 text-right text-sm text-gray-400">
-        {label}
-      </span>
-      <div className="relative h-8 flex-1 overflow-hidden rounded-md bg-gray-800">
+      <span className="w-36 shrink-0 text-right text-sm text-[#787776]">{label}</span>
+      <div className="relative h-8 flex-1 overflow-hidden rounded-md bg-[#1c1b1b]">
         <div
-          className={`flex h-full items-center justify-end pr-3 ${colorClass} transition-all duration-500`}
-          style={{ width: `${percentage}%` }}
+          className="flex h-full items-center justify-end pr-3 transition-all duration-500"
+          style={{ width: `${percentage}%`, backgroundColor: barColor }}
         >
-          <span className="text-xs font-semibold text-white">
-            {percentage}%
-          </span>
+          <span className="text-xs font-semibold text-white">{percentage}%</span>
         </div>
       </div>
-      <span className="w-40 shrink-0 text-sm text-gray-400">{description}</span>
+      <span className="w-40 shrink-0 text-sm text-[#787776]">{description}</span>
     </div>
   );
 }
@@ -84,29 +73,28 @@ function FeeWaterfallDiagram() {
 
   return (
     <div className="flex flex-col gap-3">
-      {/* Connecting arrows expressed via border-left dashed line in the gap area */}
       <WaterfallBar
         label="Gross Yield"
         percentage={GROSS_PCT}
-        colorClass="bg-gray-600"
+        barColor="#1c1b1b"
         description="Total vault earnings"
       />
       <WaterfallBar
         label="Protocol Fee"
         percentage={PROTOCOL_PCT}
-        colorClass="bg-indigo-600"
+        barColor="#7000FF"
         description="5% → protocol treasury"
       />
       <WaterfallBar
         label="Commission"
         percentage={COMMISSION_PCT}
-        colorClass="bg-amber-500"
+        barColor="#FF5722"
         description="10% → agent operators"
       />
       <WaterfallBar
         label="Net Depositor"
         percentage={DEPOSITOR_PCT}
-        colorClass="bg-emerald-600"
+        barColor="#00E5FF"
         description="85% → depositors"
       />
     </div>
@@ -123,22 +111,22 @@ function StackedBar() {
   return (
     <div className="mt-4 flex h-6 w-full overflow-hidden rounded-full">
       <div
-        className="flex items-center justify-center bg-indigo-600 text-xs font-semibold text-white"
-        style={{ width: `${PROTOCOL_WIDTH}%` }}
+        className="flex items-center justify-center text-xs font-semibold text-white"
+        style={{ width: `${PROTOCOL_WIDTH}%`, backgroundColor: "#7000FF" }}
         title="Protocol fee 5%"
       >
         5%
       </div>
       <div
-        className="flex items-center justify-center bg-amber-500 text-xs font-semibold text-white"
-        style={{ width: `${COMMISSION_WIDTH}%` }}
+        className="flex items-center justify-center text-xs font-semibold text-white"
+        style={{ width: `${COMMISSION_WIDTH}%`, backgroundColor: "#FF5722" }}
         title="Commission 10%"
       >
         10%
       </div>
       <div
-        className="flex flex-1 items-center justify-center bg-emerald-600 text-xs font-semibold text-white"
-        style={{ width: `${DEPOSITOR_WIDTH}%` }}
+        className="flex flex-1 items-center justify-center text-xs font-semibold text-white"
+        style={{ width: `${DEPOSITOR_WIDTH}%`, backgroundColor: "#00E5FF" }}
         title="Depositor yield 85%"
       >
         85%
@@ -150,18 +138,21 @@ function StackedBar() {
 // ─── Legend ───────────────────────────────────────────────────────────────────
 
 function ColorLegend() {
-  const items = [
-    { colorClass: "bg-indigo-600", label: "Protocol Fee" },
-    { colorClass: "bg-amber-500", label: "Commission" },
-    { colorClass: "bg-emerald-600", label: "Depositor Yield" },
+  const items: { color: string; label: string }[] = [
+    { color: "#7000FF", label: "Protocol Fee" },
+    { color: "#FF5722", label: "Commission" },
+    { color: "#00E5FF", label: "Depositor Yield" },
   ];
 
   return (
     <div className="mt-3 flex flex-wrap gap-4">
-      {items.map(({ colorClass, label }) => (
+      {items.map(({ color, label }) => (
         <div key={label} className="flex items-center gap-2">
-          <span className={`inline-block h-3 w-3 rounded-sm ${colorClass}`} />
-          <span className="text-xs text-gray-400">{label}</span>
+          <span
+            className="inline-block h-3 w-3 rounded-sm"
+            style={{ backgroundColor: color }}
+          />
+          <span className="text-xs text-[#787776]">{label}</span>
         </div>
       ))}
     </div>
@@ -178,16 +169,14 @@ function SharePriceTrend({
   previous: string | undefined;
 }) {
   if (previous === undefined) {
-    return <span className="text-gray-500">—</span>;
+    return <span className="text-[#787776]">—</span>;
   }
 
   const isUp = Number(current) >= Number(previous);
 
   return (
     <span
-      className={`inline-flex items-center gap-1 ${
-        isUp ? "text-emerald-400" : "text-red-400"
-      }`}
+      className={`inline-flex items-center gap-1 ${isUp ? "text-[#00E5FF]" : "text-[#FF5722]"}`}
       aria-label={isUp ? "trending up" : "trending down"}
     >
       {isUp ? "↑" : "↓"}
@@ -209,7 +198,7 @@ function EpochTable() {
       <table className="w-full border-collapse text-sm">
         <caption className="sr-only">Per-epoch fee breakdown</caption>
         <thead>
-          <tr className="border-b border-gray-800 text-left text-xs font-medium uppercase tracking-wider text-gray-400">
+          <tr className="border-b border-[#1c1b1b] text-left text-xs font-medium uppercase tracking-wider text-[#787776]">
             <th scope="col" className="pb-3 pr-4">
               Epoch
             </th>
@@ -235,33 +224,33 @@ function EpochTable() {
             return (
               <tr
                 key={row.epoch}
-                className={`border-b border-gray-800 transition-colors ${
+                className={`border-b border-[#1c1b1b] transition-colors bg-[#111111] ${
                   isCurrent
-                    ? "bg-indigo-950/40 font-medium"
-                    : "hover:bg-gray-800/40"
+                    ? "border-l-2 border-l-[#00E5FF] font-medium"
+                    : "hover:bg-[#1c1b1b]/60"
                 }`}
               >
-                <td className="py-3 pr-4 text-gray-100">
+                <td className="py-3 pr-4 text-[#E5E2E1]">
                   <span className="flex items-center gap-2">
                     {row.epoch}
                     {isCurrent && (
-                      <span className="rounded-full bg-indigo-600 px-2 py-0.5 text-[10px] font-semibold text-white">
+                      <span className="rounded-full bg-[#00E5FF]/10 border border-[#00E5FF]/40 px-2 py-0.5 text-[10px] font-semibold text-[#00E5FF]">
                         current
                       </span>
                     )}
                   </span>
                 </td>
-                <td className="py-3 pr-4 text-indigo-300">
+                <td className="py-3 pr-4" style={{ color: "#7000FF" }}>
                   {formatUsdc(row.protocolFee)}
                 </td>
-                <td className="py-3 pr-4 text-amber-300">
+                <td className="py-3 pr-4" style={{ color: "#FF5722" }}>
                   {formatUsdc(row.commission)}
                 </td>
-                <td className="py-3 pr-4 text-emerald-300">
+                <td className="py-3 pr-4 text-[#00E5FF]">
                   {formatUsdc(row.depositorYield)}
                 </td>
                 <td className="py-3">
-                  <span className="flex items-center gap-2 text-gray-100">
+                  <span className="flex items-center gap-2 text-[#E5E2E1]">
                     {formatSharePrice(row.sharePrice)}
                     <SharePriceTrend
                       current={row.sharePrice}
@@ -289,41 +278,41 @@ export default function FeeWaterfall() {
       <section aria-labelledby="fee-summary-heading">
         <h2
           id="fee-summary-heading"
-          className="mb-3 text-sm font-semibold uppercase tracking-wider text-gray-400"
+          className="mb-3 text-sm font-semibold uppercase tracking-widest text-[#787776]"
         >
-          Cumulative Totals
+          FEE WATERFALL
         </h2>
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
           <SummaryCard
             label="Protocol Fees Accrued"
             value={formatUsdc(protocolFeesAccrued)}
-            accentClass="text-indigo-400"
+            accentClass="text-[#00E5FF]"
           />
           <SummaryCard
             label="Commission Pool"
             value={formatUsdc(commissionPool)}
-            accentClass="text-amber-400"
+            accentClass="text-[#00E5FF]"
           />
           <SummaryCard
             label="Depositor Yield"
             value={formatUsdc(depositorYield)}
-            accentClass="text-emerald-400"
+            accentClass="text-[#00E5FF]"
           />
         </div>
       </section>
 
       {/* Fee waterfall diagram */}
       <section aria-labelledby="fee-waterfall-heading">
-        <Card>
+        <Card className="bg-[#111111] border border-[#1c1b1b]">
           <h2
             id="fee-waterfall-heading"
-            className="mb-4 text-base font-semibold text-gray-100"
+            className="mb-4 text-base font-semibold uppercase tracking-widest text-[#E5E2E1]"
           >
-            Fee Waterfall
+            FEE WATERFALL
           </h2>
-          <p className="mb-6 text-sm text-gray-400">
-            Gross yield flows through protocol fees and operator commissions
-            before reaching depositors.
+          <p className="mb-6 text-sm text-[#787776]">
+            Gross yield flows through protocol fees and operator commissions before reaching
+            depositors.
           </p>
           <FeeWaterfallDiagram />
           <StackedBar />
@@ -333,10 +322,10 @@ export default function FeeWaterfall() {
 
       {/* Per-epoch breakdown */}
       <section aria-labelledby="epoch-breakdown-heading">
-        <Card>
+        <Card className="bg-[#111111] border border-[#1c1b1b]">
           <h2
             id="epoch-breakdown-heading"
-            className="mb-4 text-base font-semibold text-gray-100"
+            className="mb-4 text-base font-semibold uppercase tracking-widest text-[#E5E2E1]"
           >
             Per-Epoch Breakdown
           </h2>
