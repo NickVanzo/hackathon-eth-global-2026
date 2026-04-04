@@ -5,6 +5,7 @@ import {Test} from "forge-std/Test.sol";
 import {SatelliteHarness} from "./SatelliteHarness.sol";
 import {MockERC20} from "../mocks/MockERC20.sol";
 import {MockUniswapV3Pool} from "../mocks/MockUniswapV3Pool.sol";
+import {MockPermit2} from "../mocks/MockPermit2.sol";
 import {IShared} from "../../src/interfaces/IShared.sol";
 
 /// @dev Shared test state and helpers inherited by all Satellite test suites.
@@ -49,6 +50,11 @@ abstract contract SatelliteTestBase is Test {
 
         // Pool: USDC.e / WETH, 0.3 % tier
         pool = new MockUniswapV3Pool(address(usdc), address(weth), 3000);
+
+        // Deploy mock Permit2 at the canonical address so the Satellite constructor
+        // can call IPermit2.approve() during initialization.
+        address permit2Addr = 0x000000000022D473030F116dDEE9F6B43aC78BA3;
+        vm.etch(permit2Addr, address(new MockPermit2()).code);
 
         satellite = new SatelliteHarness(
             address(pool),

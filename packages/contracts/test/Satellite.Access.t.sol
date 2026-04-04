@@ -58,7 +58,7 @@ contract SatelliteAccessTest is SatelliteTestBase {
     function test_releaseCommission_onlyMessenger() public {
         vm.prank(alice);
         vm.expectRevert("Satellite: not messenger");
-        satellite.releaseCommission(alice, 100e6);
+        satellite.releaseCommission(1, alice, 100e6);
     }
 
     function test_executeBatch_onlyMessenger() public {
@@ -71,9 +71,10 @@ contract SatelliteAccessTest is SatelliteTestBase {
 
     function test_forceClose_onlyMessenger() public {
         uint256[] memory posIds = new uint256[](0);
+        bytes[] memory swapData = new bytes[](0);
         vm.prank(alice);
         vm.expectRevert("Satellite: not messenger");
-        satellite.forceClose(1, posIds, IShared.ForceCloseSource.VAULT);
+        satellite.forceClose(1, posIds, IShared.ForceCloseSource.VAULT, swapData);
     }
 
     // =========================================================================
@@ -117,24 +118,23 @@ contract SatelliteAccessTest is SatelliteTestBase {
         _reserveCommission(0, 500e6);
 
         vm.prank(messenger);
-        satellite.releaseCommission(alice, 500e6); // should not revert
+        satellite.releaseCommission(0, alice, 500e6); // should not revert
     }
 
-    /// @dev executeBatch always reverts with "not yet implemented" — but only AFTER the
-    ///      messenger check. The messenger should get the "not yet implemented" revert.
-    function test_executeBatch_messengerReachesImplementationRevert() public {
+    /// @dev executeBatch with empty intents is a no-op (no revert).
+    function test_executeBatch_messengerCanCallEmpty() public {
         IShared.Intent[] memory intents = new IShared.Intent[](0);
 
         vm.prank(messenger);
-        vm.expectRevert("Satellite: executeBatch not yet implemented");
-        satellite.executeBatch(intents);
+        satellite.executeBatch(intents); // should not revert
     }
 
-    function test_forceClose_messengerReachesImplementationRevert() public {
+    function test_forceClose_messengerCanCallEmpty() public {
         uint256[] memory posIds = new uint256[](0);
+        bytes[] memory swapData = new bytes[](0);
         vm.prank(messenger);
-        vm.expectRevert("Satellite: forceClose not yet implemented");
-        satellite.forceClose(1, posIds, IShared.ForceCloseSource.VAULT);
+        // Empty arrays — no revert, just a no-op
+        satellite.forceClose(1, posIds, IShared.ForceCloseSource.VAULT, swapData);
     }
 
     // =========================================================================

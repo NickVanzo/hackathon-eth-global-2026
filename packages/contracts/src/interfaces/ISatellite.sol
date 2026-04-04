@@ -13,7 +13,7 @@ import {IShared} from "./IShared.sol";
 ///                         claimCommissions, pauseAgent, unpauseAgent, withdrawFromArena
 ///   messenger (relayer) — executeBatch, release, releaseQueuedWithdraw, updateSharePrice,
 ///                         reserveProtocolFees, reserveCommission, approveQueuedWithdraw,
-///                         releaseCommission, forceClose
+///                         releaseCommission, forceClose, collectAndReport
 interface ISatellite {
     // -------------------------------------------------------------------------
     // Events — emitted on Sepolia, watched by relayer → relayed to 0G
@@ -42,6 +42,10 @@ interface ISatellite {
     /// @notice Satellite reports updated position valuations after executeBatch / epoch collect.
     ///         Relayer calls agentManager.reportValues() on 0G.
     event ValuesReported(uint256 indexed agentId, uint256 positionValue, uint256 feesCollected);
+
+    /// @notice A position was closed (agent-initiated, modify, or force-close).
+    ///         Relayer calls agentManager.recordClosure() and vault.recordRecovery() on 0G.
+    event PositionClosed(uint256 indexed agentId, uint256 indexed positionId, uint256 recoveredAmount);
 
     /// @notice iNFT owner wants to claim commissions.
     ///         Relayer calls agentManager.processCommissionClaim() on 0G.
@@ -99,7 +103,7 @@ interface ISatellite {
     ///         For each OPEN intent: zap-in (Universal Router) + mint LP (NonfungiblePositionManager).
     ///         For each CLOSE intent: collect fees + decreaseLiquidity + zap-out.
     ///         For each MODIFY intent: close existing + open new range.
-    ///         Emits ValuesReported after execution.
+    ///         Emits PositionClosed for close/modify intents.
     function executeBatch(IShared.Intent[] calldata intents) external;
 
     /// @notice Release tokens to a user after vault.processWithdraw() approves (Tier-1).
@@ -131,17 +135,26 @@ interface ISatellite {
 
     /// @notice Pay commission to iNFT owner from commissionReserve.
     ///         Triggered by vault's CommissionApproved event.
-    function releaseCommission(address caller, uint256 amount) external;
+    ///         agentId identifies whose commission reserve to decrement.
+    function releaseCommission(uint256 agentId, address caller, uint256 amount) external;
 
     /// @notice Force-close positions for an agent (eviction, withdrawal, or arena exit).
     ///         positionIds: relayer-provided list from its local cache.
     ///         source: filters which positions to close (PROVING, VAULT, or ALL).
+    ///         swapCalldata: one entry per positionId — relayer-built calldata for
+    ///                       zapping non-deposit token back to depositToken.
     ///         Vault-funded capital returns to idle; proving capital returns to deployer.
     function forceClose(
         uint256 agentId,
         uint256[] calldata positionIds,
-        IShared.ForceCloseSource source
+        IShared.ForceCloseSource source,
+        bytes[] calldata swapCalldata
     ) external;
+
+    /// @notice Collect accrued trading fees on all agent positions and emit ValuesReported.
+    ///         Called by relayer once per epoch per agent before settlement.
+    ///         positionValue is computed off-chain by the relayer.
+    function collectAndReport(uint256 agentId, uint256 positionValue) external;
 
     // -------------------------------------------------------------------------
     // View functions
@@ -158,4 +171,10 @@ interface ISatellite {
 
     /// @notice Commission USDC.e reserved for a specific agent's iNFT owner.
     function commissionReserve(uint256 agentId) external view returns (uint256);
+
+    /// @notice All position NFT IDs currently owned by an agent.
+    function getAgentPositions(uint256 agentId) external view returns (uint256[] memory);
+
+    /// @notice Number of active positions for an agent.
+    function agentPositionCount(uint256 agentId) external view returns (uint256);
 }
