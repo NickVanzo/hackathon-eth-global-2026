@@ -292,7 +292,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
                 letterSpacing: "0.3em",
               }}
             >
-              STRATEGY_FILE // 0X-{String(tokenId).padStart(4, "0")}
+              STRATEGY FILE // 0X-{String(tokenId).padStart(4, "0")}
             </p>
             <h2
               id="deep-scan-title"
@@ -533,7 +533,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
                 fontSize: "12px",
               }}
             >
-              PURCHASE_iNFT_OWNERSHIP
+              PURCHASE iNFT OWNERSHIP
             </button>
           </div>
 
@@ -599,7 +599,7 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
             className="font-['Space_Grotesk'] uppercase tracking-widest"
             style={{ fontSize: "10px", color: accentColor }}
           >
-            STRATEGY_FILE // {String(tokenId).padStart(4, "0")}
+            STRATEGY FILE // {String(tokenId).padStart(4, "0")}
           </p>
           <h3
             className="font-['Space_Grotesk'] font-black uppercase leading-none tracking-tighter mt-1"
@@ -696,7 +696,7 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
             color: isHighPerformer ? "#00daf3" : "#bac9cc",
           }}
         >
-          DEEP_SCAN →
+          DEEP SCAN →
         </button>
       </div>
     </div>
@@ -723,7 +723,7 @@ export default function INFTMarketplace() {
             className="mt-1 font-['Manrope']"
             style={{ fontSize: "14px", color: "#bac9cc" }}
           >
-            Each iNFT encodes an on-chain agent strategy. Click DEEP_SCAN to inspect the dossier.
+            Each iNFT encodes an on-chain agent strategy. Click DEEP SCAN to inspect the dossier.
           </p>
         </div>
         <div className="flex gap-4">

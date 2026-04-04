@@ -112,8 +112,8 @@ const STATUS_SUFFIX: Record<IntentStatus, string> = {
 
 function getTierLabel(phase: string): { label: string; classes: string } {
   return phase === "vault"
-    ? { label: "VAULT_TIER",      classes: "bg-[#00E5FF]/10 text-[#00E5FF]" }
-    : { label: "PROVING_GROUNDS", classes: "bg-[#FF5722]/10 text-[#ffb5a0]" };
+    ? { label: "VAULT TIER",      classes: "bg-[#00E5FF]/10 text-[#00E5FF]" }
+    : { label: "PROVING GROUNDS", classes: "bg-[#FF5722]/10 text-[#ffb5a0]" };
 }
 
 function getStatusDisplay(agent: (typeof MOCK_AGENTS)[number]) {
@@ -131,7 +131,7 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
       <div className="flex justify-between items-end">
         <div>
           <h1 className="font-[family-name:var(--font-space-grotesk)] text-4xl font-black text-[#c3f5ff] tracking-tighter uppercase mb-2">
-            VAULT_PERFORMANCE
+            VAULT PERFORMANCE
           </h1>
           <p className="font-[family-name:var(--font-manrope)] text-[#bac9cc] max-w-md text-sm">
             Real-time aggregate of all active agent strategies across the Arena ecosystem.
@@ -152,8 +152,8 @@ function VaultPerformanceChart({ stats }: { stats: ReturnType<typeof deriveVault
         <div className="absolute inset-0 p-8 flex flex-col justify-between">
           {/* Top axis labels */}
           <div className="font-[family-name:var(--font-space-grotesk)] flex justify-between text-[10px] font-bold text-[#bac9cc]/40 tracking-widest">
-            <span>MARKET_INDEX_V4</span>
-            <span>LIVE_FEED_STABLE</span>
+            <span>MARKET INDEX V4</span>
+            <span>LIVE FEED STABLE</span>
           </div>
 
           {/* SVG sparkline — realistic upward-trending time series */}
@@ -225,7 +225,7 @@ function LiveBattleFeed() {
       <div className="flex items-center gap-2 mb-6">
         <div className="w-2 h-2 rounded-full bg-[#d73b00] animate-pulse shadow-[0_0_8px_#d73b00]" aria-hidden="true" />
         <h2 className="font-[family-name:var(--font-space-grotesk)] text-lg font-bold tracking-widest uppercase text-[#e5e2e1]">
-          LIVE_BATTLE_FEED
+          LIVE BATTLE FEED
         </h2>
       </div>
 
@@ -312,7 +312,7 @@ function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
       <div className="grid grid-cols-2 gap-4 pt-4 border-t border-[#3b494c]/10 relative z-10">
         <div>
           <div className="font-[family-name:var(--font-space-grotesk)] text-[9px] text-[#bac9cc]/60 tracking-widest uppercase font-bold">
-            CAPITAL_DEPLOYED
+            CAPITAL DEPLOYED
           </div>
           <div className="font-[family-name:var(--font-space-grotesk)] text-sm font-bold text-white">
             {capitalLabel}
@@ -342,7 +342,7 @@ function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
                 </span>
                 <span className="text-[#00E5FF]">{formatLiquidity(pos.liquidity)}</span>
                 <span className={`font-[family-name:var(--font-space-grotesk)] px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase ${inRange ? "text-[#00E5FF] bg-[#00E5FF]/10" : "text-[#d73b00] bg-[#d73b00]/10"}`}>
-                  {inRange ? "IN_RANGE" : "OUT"}
+                  {inRange ? "IN RANGE" : "OUT"}
                 </span>
                 <span className="text-[#bac9cc]/60">{formatUsdc(pos.feesCollected)} USDC</span>
               </div>
@@ -351,7 +351,7 @@ function GladiatorCard({ agent }: { agent: (typeof MOCK_AGENTS)[number] }) {
           {totalFees > 0 && (
             <div className="flex justify-end pt-1">
               <span className="font-[family-name:var(--font-space-grotesk)] text-[9px] text-[#bac9cc]/40 tracking-widest uppercase">
-                TOTAL_FEES: {formatUsdc(String(totalFees))} USDC
+                TOTAL FEES: {formatUsdc(String(totalFees))} USDC
               </span>
             </div>
           )}
@@ -370,7 +370,7 @@ function DeployCtaCard() {
         <span className="material-symbols-outlined text-[#00E5FF] text-3xl" aria-hidden="true">add</span>
       </div>
       <h4 className="font-[family-name:var(--font-space-grotesk)] text-lg font-black text-white uppercase tracking-widest mb-2">
-        DEPLOY_NEW_AGENT
+        DEPLOY NEW AGENT
       </h4>
       <p className="font-[family-name:var(--font-manrope)] text-xs text-[#bac9cc] px-4">
         Start your own strategy and climb the leaderboard.
@@ -382,17 +382,17 @@ function DeployCtaCard() {
 // ─── ArenaLogs ────────────────────────────────────────────────────────────────
 
 const ARENA_LOGS: ReadonlyArray<{ time: string; message: string; accent: boolean }> = [
-  { time: "[14:02:11]", message: "NODE_04 CONNECTED",           accent: false },
-  { time: "[14:02:15]", message: "THREAT DETECTED: MEV_SCANNER", accent: true  },
-  { time: "[14:02:19]", message: "VALIDATING AGENT_33_SIG",     accent: false },
-  { time: "[14:03:01]", message: "BATCH_COMMIT: SUCCESS",       accent: false },
+  { time: "[14:02:11]", message: "NODE 04 CONNECTED",           accent: false },
+  { time: "[14:02:15]", message: "THREAT DETECTED: REV SCANNER", accent: true  },
+  { time: "[14:02:19]", message: "VALIDATING AGENT 33 S10",     accent: false },
+  { time: "[14:03:01]", message: "BATCH COMMIT: SUCCESS",       accent: false },
 ];
 
 function ArenaLogs() {
   return (
     <div className="md:col-span-4 bg-[#1c1b1b] p-8 border border-[#3b494c]/10 space-y-6">
       <h3 className="font-[family-name:var(--font-space-grotesk)] text-sm font-black tracking-widest uppercase text-[#bac9cc]">
-        ARENA_LOGS
+        ARENA LOGS
       </h3>
       <div className="space-y-4 font-mono text-[11px] text-[#00E5FF]/60">
         {ARENA_LOGS.map((log) => (
@@ -423,10 +423,10 @@ function CtaBanner() {
       </p>
       <div className="flex gap-4 w-full sm:w-auto">
         <button className="font-[family-name:var(--font-space-grotesk)] bg-[#00e5ff] text-[#00363d] font-black tracking-widest px-8 py-3 text-sm uppercase flex-1 sm:flex-none hover:brightness-110 transition-all active:scale-95">
-          INITIATE_DEPLOYMENT
+          INITIATE DEPLOYMENT
         </button>
         <button className="font-[family-name:var(--font-space-grotesk)] bg-transparent text-white border border-[#3b494c] font-black tracking-widest px-8 py-3 text-sm uppercase flex-1 sm:flex-none hover:bg-white/5 transition-colors">
-          VIEW_DOCS
+          VIEW DOCS
         </button>
       </div>
     </div>
@@ -476,10 +476,10 @@ export default function PositionView() {
       <section className="space-y-8">
         <div className="flex justify-between items-center">
           <h2 className="font-[family-name:var(--font-space-grotesk)] text-2xl font-black tracking-widest uppercase text-[#e5e2e1]">
-            TOP_GLADIATORS
+            TOP GLADIATORS
           </h2>
           <button className="font-[family-name:var(--font-space-grotesk)] text-[#00E5FF] text-xs font-bold hover:underline tracking-widest">
-            VIEW_ALL_AGENTS
+            VIEW ALL AGENTS
           </button>
         </div>
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">

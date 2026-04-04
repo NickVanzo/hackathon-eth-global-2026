@@ -38,7 +38,7 @@ function formatPerf(value: number): string {
 
 // ─── Tier badge derived from mock data ────────────────────────────────────────
 
-type TierClass = "S-TIER GLADIATOR" | "VAULT_ELITE" | "PROVING_GROUNDS";
+type TierClass = "S-TIER GLADIATOR" | "VAULT ELITE" | "PROVING GROUNDS";
 
 function resolveTierClass(
   phase: "vault" | "proving",
@@ -46,8 +46,8 @@ function resolveTierClass(
   rank: number
 ): TierClass {
   if (rank === 1 && sharpeScore > 2) return "S-TIER GLADIATOR";
-  if (phase === "vault") return "VAULT_ELITE";
-  return "PROVING_GROUNDS";
+  if (phase === "vault") return "VAULT ELITE";
+  return "PROVING GROUNDS";
 }
 
 interface TierBadgeProps {
@@ -191,7 +191,7 @@ function SideNav() {
                 textTransform: "uppercase",
               }}
             >
-              OPERATOR_01
+              OPERATOR 01
             </p>
             <p
               style={{
@@ -256,7 +256,7 @@ function SideNav() {
             (e.currentTarget as HTMLButtonElement).style.opacity = "1";
           }}
         >
-          DEPLOY_AGENT
+          DEPLOY AGENT
         </button>
         <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
           <FooterLink icon="terminal" label="TERMINAL" />
@@ -486,7 +486,7 @@ function TopNav() {
             (e.currentTarget as HTMLButtonElement).style.transform = "scale(1)";
           }}
         >
-          CONNECT_VOICE
+          CONNECT VOICE
         </button>
       </div>
     </header>
@@ -514,13 +514,13 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
 
   // Subtitle label derived from tier
   const subtitleMap: Record<TierClass, string> = {
-    "S-TIER GLADIATOR": "PROBABILITY_ENGINE_v4",
-    VAULT_ELITE: "QUANT_REACTION_NODE",
-    PROVING_GROUNDS: "HFT_ARBITRAGE_CORE",
+    "S-TIER GLADIATOR": "PROBABILITY ENGINE V4",
+    "VAULT ELITE": "QUANT REACTION NODE",
+    "PROVING GROUNDS": "HFT ARBITRAGE CORE",
   };
 
   // Controller org label
-  const orgLabels = ["VALOR_HOLDINGS", "ANONYMOUS", "ZENITH_LABS"];
+  const orgLabels = ["VALOR HOLDINGS", "ANONYMOUS", "ZENITH LABS"];
   const orgLabel = orgLabels[rank - 1] ?? "ANONYMOUS";
 
   return (
@@ -725,7 +725,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
 function RecentPromotions() {
   const promotions = [
     { name: "GLITCH_RUNNER_8", tier: "S-TIER", time: "2m ago" },
-    { name: "CYBER_HAWK", tier: "VAULT_ELITE", time: "14m ago" },
+    { name: "CYBER_HAWK", tier: "VAULT ELITE", time: "14m ago" },
   ];
 
   return (
@@ -758,7 +758,7 @@ function RecentPromotions() {
             textTransform: "uppercase",
           }}
         >
-          RECENT_PROMOTIONS
+          RECENT PROMOTIONS
         </span>
         <span
           className="material-symbols-outlined"
@@ -868,7 +868,7 @@ function RecentEvictions() {
             textTransform: "uppercase",
           }}
         >
-          RECENT_EVICTIONS
+          RECENT EVICTIONS
         </span>
         <span
           className="material-symbols-outlined"
@@ -1009,7 +1009,7 @@ function PromoCard() {
             marginBottom: "4px",
           }}
         >
-          STAKE_AGENT_NFT
+          STAKE AGENT NFT
         </h3>
         <p
           style={{
@@ -1020,7 +1020,7 @@ function PromoCard() {
             textTransform: "uppercase",
           }}
         >
-          EARN_PASSIVE_REWARDS
+          EARN PASSIVE REWARDS
         </p>
       </div>
     </div>
@@ -1150,7 +1150,7 @@ export default function AgentPerformance() {
                       textTransform: "uppercase",
                     }}
                   >
-                    LIVE_SIMULATION_ACTIVE
+                    LIVE SIMULATION ACTIVE
                   </span>
                   {count !== undefined && (
                     <span
@@ -1171,7 +1171,7 @@ export default function AgentPerformance() {
                       }}
                     >
                       <span style={{ width: "6px", height: "6px", borderRadius: "50%", backgroundColor: "#00e5ff", display: "inline-block" }} />
-                      LIVE_DATA
+                      LIVE DATA
                     </span>
                   )}
                 </div>
@@ -1208,12 +1208,12 @@ export default function AgentPerformance() {
               {/* Stats cards */}
               <div style={{ display: "flex", gap: "16px" }}>
                 <StatCard
-                  label="TOTAL_REWARDS"
+                  label="TOTAL REWARDS"
                   value="842.05 ETH"
                   valueColor={COLORS.primary}
                 />
                 <StatCard
-                  label="ARENA_TIME"
+                  label="ARENA TIME"
                   value="14:02:55:09"
                   valueColor={COLORS.secondary}
                 />
@@ -1247,11 +1247,11 @@ export default function AgentPerformance() {
                   }}
                 >
                   <ColHeader>RK</ColHeader>
-                  <ColHeader>AGENT_IDENTIFIER</ColHeader>
-                  <ColHeader>TIER_CLASS</ColHeader>
+                  <ColHeader>AGENT IDENTIFIER</ColHeader>
+                  <ColHeader>TIER CLASS</ColHeader>
                   <ColHeader>SHARPE</ColHeader>
                   <ColHeader>CREDITS</ColHeader>
-                  <ColHeader>7D_PERF</ColHeader>
+                  <ColHeader>7D PERF</ColHeader>
                   <ColHeader right>CONTROLLER</ColHeader>
                 </div>
 

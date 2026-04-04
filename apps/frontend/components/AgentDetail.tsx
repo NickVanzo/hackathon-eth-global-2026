@@ -66,7 +66,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
             className="text-5xl font-black tracking-tighter mt-1"
             style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
           >
-            AGENT_ID:{" "}
+            AGENT ID:{" "}
             <span style={{ color: "#00e5ff" }}>X-{String(agent.id).padStart(2, "0")}</span>
           </h1>
           <div className="flex items-center gap-4 mt-4">
@@ -89,7 +89,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               className="text-xs"
               style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#bac9cc" }}
             >
-              EMA_SHARPE:{" "}
+              EMA SHARPE:{" "}
               <span
                 className="font-black"
                 style={{ color: "#e5e2e1" }}
@@ -336,7 +336,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   className="text-lg font-bold tracking-tight"
                   style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#e5e2e1" }}
                 >
-                  HISTORICAL_PERFORMANCE
+                  HISTORICAL PERFORMANCE
                 </h3>
                 <p
                   className="text-xs uppercase tracking-widest"
@@ -441,7 +441,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
             </h4>
             <div className="space-y-4">
               {[
-                { label: "TOKEN_TYPE", value: "ERC-721i", color: "#e5e2e1" },
+                { label: "TOKEN TYPE", value: "ERC-721i", color: "#e5e2e1" },
                 { label: "CONTRACT", value: "0x9a...f42c", color: "#00e5ff" },
                 { label: "RARITY", value: "LEGENDARY", color: "#ffb5a0" },
               ].map((row) => (
@@ -511,28 +511,28 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                 className="w-2 h-2 rounded-full animate-pulse"
                 style={{ backgroundColor: "#d73b00" }}
               />
-              LIVE_EVENT_LOG
+              LIVE EVENT LOG
             </div>
             <div className="space-y-2 max-h-40 overflow-y-auto pr-2">
               {[
                 {
                   time: "14:20:11",
-                  msg: "EXECUTE_ORDER: BUY 0.42 ETH @ 2452.1",
+                  msg: "EXECUTE ORDER: BUY 0.42 ETH @ 2452.1",
                   type: "primary",
                 },
                 {
                   time: "14:18:05",
-                  msg: "REBALANCING: VECTOR_DELTA adjusted to 0.82",
+                  msg: "REBALANCING: VECTOR DELTA adjusted to 0.82",
                   type: "primary",
                 },
                 {
                   time: "14:15:32",
-                  msg: "BUCKET_LOW: Triggering refill protocol...",
+                  msg: "BUCKET LOW: Triggering refill protocol...",
                   type: "warning",
                 },
                 {
                   time: "14:12:44",
-                  msg: "DATA_SYNC: Global sentiment calibrated",
+                  msg: "DATA SYNC: Global sentiment calibrated",
                   type: "primary",
                 },
                 {
@@ -590,7 +590,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
               borderColor: "rgba(59,73,76,0.2)",
             }}
           >
-            ACTIVE_POSITIONS
+            ACTIVE POSITIONS
           </h3>
           <div className="overflow-x-auto">
             <table className="w-full text-[10px] font-mono">
@@ -599,7 +599,7 @@ export default function AgentDetail({ agentId = 1 }: AgentDetailProps) {
                   className="border-b"
                   style={{ borderColor: "rgba(59,73,76,0.2)" }}
                 >
-                  {["TOKEN_ID", "TICK_LOWER", "TICK_UPPER", "LIQUIDITY", "FEES_COLLECTED", "STATUS"].map(
+                  {["TOKEN ID", "TICK LOWER", "TICK UPPER", "LIQUIDITY", "FEES COLLECTED", "STATUS"].map(
                     (h) => (
                       <th
                         key={h}
