@@ -218,14 +218,14 @@ AgentManager is done. Now build the strategies that use it.
 - **Skills**: `.0g-skills/patterns/COMPUTE.md`, `liquidity-planner`, `backend-developer`
 
 ### Dev B — Deploy all 0G contracts + verify relayer
-- [ ] Deploy iNFT contract to 0G testnet
-- [ ] Deploy AgentManager to 0G testnet (with constructor params: alpha, maxAgents, totalRefillBudget, provingEpochsRequired, minPromotionSharpe, minActionInterval, maxPromotionShare, rampEpochs, evictionEpochs, messenger)
+- [x] Deploy iNFT contract to 0G testnet
+- [x] Deploy AgentManager to 0G testnet (with constructor params: alpha, maxAgents, totalRefillBudget, provingEpochsRequired, minPromotionSharpe, minActionInterval, maxPromotionShare, rampEpochs, evictionEpochs, messenger)
 - [x] Deploy Vault to 0G testnet (with constructor params: agentManager, epochLength, maxExposureRatio, protocolFeeRate, protocolTreasury, commissionRate, depositToken, pool, messenger). Verify deployment invariant: `maxExposureRatio + idleReserveRatio = 10000`
-- [ ] Call `AgentManager.setVault(vaultAddress)` to complete circular reference
+- [x] Call `AgentManager.setVault(vaultAddress)` to complete circular reference
 - [ ] Verify all contracts on 0G explorer
-- [ ] Record all addresses in `.env`, announce to team
-- [ ] Smoke test: deposit on satellite -> relayer -> shares minted on vault
-- [ ] Verify relayer routes correctly to both Vault and AgentManager
+- [x] Record all addresses in `.env`, announce to team
+- [x] Smoke test: deposit on satellite -> relayer -> shares minted on vault
+- [x] Verify relayer routes correctly to both Vault and AgentManager (Vault.agentManager==AM, AM.vault==Vault, same messenger on both)
 - **Skills**: `deploy-contract`, `interact-contract`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
 ### PM — Wire dashboard to real contracts
