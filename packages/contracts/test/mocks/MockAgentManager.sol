@@ -27,6 +27,16 @@ contract MockAgentManager {
     uint256 public lastMaxExposureRatio;
     uint256 public aggregateVaultPositionValue;
 
+    uint256 private _totalDeployedVault;
+
+    function setTotalDeployedVault(uint256 val) external {
+        _totalDeployedVault = val;
+    }
+
+    function totalDeployedVault() external view returns (uint256) {
+        return _totalDeployedVault;
+    }
+
     function setAggregateVaultPositionValue(uint256 val) external {
         aggregateVaultPositionValue = val;
     }
@@ -114,4 +124,5 @@ contract ReentrantAgentManager {
     function sharpeScore(uint256) external pure returns (uint256) { return 0; }
     function provingBalance(uint256) external pure returns (uint256) { return 0; }
     function provingDeployed(uint256) external pure returns (uint256) { return 0; }
+    function totalDeployedVault() external pure returns (uint256) { return 0; }
 }

@@ -35,7 +35,15 @@ contract VaultHarness is Vault {
     }
 
     function trackedIdleBalance() external view returns (uint256) {
-        return _trackedIdleBalance;
+        return _idleBalance();
+    }
+
+    function pendingShareLocks(address user) external view returns (uint256) {
+        return _pendingShareLocks[user];
+    }
+
+    function pendingEpochs(address user) external view returns (uint256) {
+        return _pendingEpochs[user];
     }
 
     function internalPendingWithdrawal(address user) external view returns (uint256) {
@@ -60,8 +68,9 @@ contract VaultHarness is Vault {
         _trackedTotalAssets = amount;
     }
 
-    function setTrackedIdleBalance(uint256 amount) external {
-        _trackedIdleBalance = amount;
+    /// @dev Add a pending share lock for a user (test-only, for Tier-2 queue setup).
+    function setPendingShareLocks(address user, uint256 shares) external {
+        _pendingShareLocks[user] = shares;
     }
 
     function setCommissionsOwed(uint256 agentId, uint256 amount) external {
@@ -77,9 +86,12 @@ contract VaultHarness is Vault {
     // ── Pending queue helpers (test-only) ────────────────────────────────────
 
     /// @dev Add a user + amount to the Tier-2 pending queue directly,
-    ///      bypassing processWithdraw (avoids share-burn side effects).
-    function addPendingUser(address user, uint256 amount) external {
+    ///      bypassing processWithdraw (avoids share-lock side effects).
+    ///      Also locks `shares` from the vault's own balance to mirror real Tier-2 flow.
+    function addPendingUser(address user, uint256 amount, uint256 shares) external {
         _pendingWithdrawals[user] += amount;
+        _pendingShareLocks[user]  += shares;
+        _pendingEpochs[user]       = currentEpoch;
         if (!_inPendingQueue[user]) {
             _pendingUsers.push(user);
             _inPendingQueue[user] = true;

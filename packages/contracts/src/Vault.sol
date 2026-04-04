@@ -68,9 +68,11 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     ///         Does NOT include protocol fees or commissions — those are reserved on Satellite.
     uint256 internal _trackedTotalAssets;
 
-    /// @notice Portion of total assets currently idle on Satellite (not deployed in LP positions).
-    ///         Used by AgentManager to cap vault-agent intent sizes.
-    uint256 internal _trackedIdleBalance;
+    /// @notice Shares locked per user for Tier-2 withdrawals (held by vault until fulfillment).
+    mapping(address user => uint256 shares) internal _pendingShareLocks;
+
+    /// @notice Epoch number when a user's Tier-2 withdrawal was queued.
+    mapping(address user => uint256 epoch) internal _pendingEpochs;
 
     // -------------------------------------------------------------------------
     // State: epoch
@@ -217,7 +219,6 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 shares = _tokensToShares(amount);
 
         _trackedTotalAssets += amount;
-        _trackedIdleBalance += amount;
 
         _mint(user, shares);
     }
@@ -230,17 +231,14 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     ///         The relayer converts tokenAmount → shares using cachedSharePrice
     ///         before calling this function.
     ///
-    ///   Tier-1 (instant): tokenAmount ≤ _trackedIdleBalance
-    ///     → burn shares, decrement idle, emit WithdrawApproved immediately.
+    ///   Tier-1 (instant): tokenAmount ≤ idle (totalAssets - totalDeployedVault)
+    ///     → burn shares, decrement totalAssets, emit WithdrawApproved immediately.
     ///       Relayer calls satellite.release(user, tokenAmount) on Sepolia.
     ///
-    ///   Tier-2 (queued): tokenAmount > _trackedIdleBalance
-    ///     → burn shares, record tokenAmount in _pendingWithdrawals.
+    ///   Tier-2 (queued): tokenAmount > idle
+    ///     → lock shares (transfer to vault), queue tokenAmount + epoch number.
     ///       WithdrawApproved fires at the next epoch once idle is freed.
-    ///
-    ///   Shares are burned immediately in both tiers so share supply stays
-    ///   consistent.  _trackedTotalAssets is only decremented when tokens
-    ///   actually leave (Tier-1 now, Tier-2 at epoch processing).
+    ///       Locked shares are burned when the withdrawal is fulfilled.
     function processWithdraw(address user, uint256 shares)
         external
         onlyMessenger
@@ -254,18 +252,22 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 tokenAmount = _sharesToTokens(shares);
         require(tokenAmount > 0, "Vault: zero tokenAmount");
 
-        _burn(user, shares);
+        uint256 idle = _idleBalance();
 
-        if (tokenAmount <= _trackedIdleBalance) {
+        if (tokenAmount <= idle) {
             // ── Tier-1: instant release ──────────────────────────────────────
-            _trackedIdleBalance -= tokenAmount;
+            _burn(user, shares);
             _trackedTotalAssets -= tokenAmount;
             emit WithdrawApproved(user, tokenAmount);
         } else {
-            // ── Tier-2: queue for next epoch ─────────────────────────────────
-            // _trackedTotalAssets stays unchanged — these tokens are still owed
-            // to the user; they will be decremented when WithdrawApproved fires.
+            // ── Tier-2: lock shares, queue for next epoch ────────────────────
+            // Shares are transferred to the vault (locked) — totalSupply and
+            // totalAssets both stay unchanged, so sharePrice is unaffected.
+            // Shares are burned and totalAssets decremented when fulfilled.
+            _transfer(user, address(this), shares);
             _pendingWithdrawals[user] += tokenAmount;
+            _pendingShareLocks[user]  += shares;
+            _pendingEpochs[user]       = currentEpoch;
             if (!_inPendingQueue[user]) {
                 _pendingUsers.push(user);
                 _inPendingQueue[user] = true;
@@ -331,9 +333,14 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
 
     function totalAssets() external view returns (uint256) { return _trackedTotalAssets; }
     function sharePrice()  external view returns (uint256) { return _sharePrice(); }
-    function idleBalance() external view returns (uint256) { return _trackedIdleBalance; }
+    function idleBalance() external view returns (uint256) { return _idleBalance(); }
     function pendingWithdrawal(address user) external view returns (uint256) {
         return _pendingWithdrawals[user];
+    }
+
+    function _idleBalance() internal view returns (uint256) {
+        uint256 deployed = IAgentManager(agentManager).totalDeployedVault();
+        return _trackedTotalAssets > deployed ? _trackedTotalAssets - deployed : 0;
     }
 
     function _sharePrice() internal view returns (uint256) {
@@ -416,13 +423,12 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         }
 
         // Reconcile totalAssets: position values from settleAgents + idle + depositor fees.
-        // idle = _trackedTotalAssets - deployed (approximated by what's NOT in positions).
+        // idle = totalAssets - totalDeployedVault (nominal deployed amount from AgentManager).
         // Reconciliation formula: totalAssets = aggregateVaultPositionValue + idle + depositorReturn
-        uint256 idle = _trackedTotalAssets > aggregateVaultPositionValue
-            ? _trackedTotalAssets - aggregateVaultPositionValue
-            : 0;
+        // This correctly accounts for impermanent loss: if positions lost value,
+        // totalAssets decreases by (totalDeployedVault - aggregateVaultPositionValue).
+        uint256 idle = _idleBalance();
         _trackedTotalAssets = aggregateVaultPositionValue + idle + totalDepositorReturn;
-        _trackedIdleBalance = idle + totalDepositorReturn;
 
         // ── Step 3: process Tier-2 withdrawal queue ───────────────────────────
         // If idle is insufficient, emit ForceCloseRequested for lowest-Sharpe
@@ -453,6 +459,9 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
         uint256 len = _pendingUsers.length;
         if (len == 0) return;
 
+        // Read idle once; track locally as we decrement totalAssets per fulfilment.
+        uint256 currentIdle = _idleBalance();
+
         address[] memory remaining = new address[](len);
         uint256 remainingCount;
         uint256 unfulfilledTotal;
@@ -463,15 +472,21 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
 
             if (amount == 0) {
                 // Already cleared (e.g., user re-deposited and zeroed their entry)
-                _inPendingQueue[user] = false;
+                _inPendingQueue[user]     = false;
+                _pendingShareLocks[user]  = 0;
+                _pendingEpochs[user]      = 0;
                 continue;
             }
 
-            if (_trackedIdleBalance >= amount) {
-                // Fulfil
-                _trackedIdleBalance       -= amount;
+            if (currentIdle >= amount) {
+                // Fulfil: burn the locked shares held by the vault, decrement totalAssets.
+                uint256 lockedShares = _pendingShareLocks[user];
+                _burn(address(this), lockedShares);
                 _trackedTotalAssets       -= amount;
+                currentIdle               -= amount;
                 _pendingWithdrawals[user]  = 0;
+                _pendingShareLocks[user]   = 0;
+                _pendingEpochs[user]       = 0;
                 _inPendingQueue[user]      = false;
                 emit WithdrawApproved(user, amount);
             } else {
