@@ -166,15 +166,15 @@ contract AgentManager is IAgentManager {
         IAgenticID.IntelligentData[] memory datas = new IAgenticID.IntelligentData[](3);
         datas[0] = IAgenticID.IntelligentData({
             dataDescription: "Strategy Name",
-            dataHash:        keccak256(abi.encodePacked(agentId))
+            dataHash:        keccak256(abi.encode(agentId))
         });
         datas[1] = IAgenticID.IntelligentData({
             dataDescription: "Model",
-            dataHash:        keccak256(abi.encodePacked("qwen/qwen-2.5-7b-instruct"))
+            dataHash:        keccak256(abi.encode("qwen/qwen-2.5-7b-instruct"))
         });
         datas[2] = IAgenticID.IntelligentData({
             dataDescription: "Agent Address",
-            dataHash:        keccak256(abi.encodePacked(agentAddress_))
+            dataHash:        keccak256(abi.encode(agentAddress_))
         });
 
         uint256 mintFee = agenticId.mintFee();
