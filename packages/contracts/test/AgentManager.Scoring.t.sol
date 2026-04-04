@@ -132,8 +132,27 @@ contract AgentManagerScoringTest is AgentManagerTestBase {
             "must be VAULT before eviction test"
         );
 
-        // Now report 0 fees for EVICTION_EPOCHS epochs to produce zero Sharpe streak
-        for (uint256 epoch = 0; epoch < EVICTION_EPOCHS; epoch++) {
+        // EMAs carry over from proving phase (no cold start per spec).
+        // With int256 EMAs at 1e18 scale and alpha=0.3, the EMA decays by 0.7x
+        // each epoch but integer truncation keeps it positive for many epochs.
+        // To test eviction specifically (not EMA decay speed), we use vm.store
+        // to zero the scores, simulating a long period of zero performance.
+        // Scores storage slot: scores mapping at slot that holds emaReturn/emaReturnSq.
+        // Instead, we just run enough zero-fee epochs. With SCALE=1e18 and
+        // alpha=3000/10000, each epoch: ema = 7000*ema/10000.
+        // From ~1e17 initial, 100 epochs: 0.7^100 * 1e17 ≈ 3e-2 → still > 0.
+        // Simpler approach: report negative-like performance (position value drop)
+        // to drive Sharpe to 0 faster. But epochReturn uses only feesCollected.
+        //
+        // Run zero-fee epochs until the agent drops from VAULT to PROVING.
+        // With EMAs carried over (no cold start), Sharpe takes many epochs to decay
+        // to 0. Once it hits 0 for evictionEpochs consecutive epochs, eviction fires.
+        // Stop as soon as phase changes to avoid over-running into proving ejection.
+        for (uint256 epoch = 0; epoch < 300; epoch++) {
+            // Check if already evicted from vault
+            if (uint256(agentMgr.agentPhase(1)) == uint256(IShared.AgentPhase.PROVING)) {
+                break;
+            }
             vm.prank(messenger);
             agentMgr.reportValues(1, 0, 0);
 
