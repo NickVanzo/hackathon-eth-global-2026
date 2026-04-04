@@ -61,7 +61,7 @@ Begin satellite immediately using shared interfaces from Dev A.
 - [x] Deploy or identify Uniswap v3 pool on Sepolia (e.g., USDC.e/WETH)
 - [x] Seed pool with initial liquidity
 - [x] Record pool address, token addresses, fee tier in `.env`
-- [ ] Start MCP server: set up Node.js project with @modelcontextprotocol/sdk
+- [x] Start MCP server: set up Node.js project with @modelcontextprotocol/sdk
 - **Skills**: `liquidity-planner`, `swap-integration`, `.0g-skills/patterns/NETWORK_CONFIG.md`
 
 ---
