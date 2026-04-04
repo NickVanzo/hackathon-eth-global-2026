@@ -52,7 +52,7 @@ Build the agent foundation that all 3 strategies will extend. **Mock**: agents l
 ### Dev B — Start satellite contract
 Begin satellite immediately using shared interfaces from Dev A.
 
-- [ ] Start 2.1 - Core: `deposit()`, `registerAgent()`, `requestWithdraw()`, `release()`, `updateSharePrice()`, idle reserve tracking, `onlyMessenger` modifier
+- [x] Start 2.1 - Core: `deposit()`, `registerAgent()`, `requestWithdraw()`, `release()`, `updateSharePrice()`, idle reserve tracking, `onlyMessenger` modifier
 - **Skills**: `.0g-skills/patterns/CHAIN.md`, `swap-integration`, `liquidity-planner`
 
 ### PM — Pool setup + start MCP server
