@@ -19,6 +19,7 @@ import {
   Satellite_WithdrawFromArenaRequested,
   Satellite_WithdrawRequested,
   Satellite_WithdrawalCompleted,
+  AgentPerformanceSnapshot,
 } from "generated";
 
 import {
@@ -54,6 +55,14 @@ async function relay(
 
 // Alias for readability in this file (all relay targets are 0G unless noted)
 const relayTo0G = relay;
+
+// ---------------------------------------------------------------------------
+// Performance snapshot tracking (in-memory, rebuilt from event replay)
+// Used to compute per-agent historical return on capital for the frontend chart.
+// ---------------------------------------------------------------------------
+
+const agentCumulativeFees = new Map<string, bigint>();
+const agentInitialCapital = new Map<string, bigint>();
 
 // ---------------------------------------------------------------------------
 // Deposited
@@ -97,6 +106,20 @@ Satellite.AgentRegistered.handler(async ({ event, context }) => {
     provingAmount: event.params.provingAmount,
   };
   context.Satellite_AgentRegistered.set(entity);
+
+  // Performance snapshot: record initial capital and create baseline snapshot
+  const agentKey = event.params.agentId.toString();
+  agentInitialCapital.set(agentKey, event.params.provingAmount);
+  context.AgentPerformanceSnapshot.set({
+    id: `perf_${event.chainId}_${event.block.number}_${event.logIndex}_reg`,
+    agentId: event.params.agentId,
+    positionValue: 0n,
+    feesCollected: 0n,
+    cumulativeFees: 0n,
+    blockNumber: BigInt(event.block.number),
+    blockTimestamp: BigInt(event.block.timestamp),
+    returnBps: 0,
+  });
 
   await relayTo0G(
     `AgentRegistered(agentId=${event.params.agentId})`,
@@ -214,6 +237,32 @@ Satellite.ValuesReported.handler(async ({ event, context }) => {
     feesCollected: event.params.feesCollected,
   };
   context.Satellite_ValuesReported.set(entity);
+
+  // Performance snapshot: accumulate fees and compute return on capital
+  {
+    const agentKey = event.params.agentId.toString();
+    const prevCumFees = agentCumulativeFees.get(agentKey) ?? 0n;
+    const newCumFees = prevCumFees + event.params.feesCollected;
+    agentCumulativeFees.set(agentKey, newCumFees);
+
+    const initialCapital = agentInitialCapital.get(agentKey) ?? 0n;
+    let returnBps = 0;
+    if (initialCapital > 0n) {
+      const pnl = event.params.positionValue + newCumFees - initialCapital;
+      returnBps = Number((pnl * 10000n) / initialCapital);
+    }
+
+    context.AgentPerformanceSnapshot.set({
+      id: `perf_${event.chainId}_${event.block.number}_${event.logIndex}`,
+      agentId: event.params.agentId,
+      positionValue: event.params.positionValue,
+      feesCollected: event.params.feesCollected,
+      cumulativeFees: newCumFees,
+      blockNumber: BigInt(event.block.number),
+      blockTimestamp: BigInt(event.block.timestamp),
+      returnBps,
+    });
+  }
 
   await relayTo0G(
     `ValuesReported(agentId=${event.params.agentId})`,

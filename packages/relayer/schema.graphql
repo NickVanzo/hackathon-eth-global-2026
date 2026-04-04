@@ -88,6 +88,17 @@ type AgentManager_AgentEvicted {
   fullEviction: Boolean!
 }
 
+type AgentPerformanceSnapshot {
+  id: ID!
+  agentId: BigInt!
+  positionValue: BigInt!
+  feesCollected: BigInt!
+  cumulativeFees: BigInt!
+  blockNumber: BigInt!
+  blockTimestamp: BigInt!
+  returnBps: Int!
+}
+
 type Vault_Approval {
   id: ID!
   owner: String!
