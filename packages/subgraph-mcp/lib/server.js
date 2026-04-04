@@ -5,6 +5,7 @@ const mcp_js_1 = require("@modelcontextprotocol/sdk/server/mcp.js");
 const zod_1 = require("zod");
 const subgraph_js_1 = require("./subgraph.js");
 const rpc_js_1 = require("./rpc.js");
+const trading_api_js_1 = require("./trading-api.js");
 const chainValues = ["ethereum", "base", "sepolia"];
 const chainSchema = zod_1.z
     .enum(chainValues)
@@ -25,7 +26,7 @@ const minAmountUSDSchema = zod_1.z
     .regex(/^\d+(\.\d+)?$/, "Must be a positive numeric string, e.g. '50000'")
     .describe("Minimum swap size in USD, e.g. '50000'");
 function createMcpServer() {
-    const server = new mcp_js_1.McpServer({ name: "0g-defi-mcp", version: "1.0.0" });
+    const server = new mcp_js_1.McpServer({ name: "0g-defi-mcp", version: "2.0.0" });
     server.registerTool("get_eth_macro_price", {
         description: "Get the current ETH price in USD from a Uniswap V3 bundle on the given chain.",
         inputSchema: { chain: chainSchema },
@@ -80,6 +81,100 @@ function createMcpServer() {
                 .describe("Number of swaps to return (1–100, default 20)"),
         },
     }, getRecentSwaps);
+    // ── Uniswap Trading API proxy tools ──────────────────────────────────
+    server.registerTool("get_quote", {
+        description: "Get a Uniswap swap quote. Returns the best route and output amount.",
+        inputSchema: {
+            tokenInChainId: zod_1.z.number().int().describe("Chain ID for the input token"),
+            tokenOutChainId: zod_1.z.number().int().describe("Chain ID for the output token"),
+            tokenInAddress: poolAddressSchema,
+            tokenOutAddress: poolAddressSchema,
+            amount: zod_1.z.string().describe("Token amount in smallest unit (wei)"),
+            type: zod_1.z.enum(["EXACT_INPUT", "EXACT_OUTPUT"]).describe("Quote type"),
+        },
+    }, async ({ tokenInChainId, tokenOutChainId, tokenInAddress, tokenOutAddress, amount, type, }) => {
+        try {
+            const result = await (0, trading_api_js_1.fetchQuote)({
+                tokenInChainId: String(tokenInChainId),
+                tokenOutChainId: String(tokenOutChainId),
+                tokenInAddress,
+                tokenOutAddress,
+                amount,
+                type,
+            });
+            return buildToolResult(result);
+        }
+        catch (err) {
+            return buildErrorResult(toErrorMessage(err));
+        }
+    });
+    server.registerTool("get_route", {
+        description: "Get the full swap route details for a Uniswap trade.",
+        inputSchema: {
+            tokenInChainId: zod_1.z.number().int().describe("Chain ID for the input token"),
+            tokenOutChainId: zod_1.z.number().int().describe("Chain ID for the output token"),
+            tokenInAddress: poolAddressSchema,
+            tokenOutAddress: poolAddressSchema,
+            amount: zod_1.z.string().describe("Token amount in smallest unit (wei)"),
+            type: zod_1.z.enum(["EXACT_INPUT", "EXACT_OUTPUT"]).describe("Quote type"),
+        },
+    }, async ({ tokenInChainId, tokenOutChainId, tokenInAddress, tokenOutAddress, amount, type, }) => {
+        try {
+            const result = await (0, trading_api_js_1.fetchRoute)({
+                tokenInChainId: String(tokenInChainId),
+                tokenOutChainId: String(tokenOutChainId),
+                tokenInAddress,
+                tokenOutAddress,
+                amount,
+                type,
+            });
+            return buildToolResult(result);
+        }
+        catch (err) {
+            return buildErrorResult(toErrorMessage(err));
+        }
+    });
+    server.registerTool("get_pools", {
+        description: "List Uniswap pools, optionally filtered by token addresses.",
+        inputSchema: {
+            chainId: zod_1.z.number().int().describe("Chain ID to query pools on"),
+            token0Address: poolAddressSchema.optional().describe("Optional token0 address filter"),
+            token1Address: poolAddressSchema.optional().describe("Optional token1 address filter"),
+        },
+    }, async ({ chainId, token0Address, token1Address, }) => {
+        try {
+            const result = await (0, trading_api_js_1.fetchPools)({
+                chainId: String(chainId),
+                token0Address,
+                token1Address,
+            });
+            return buildToolResult(result);
+        }
+        catch (err) {
+            return buildErrorResult(toErrorMessage(err));
+        }
+    });
+    server.registerTool("get_positions", {
+        description: "Get Uniswap liquidity positions for a wallet address on a given chain.",
+        inputSchema: {
+            chainId: zod_1.z.number().int().describe("Chain ID to query positions on"),
+            address: zod_1.z
+                .string()
+                .regex(/^0x[0-9a-fA-F]{40}$/, "Must be a valid Ethereum address")
+                .describe("Wallet address to look up positions for"),
+        },
+    }, async ({ chainId, address }) => {
+        try {
+            const result = await (0, trading_api_js_1.fetchPositions)({
+                chainId: String(chainId),
+                address,
+            });
+            return buildToolResult(result);
+        }
+        catch (err) {
+            return buildErrorResult(toErrorMessage(err));
+        }
+    });
     return server;
 }
 async function getEthMacroPrice({ chain }) {

@@ -89,6 +89,6 @@ exports.mcp = (0, https_1.onRequest)({
     timeoutSeconds: 3600,
     memory: "512MiB",
     region: "us-central1",
-    secrets: ["GRAPH_API_KEY"],
+    secrets: ["GRAPH_API_KEY", "UNISWAP_API_KEY"],
 }, app);
 //# sourceMappingURL=index.js.map

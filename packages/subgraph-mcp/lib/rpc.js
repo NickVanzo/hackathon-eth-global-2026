@@ -68,7 +68,7 @@ async function getSpotPriceFromRpc(poolAddress, rpcUrl = DEFAULT_RPC_URL) {
         const priceToken1PerToken0 = rawPrice * 10 ** (tokens.decimals0 - tokens.decimals1);
         const priceToken0PerToken1 = priceToken1PerToken0 !== 0 ? 1 / priceToken1PerToken0 : 0;
         return {
-            sqrtPriceX96,
+            sqrtPriceX96: sqrtPriceX96.toString(),
             tick,
             priceToken1PerToken0,
             priceToken0PerToken1,

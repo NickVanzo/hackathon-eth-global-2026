@@ -176,13 +176,13 @@ The Vault is now simpler — pure accounting, no agent logic. AgentManager handl
 
 **Hour 1:15 - 2:15: Finish MCP server (1 hour)**
 
-- [ ] Implement MCP tools — subgraph data: `getPoolPrice`, `getPoolTicks`, `getPoolVolume`, `getPoolFees`, `getRecentSwaps`, `getPoolTVL`
-- [ ] Connect to Uniswap v3 subgraph on Sepolia via TheGraph
-- [ ] Implement GraphQL queries for each tool
-- [ ] Implement MCP tools — Uniswap Trading API GET proxying: `getQuote` (→ GET /quote), `getRoute` (→ GET /route), `getPools` (→ GET /pools), `getPositions` (→ GET /positions). MCP server holds the Uniswap API key — agents never see it
-- [ ] Add RPC fallback for current spot price (direct `slot0()` read)
-- [ ] Test against live Sepolia pool data
-- [ ] Deploy/run MCP server, record endpoint URL in `.env`
+- [x] Implement MCP tools — subgraph data: `getPoolPrice`, `getPoolTicks`, `getPoolVolume`, `getPoolFees`, `getRecentSwaps`, `getPoolTVL`
+- [x] Connect to Uniswap v3 subgraph on Sepolia via TheGraph
+- [x] Implement GraphQL queries for each tool
+- [x] Implement MCP tools — Uniswap Trading API GET proxying: `getQuote` (→ GET /quote), `getRoute` (→ GET /route), `getPools` (→ GET /pools), `getPositions` (→ GET /positions). MCP server holds the Uniswap API key — agents never see it
+- [x] Add RPC fallback for current spot price (direct `slot0()` read)
+- [x] Test against live Sepolia pool data
+- [x] Deploy/run MCP server, record endpoint URL in `.env`
 
 **Skills**: `backend-developer`, `viem-integration`
 

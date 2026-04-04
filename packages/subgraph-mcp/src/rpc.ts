@@ -73,7 +73,7 @@ export async function getSpotPriceFromRpc(
   poolAddress: string,
   rpcUrl: string = DEFAULT_RPC_URL
 ): Promise<{
-  sqrtPriceX96: bigint;
+  sqrtPriceX96: string;
   tick: number;
   priceToken1PerToken0: number;
   priceToken0PerToken1: number;
@@ -102,7 +102,7 @@ export async function getSpotPriceFromRpc(
       priceToken1PerToken0 !== 0 ? 1 / priceToken1PerToken0 : 0;
 
     return {
-      sqrtPriceX96,
+      sqrtPriceX96: sqrtPriceX96.toString(),
       tick,
       priceToken1PerToken0,
       priceToken0PerToken1,
