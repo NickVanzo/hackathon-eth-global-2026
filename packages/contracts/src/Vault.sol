@@ -181,8 +181,31 @@ contract Vault is IVault, ERC20, ReentrancyGuard {
     // Stubs — filled in by subsequent commits
     // =========================================================================
 
-    function recordDeposit(address, uint256) external onlyMessenger epochCheck {
-        revert("Vault: recordDeposit not implemented");
+    // =========================================================================
+    // 3.2 — DEPOSIT ACCOUNTING
+    // =========================================================================
+
+    /// @notice Record a user deposit relayed from Satellite.
+    ///         Mints shares proportional to the current share price so existing
+    ///         holders are not diluted.  Triggers lazy epoch settlement first.
+    ///
+    ///         Share minting formula:
+    ///           shares = amount × totalSupply / totalAssets   (if supply > 0)
+    ///           shares = amount                               (bootstrap: 1:1)
+    function recordDeposit(address user, uint256 amount)
+        external
+        onlyMessenger
+        epochCheck
+    {
+        require(user   != address(0), "Vault: zero user");
+        require(amount >  0,          "Vault: zero amount");
+
+        uint256 shares = _tokensToShares(amount);
+
+        _trackedTotalAssets += amount;
+        _trackedIdleBalance += amount;
+
+        _mint(user, shares);
     }
 
     function processWithdraw(address, uint256) external onlyMessenger nonReentrant epochCheck {
