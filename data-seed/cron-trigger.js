@@ -1,15 +1,15 @@
 #!/usr/bin/env node
 /**
- * Epoch trigger for local development with 0G vLLM (no tool calling).
+ * Epoch trigger for Agent Arena.
  *
  * Each epoch:
  *   1. Build pool state (mock until Subgraph MCP is available)
- *   2. Ask each agent via `openclaw agent --local` with pool state injected
- *   3. Parse the JSON decision from the agent's reply
- *   4. Execute submit-intent.mjs as a child process
+ *   2. Call the 0G compute API directly with each agent's AGENTS.md as system prompt
+ *   3. Parse the JSON decision from the reply
+ *   4. In DRY_RUN mode, write intent to /data/intents/ instead of submitting on-chain
  */
 
-import { spawnSync } from "child_process";
+import { mkdirSync, writeFileSync } from "fs";
 import { fileURLToPath } from "url";
 import { dirname, join } from "path";
 
@@ -18,8 +18,11 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const STATE_DIR =
   process.env.OPENCLAW_STATE_DIR ?? join(__dirname, "../local");
 const EPOCH_INTERVAL_MS = parseInt(process.env.EPOCH_INTERVAL_MS || "30000", 10);
+const DRY_RUN = process.env.DRY_RUN === "true";
 const AGENTS = ["agent-alpha", "agent-beta", "agent-gamma"];
-const WORKSPACE_BASE = join(__dirname, "workspaces");
+const WORKSPACE_BASE = join(STATE_DIR, "workspaces");
+
+const GATEWAY_URL = "http://127.0.0.1:3000";
 
 // Tracks previous price per agent for beta's contrarian strategy
 const previousPrices = {};
@@ -29,7 +32,7 @@ const previousPrices = {};
  * Replace with a real Subgraph fetch when the MCP server is available.
  */
 function getPoolState(agentId) {
-  const currentPrice = 1800.0 + Math.random() * 20 - 10; // small drift each epoch
+  const currentPrice = 1800.0 + Math.random() * 20 - 10;
   const previousPrice = previousPrices[agentId] ?? currentPrice;
   previousPrices[agentId] = currentPrice;
 
@@ -42,25 +45,34 @@ function getPoolState(agentId) {
 }
 
 /**
- * Calls openclaw agent --local, returns the last non-empty line of stdout.
+ * Calls the OpenClaw gateway HTTP endpoint.
+ * The gateway injects the agent's AGENTS.md system prompt automatically.
  */
-function callAgent(agentId, message) {
-  const result = spawnSync(
-    "openclaw",
-    ["agent", "--agent", agentId, "--local", "--message", message],
-    {
-      env: { ...process.env, OPENCLAW_STATE_DIR: STATE_DIR },
-      encoding: "utf8",
-      timeout: 90_000,
-    }
-  );
+async function callAgent(agentId, message) {
+  const token = process.env.OPENCLAW_GATEWAY_TOKEN;
+  if (!token) throw new Error("OPENCLAW_GATEWAY_TOKEN is not set");
 
-  if (result.error) throw new Error(`spawn failed: ${result.error.message}`);
+  const response = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+      "Authorization": `Bearer ${token}`,
+    },
+    body: JSON.stringify({
+      model: `openclaw/${agentId}`,
+      messages: [{ role: "user", content: message }],
+      max_tokens: 128,
+    }),
+    signal: AbortSignal.timeout(60_000),
+  });
 
-  // Strip ANSI codes and find last non-empty line (the agent reply)
-  const clean = result.stdout.replace(/\x1b\[[0-9;]*m/g, "");
-  const lines = clean.split("\n").map((l) => l.trim()).filter(Boolean);
-  return lines[lines.length - 1] ?? "";
+  if (!response.ok) {
+    const text = await response.text();
+    throw new Error(`Gateway error ${response.status}: ${text}`);
+  }
+
+  const data = await response.json();
+  return data.choices[0].message.content.trim();
 }
 
 /**
@@ -69,27 +81,26 @@ function callAgent(agentId, message) {
 function parseDecision(reply) {
   const match = reply.match(/\{[\s\S]*?\}/);
   if (!match) throw new Error(`no JSON found in: ${reply}`);
-  return JSON.parse(match[0]);
+  const repaired = match[0].replace(/(\d)"([},])/g, "$1$2");
+  return JSON.parse(repaired);
 }
 
 /**
- * Runs submit-intent.mjs for the given agent and action.
- * The script reads VAULT_ADDRESS, AGENT_ID, PRIVATE_KEY_ENV_VAR from the
- * workspace .env and the private key from process.env[PRIVATE_KEY_ENV_VAR].
+ * Submits or dry-runs the intent for the given agent and action.
  */
 function submitIntent(agentId, action, params = {}) {
-  const scriptPath = join(WORKSPACE_BASE, agentId, "skills", "submit-intent.mjs");
-  const paramsJson = JSON.stringify(params);
+  if (DRY_RUN) {
+    const intentsDir = join(STATE_DIR, "intents");
+    mkdirSync(intentsDir, { recursive: true });
+    const filename = `${agentId}-${action}-${Date.now()}.json`;
+    const intent = { agentId, action, params, timestamp: new Date().toISOString() };
+    writeFileSync(join(intentsDir, filename), JSON.stringify(intent, null, 2));
+    console.log(`[${agentId}] dry-run: wrote ${filename}`);
+    return;
+  }
 
-  const result = spawnSync("node", [scriptPath, action, paramsJson], {
-    env: process.env,
-    encoding: "utf8",
-    timeout: 30_000,
-  });
-
-  if (result.stdout) console.log(`[${agentId}] submit-intent: ${result.stdout.trim()}`);
-  if (result.stderr) console.error(`[${agentId}] submit-intent stderr: ${result.stderr.trim()}`);
-  if (result.status !== 0) throw new Error(`submit-intent exited ${result.status}`);
+  // TODO: call submit-intent.mjs once vault is deployed
+  console.warn(`[${agentId}] non-dry-run submit not yet implemented`);
 }
 
 async function runAgentEpoch(agentId) {
@@ -100,7 +111,7 @@ async function runAgentEpoch(agentId) {
 
   let reply;
   try {
-    reply = callAgent(agentId, message);
+    reply = await callAgent(agentId, message);
   } catch (err) {
     console.error(`[${agentId}] agent call failed: ${err.message}`);
     return;
@@ -123,7 +134,6 @@ async function runAgentEpoch(agentId) {
     }
 
     if (decision.action === "rebalance") {
-      // Close existing then open new
       submitIntent(agentId, "close", {});
       submitIntent(agentId, "open", {
         tickLower: decision.tickLower,
@@ -160,7 +170,7 @@ async function runEpoch() {
   }
 }
 
-// Short startup delay so openclaw gateway (if running) is fully up
+// Short startup delay
 setTimeout(async () => {
   await runEpoch();
   setInterval(runEpoch, EPOCH_INTERVAL_MS);
