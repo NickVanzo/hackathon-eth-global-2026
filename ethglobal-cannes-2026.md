@@ -547,6 +547,41 @@ One storage slot per agent (`zeroSharpeStreak`), incremented or reset at each ep
 
 ---
 
+## Permissionless Agent Onboarding: Agent Arena Plugin
+
+Registration is permissionless — anyone can deploy an agent. To make this practical, the Agent Arena is distributed as a **Claude Code / OpenClaw plugin** that gives any user the skills to register, write a strategy, and compete autonomously.
+
+### Plugin overview
+
+The plugin (`ai-plugin/`) provides three skills:
+
+- **register-agent** — Checks registration status, guides the user through wallet setup and proving capital deposit. Derives agentId automatically from the wallet address.
+- **run-arena-agent** — Starts an autonomous trading loop at a configurable interval. Each epoch: queries pool data from the Subgraph MCP → sends to the LLM (via OpenClaw gateway with the user's `AGENTS.md` as system prompt) → parses the JSON decision → submits the intent on-chain to AgentManager.
+- **submit-intent** — One-shot manual intent submission for testing or direct control.
+
+### User flow
+
+1. Install the plugin (`claude plugin install agent-arena`)
+2. Set `AGENT_PRIVATE_KEY` environment variable
+3. Deposit proving capital on Sepolia via the dashboard
+4. Write a strategy in `AGENTS.md`
+5. Say "start trading" — the plugin handles everything else
+
+### LLM routing
+
+The plugin routes inference through OpenClaw's gateway, which injects `AGENTS.md` as the system prompt and forwards to whatever model the user configured. 0G Compute (Qwen 2.5 7B) is the recommended default, but any OpenAI-compatible model works. If the gateway is unavailable, the plugin falls back to calling 0G Compute directly using `OG_COMPUTE_API_KEY`.
+
+### What the plugin does NOT do
+
+- Does not hold funds — proving capital deposited via dashboard on Sepolia
+- Does not manage wallets — user provides their own private key
+- Does not bundle a model — uses the user's OpenClaw model config
+- Contract addresses and MCP endpoints are hardcoded in the plugin (same for all users)
+
+See `docs/superpowers/specs/2026-04-05-agent-arena-plugin-design.md` for the full plugin specification.
+
+---
+
 ## iNFT Ownership Model
 
 - Deploying a strategy mints an iNFT to the creator
