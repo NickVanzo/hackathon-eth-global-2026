@@ -44,6 +44,16 @@ const NAV_TO_CONTENT: Record<NavKey, ContentKey> = {
 
 export default function Home() {
   const [activeNav, setActiveNav] = useState<NavKey>("arena");
+  const [showJoinDialog, setShowJoinDialog] = useState(false);
+  const [copied, setCopied] = useState(false);
+
+  const installCommand = "YOUR_INSTALL_COMMAND_HERE";
+
+  const handleCopy = () => {
+    navigator.clipboard.writeText(installCommand);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2000);
+  };
 
   const activeContent = NAV_TO_CONTENT[activeNav];
 
@@ -51,43 +61,18 @@ export default function Home() {
     <div className="bg-[#0e0e0e] text-[#e5e2e1] min-h-screen overflow-x-hidden">
       {/* ── Top Navigation Bar ─────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313]/80 backdrop-blur-md shadow-[0_0_20px_rgba(0,229,255,0.08)]">
-        {/* Left: branding + stats */}
-        <div className="flex items-center gap-8">
+        {/* Left: branding */}
+        <div className="flex items-center">
           <span
             className="text-xl font-black italic text-[#00E5FF] tracking-tighter uppercase"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             ARENA_OS
           </span>
-          <nav
-            className="hidden md:flex items-center gap-6"
-            aria-label="Market stats"
-          >
-            <span
-              className="text-[#bac9cc] text-xs font-bold tracking-tighter uppercase hover:text-[#00E5FF] transition-colors cursor-default"
-              style={{ fontFamily: "var(--font-space-grotesk)" }}
-            >
-              TVL: $1.2B
-            </span>
-            <span
-              className="text-[#bac9cc] text-xs font-bold tracking-tighter uppercase hover:text-[#00E5FF] transition-colors cursor-default"
-              style={{ fontFamily: "var(--font-space-grotesk)" }}
-            >
-              APY: 24.5%
-            </span>
-          </nav>
         </div>
 
-        {/* Right: utilities + connect */}
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-4 px-4 py-1.5 bg-[#2a2a2a] border border-[#3b494c]/10">
-            <span className="material-symbols-outlined text-[#00E5FF] text-[18px]">
-              notifications
-            </span>
-            <span className="material-symbols-outlined text-[#bac9cc] text-[18px] cursor-pointer hover:text-[#00E5FF] transition-colors">
-              settings
-            </span>
-          </div>
+        {/* Right: connect */}
+        <div className="flex items-center">
           <ConnectButton />
         </div>
       </header>
@@ -97,30 +82,6 @@ export default function Home() {
         className="fixed left-0 top-0 h-full w-16 lg:w-64 flex flex-col pt-20 pb-8 bg-[#0e0e0e] border-r border-[#3b494c]/15 z-40"
         aria-label="Main navigation"
       >
-        {/* Operator profile block — hidden on small screens */}
-        <div className="hidden lg:block px-6 mb-10">
-          <div className="flex items-center gap-3 p-3 bg-[#201f1f] border border-[#3b494c]/10">
-            <div className="w-10 h-10 overflow-hidden bg-[#00e5ff]/20 flex items-center justify-center flex-shrink-0">
-              <span className="material-symbols-outlined text-[#00E5FF] text-2xl">
-                person
-              </span>
-            </div>
-            <div>
-              <p
-                className="text-[10px] font-black text-[#c3f5ff] tracking-widest uppercase"
-                style={{ fontFamily: "var(--font-space-grotesk)" }}
-              >
-                OPERATOR 01
-              </p>
-              <p
-                className="text-[8px] text-[#bac9cc] font-bold"
-                style={{ fontFamily: "var(--font-space-grotesk)" }}
-              >
-                RANK: ELITE
-              </p>
-            </div>
-          </div>
-        </div>
 
         {/* Primary nav links */}
         <nav className="flex-1 flex flex-col gap-1" aria-label="Site sections">
@@ -150,42 +111,89 @@ export default function Home() {
           })}
         </nav>
 
-        {/* Bottom section: CTA + utility links */}
-        <div className="px-2 lg:px-6 mt-auto flex flex-col gap-6">
+        <div className="px-2 lg:px-6 mt-auto">
           <button
             type="button"
+            onClick={() => setShowJoinDialog(true)}
             className="bg-[#00e5ff] text-[#00363d] w-full py-3 text-xs font-black tracking-widest uppercase hover:opacity-90 transition-all flex items-center justify-center gap-2"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
-            title="DEPLOY AGENT"
           >
             <span className="material-symbols-outlined text-[18px] flex-shrink-0">rocket_launch</span>
-            <span className="hidden lg:inline">DEPLOY AGENT</span>
+            <span className="hidden lg:inline">JOIN THE ARENA</span>
           </button>
-
-          <div className="hidden lg:flex flex-col gap-2">
-            <a
-              href="#"
-              className="text-[#bac9cc] flex items-center gap-3 text-[10px] font-bold tracking-widest uppercase hover:text-white transition-colors"
-              style={{ fontFamily: "var(--font-space-grotesk)" }}
-            >
-              <span className="material-symbols-outlined text-[14px]">
-                terminal
-              </span>
-              TERMINAL
-            </a>
-            <a
-              href="#"
-              className="text-[#bac9cc] flex items-center gap-3 text-[10px] font-bold tracking-widest uppercase hover:text-white transition-colors"
-              style={{ fontFamily: "var(--font-space-grotesk)" }}
-            >
-              <span className="material-symbols-outlined text-[14px]">
-                help_center
-              </span>
-              SUPPORT
-            </a>
-          </div>
         </div>
       </aside>
+
+      {/* ── Join Arena Dialog ──────────────────────────────────────────── */}
+      {showJoinDialog && (
+        <div
+          className="fixed inset-0 z-[60] flex items-center justify-center p-4"
+          style={{ backdropFilter: "blur(8px)", background: "rgba(13,13,13,0.7)" }}
+          onClick={() => setShowJoinDialog(false)}
+        >
+          <div
+            className="w-full max-w-md p-8 relative"
+            style={{
+              background: "#1c1b1b",
+              border: "1px solid rgba(0,229,255,0.2)",
+              borderRadius: "0.75rem",
+              boxShadow: "0 0 40px rgba(0,229,255,0.1)",
+            }}
+            onClick={(e) => e.stopPropagation()}
+          >
+            {/* Close button */}
+            <button
+              onClick={() => setShowJoinDialog(false)}
+              className="absolute top-4 right-4 text-[#bac9cc] hover:text-white transition-colors"
+            >
+              <span className="material-symbols-outlined text-[20px]">close</span>
+            </button>
+
+            {/* Title */}
+            <h2
+              className="text-lg font-black uppercase tracking-tight mb-1 text-center"
+              style={{ fontFamily: "var(--font-space-grotesk)", color: "#e5e2e1" }}
+            >
+              Bring your agent in the arena
+            </h2>
+            <p
+              className="text-xs uppercase tracking-widest mb-6 text-center"
+              style={{ fontFamily: "var(--font-space-grotesk)", color: "#6b7a7d" }}
+            >
+              Paste the following command in your Open Claw
+            </p>
+
+            {/* Command box */}
+            <div
+              className="flex items-center gap-3 p-3 mb-4"
+              style={{
+                background: "#131313",
+                border: "1px solid rgba(59,73,76,0.3)",
+                borderRadius: "0.5rem",
+              }}
+            >
+              <code
+                className="flex-1 text-xs overflow-x-auto whitespace-nowrap"
+                style={{ fontFamily: "'JetBrains Mono', 'SF Mono', monospace", color: "#00e5ff" }}
+              >
+                {installCommand}
+              </code>
+              <button
+                onClick={handleCopy}
+                className="flex-shrink-0 px-3 py-1.5 text-[10px] font-bold uppercase tracking-widest transition-all"
+                style={{
+                  fontFamily: "var(--font-space-grotesk)",
+                  background: copied ? "rgba(0,229,255,0.2)" : "#00e5ff",
+                  color: copied ? "#00e5ff" : "#00363d",
+                  borderRadius: "0.25rem",
+                }}
+              >
+                {copied ? "COPIED" : "COPY"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {/* ── Main Content Canvas ─────────────────────────────────────────── */}
       <main className="ml-16 lg:ml-64 pt-16 min-h-screen bg-grid overflow-x-hidden">
