@@ -1,0 +1,19 @@
+# Deploy the Hasura subgraph (no image build — uses public hasura/graphql-engine)
+# Usage: gcloud builds submit --config=packages/subgraph/cloudbuild.yaml --project=subgraph-mcp .
+steps:
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud container clusters get-credentials ${_CLUSTER} \
+          --region=${_REGION} --project=$PROJECT_ID
+        kubectl apply -k packages/subgraph/k8s/
+
+substitutions:
+  _REGION: us-central1
+  _CLUSTER: arena-autopilot
+
+options:
+  logging: CLOUD_LOGGING_ONLY

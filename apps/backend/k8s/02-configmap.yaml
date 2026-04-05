@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backend-config
+  namespace: arena-backend
+data:
+  PORT: "3000"
+  SCRIPTS_DIR: "/app/scripts"
+  SEPOLIA_RPC_URL: "https://ethereum-sepolia.publicnode.com"
+  ZG_RPC_URL: "https://evmrpc-testnet.0g.ai"
+  SATELLITE_ADDRESS: "0xf555e8e01cbf59a35b67a0c77830118f06f8d8d8"
+  VAULT_ADDRESS: "0xfd3adf85acc5a048e683f0da32ea8386c5dcb3ef"
+  AGENT_MANAGER_ADDRESS: "0x92740b1873fafdb4464328201b095334431d9e42"
+  USDC_E_ADDRESS: "0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238"
+  WETH_ADDRESS: "0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14"
+  POOL_ADDRESS: "0x6Ce0896eAE6D4BD668fDe41BB784548fb8F59b50"

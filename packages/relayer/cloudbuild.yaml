@@ -1,18 +1,7 @@
+# Build & deploy the Envio relayer
+# Usage: gcloud builds submit --config=packages/relayer/cloudbuild.yaml --project=subgraph-mcp .
 steps:
-  - id: ensure-artifact-registry
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        gcloud artifacts repositories describe ${_REPOSITORY} \
-          --location=${_REGION} >/dev/null 2>&1 || \
-        gcloud artifacts repositories create ${_REPOSITORY} \
-          --repository-format=docker \
-          --location=${_REGION} \
-          --description="Docker images for Arena platform"
-
-  - id: build-relayer
+  - id: build
     name: gcr.io/cloud-builders/docker
     args:
       - build
@@ -24,14 +13,14 @@ steps:
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:latest
       - packages/relayer
 
-  - id: push-relayer
+  - id: push
     name: gcr.io/cloud-builders/docker
     args:
       - push
       - --all-tags
       - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer
 
-  - id: deploy-relayer
+  - id: deploy
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
     entrypoint: bash
     args:
@@ -39,20 +28,9 @@ steps:
       - |
         gcloud container clusters get-credentials ${_CLUSTER} \
           --region=${_REGION} --project=$PROJECT_ID
-        # Update the relayer image in kustomization
         cd packages/relayer/k8s
-        sed -i "s|image: relayer:.*|image: ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:$BUILD_ID|" 04-deployment.yaml
+        sed -i "s|image: .*relayer:.*|image: ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:$BUILD_ID|" 04-deployment.yaml
         kubectl apply -k .
-
-  - id: deploy-subgraph
-    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    entrypoint: bash
-    args:
-      - -c
-      - |
-        gcloud container clusters get-credentials ${_CLUSTER} \
-          --region=${_REGION} --project=$PROJECT_ID
-        kubectl apply -k packages/subgraph/k8s/
 
 images:
   - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:$BUILD_ID
@@ -65,3 +43,5 @@ substitutions:
 
 options:
   logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_32
+  diskSizeGb: 200

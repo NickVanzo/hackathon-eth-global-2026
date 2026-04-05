@@ -18,7 +18,7 @@ data:
   ENVIO_PG_USER: "arena"
   ENVIO_PG_DATABASE: "arena_indexer"
   ENVIO_PG_PUBLIC_SCHEMA: "envio"
-  ENVIO_PG_SSL_MODE: "disable"
+  ENVIO_PG_SSL_MODE: "false"
   PGSSLMODE: "disable"
 
   # Hasura (lives in arena-subgraph namespace)

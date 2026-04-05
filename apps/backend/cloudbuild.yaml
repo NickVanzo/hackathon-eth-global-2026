@@ -1,0 +1,47 @@
+# Build & deploy the backend script runner
+# Usage: gcloud builds submit --config=apps/backend/cloudbuild.yaml --project=subgraph-mcp .
+steps:
+  - id: build
+    name: gcr.io/cloud-builders/docker
+    args:
+      - build
+      - -f
+      - apps/backend/Dockerfile
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:$BUILD_ID
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:latest
+      - .
+
+  - id: push
+    name: gcr.io/cloud-builders/docker
+    args:
+      - push
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend
+
+  - id: deploy
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud container clusters get-credentials ${_CLUSTER} \
+          --region=${_REGION} --project=$PROJECT_ID
+        cd apps/backend/k8s
+        sed -i "s|image: .*backend:.*|image: ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:$BUILD_ID|" 03-deployment.yaml
+        kubectl apply -k .
+
+images:
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/backend:latest
+
+substitutions:
+  _REGION: us-central1
+  _REPOSITORY: arena-images
+  _CLUSTER: arena-autopilot
+
+options:
+  logging: CLOUD_LOGGING_ONLY
+  machineType: E2_HIGHCPU_32
+  diskSizeGb: 200

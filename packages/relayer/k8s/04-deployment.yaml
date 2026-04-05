@@ -32,7 +32,7 @@ spec:
 
       containers:
         - name: relayer
-          image: relayer:latest
+          image: us-central1-docker.pkg.dev/subgraph-mcp/arena-images/relayer:latest
           imagePullPolicy: Always
 
           securityContext:
@@ -58,20 +58,3 @@ spec:
                 name: relayer-config
             - secretRef:
                 name: relayer-secret
-
-          livenessProbe:
-            httpGet:
-              path: /healthz
-              port: 9898
-            initialDelaySeconds: 30
-            periodSeconds: 20
-            failureThreshold: 3
-
-          readinessProbe:
-            httpGet:
-              path: /healthz
-              port: 9898
-            initialDelaySeconds: 10
-            periodSeconds: 5
-            successThreshold: 1
-            failureThreshold: 3
