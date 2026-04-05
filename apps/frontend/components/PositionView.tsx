@@ -136,7 +136,7 @@ function getStatusDisplay(agent: AgentInfo) {
 
 // ─── VaultPerformanceChart ────────────────────────────────────────────────────
 
-function VaultPerformanceChart({ stats, sharePriceData }: { stats: ReturnType<typeof deriveVaultStats>; sharePriceData: { time: string; value: number }[] }) {
+function VaultPerformanceChart({ stats, yieldData }: { stats: ReturnType<typeof deriveVaultStats>; yieldData: { time: string; value: number }[] }) {
   return (
     <div className="xl:col-span-8 space-y-6">
       {/* Header row */}
@@ -162,12 +162,12 @@ function VaultPerformanceChart({ stats, sharePriceData }: { stats: ReturnType<ty
       {/* Chart panel */}
       <div className="relative bg-[#201f1f] rounded-lg border border-[#3b494c]/10 overflow-hidden group">
         <div className="p-6">
-          {sharePriceData.length >= 2 ? (
-            <LightweightChart data={sharePriceData} height={320} yAxisLabel="Share Price (USDC)" />
+          {yieldData.length >= 2 ? (
+            <LightweightChart data={yieldData} height={320} yAxisLabel="Depositor Yield (USDC)" />
           ) : (
             <div className="h-[320px] flex items-center justify-center">
               <p className="font-[family-name:var(--font-space-grotesk)] text-[#6b7a7d] text-xs uppercase tracking-widest">
-                Share price history will appear after 2+ epochs
+                Yield history will appear after 2+ epochs
               </p>
             </div>
           )}
@@ -455,8 +455,8 @@ export default function PositionView() {
 
   const stats = deriveVaultStats(agents, totalAssets);
 
-  // Build share price time series from fee epochs (sorted ascending by timestamp)
-  const sharePriceData = useMemo(() => {
+  // Build depositor yield per epoch time series (sorted ascending by timestamp)
+  const yieldData = useMemo(() => {
     const seen = new Set<string>();
     return [...epochs]
       .filter((e) => {
@@ -467,7 +467,7 @@ export default function PositionView() {
       .sort((a, b) => Number(a.blockTimestamp) - Number(b.blockTimestamp))
       .map((e, i) => ({
         time: `2026-01-${String(i + 1).padStart(2, "0")}` as string,
-        value: Number(e.sharePrice) / 1_000_000,
+        value: Number(e.depositorYield) / 1_000_000,
       }));
   }, [epochs]);
 
@@ -475,7 +475,7 @@ export default function PositionView() {
     <div className="space-y-10 font-[family-name:var(--font-manrope)]">
       {/* ── Hero: vault chart + live feed ─────────────────────────────────── */}
       <div className="grid grid-cols-1 xl:grid-cols-12 gap-8">
-        <VaultPerformanceChart stats={stats} sharePriceData={sharePriceData} />
+        <VaultPerformanceChart stats={stats} yieldData={yieldData} />
         <LiveBattleFeed agents={agents} intents={intents} />
       </div>
 
