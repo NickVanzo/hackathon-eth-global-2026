@@ -251,316 +251,115 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
   const survivalPct = epochs > 0
     ? `${Math.min(100, Math.round((1 - (agent?.zeroSharpeStreak ?? 0) / Math.max(epochs, 1)) * 100))}%`
     : "N/A";
+  const displayName = agentName.toUpperCase().replace(" ", "_");
 
   return (
-    /* Backdrop */
     <div
-      className="fixed inset-0 z-[60] flex items-center justify-center p-4"
-      style={{ backdropFilter: "blur(12px)", background: "rgba(19,19,19,0.6)" }}
+      className="fixed inset-0 z-[60] flex items-center justify-center p-6"
+      style={{ backdropFilter: "blur(10px)", background: "rgba(10,10,10,0.75)" }}
+      onClick={onClose}
       role="dialog"
       aria-modal="true"
       aria-labelledby="deep-scan-title"
     >
-      {/* Modal shell */}
       <div
-        className="w-full max-w-5xl relative overflow-hidden flex flex-col md:flex-row"
+        onClick={(e) => e.stopPropagation()}
+        className="w-full max-w-lg overflow-y-auto"
         style={{
-          background: "#0e0e0e",
-          border: "1px solid rgba(0,229,255,0.2)",
-          boxShadow: "0 0 50px rgba(0,229,255,0.15)",
+          background: "#1c1b1b",
+          border: "1px solid rgba(59,73,76,0.3)",
+          borderRadius: "0.75rem",
+          maxHeight: "85vh",
         }}
       >
-        {/* Top glow line */}
-        <div
-          className="absolute top-0 left-0 w-full h-px opacity-50"
-          style={{
-            background:
-              "linear-gradient(to right, transparent, #00e5ff, transparent)",
-          }}
-          aria-hidden="true"
-        />
-        {/* Decorative circle */}
-        <div
-          className="absolute -right-12 -top-12 w-48 h-48 rounded-full pointer-events-none"
-          style={{ border: "1px solid rgba(0,229,255,0.1)" }}
-          aria-hidden="true"
-        />
-
-        {/* ── Left column: Strategy Identity ── */}
-        <div
-          className="w-full md:w-80 p-8 flex flex-col"
-          style={{
-            background: "#1c1b1b",
-            borderRight: "1px solid rgba(59,73,76,0.2)",
-          }}
-        >
-          {/* Header */}
-          <div className="mb-8">
+        {/* Header */}
+        <div className="flex justify-between items-start p-6 pb-0">
+          <div>
             <p
-              className="font-['Space_Grotesk'] uppercase mb-2"
-              style={{
-                fontSize: "10px",
-                color: "#00daf3",
-                letterSpacing: "0.3em",
-              }}
+              className="font-['Space_Grotesk'] uppercase"
+              style={{ fontSize: "10px", color: "#00daf3", letterSpacing: "0.2em" }}
             >
-              STRATEGY FILE // 0X-{String(tokenId).padStart(4, "0")}
+              iNFT #{String(tokenId).padStart(4, "0")}
             </p>
             <h2
               id="deep-scan-title"
-              className="font-['Space_Grotesk'] font-black uppercase leading-none tracking-tighter mb-4"
-              style={{ fontSize: "30px", color: "#e5e2e1" }}
+              className="font-['Space_Grotesk'] font-black uppercase tracking-tight mt-1"
+              style={{ fontSize: "24px", color: "#e5e2e1" }}
             >
-              {agentName.toUpperCase().replace(" ", "_")}
+              {displayName}
             </h2>
-            <div
-              className="inline-flex items-center gap-2 px-3 py-1 uppercase font-bold"
-              style={{
-                fontSize: "10px",
-                letterSpacing: "0.2em",
-                background: "rgba(123,63,228,0.1)",
-                border: "1px solid #7B3FE4",
-                color: "#c4b5ff",
-              }}
-            >
-              <span
-                className="w-2 h-2 rounded-full animate-pulse"
-                style={{ background: "#c4b5ff" }}
-              />
-              ACTIVE EMITTER
-            </div>
           </div>
-
-          {/* Contract info */}
-          <div className="flex-1 space-y-6">
-            <div
-              className="p-4"
-              style={{
-                background: "rgba(53,53,52,0.3)",
-                border: "1px solid rgba(59,73,76,0.3)",
-              }}
-            >
-              <p
-                className="font-['Space_Grotesk'] uppercase mb-1"
-                style={{ fontSize: "10px", color: "#bac9cc" }}
-              >
-                Contract ID (0G)
-              </p>
-              <a
-                href={`https://chainscan-galileo.0g.ai/address/${INFT_ADDRESS}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                className="font-mono truncate block hover:underline"
-                style={{ fontSize: "12px", color: "#c3f5ff" }}
-              >
-                {truncateAddress(INFT_ADDRESS)}
-              </a>
-              <div className="mt-4">
-                <p
-                  className="font-['Space_Grotesk'] uppercase mb-1"
-                  style={{ fontSize: "10px", color: "#bac9cc" }}
-                >
-                  Current Owner
-                </p>
-                <a
-                  href={`https://chainscan-galileo.0g.ai/address/${owner}`}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="font-mono truncate block hover:underline"
-                  style={{ fontSize: "12px", color: "#e5e2e1" }}
-                >
-                  {truncateAddress(owner)}
-                </a>
-              </div>
-            </div>
-
-            {/* Radar fingerprint */}
-            <div>
-              <p
-                className="font-['Space_Grotesk'] uppercase mb-4 tracking-widest"
-                style={{ fontSize: "10px", color: "#c3f5ff" }}
-              >
-                Strategy Fingerprint
-              </p>
-              <RadarChart
-                sharpe={sharpeScore}
-                totalReturn={totalReturn}
-                commission={commissionYield}
-              />
-            </div>
-          </div>
-
-          {/* Risk level */}
-          <div
-            className="mt-8 pt-6 flex justify-between items-center"
-            style={{ borderTop: "1px solid rgba(59,73,76,0.2)" }}
+          <button
+            onClick={onClose}
+            className="text-[#6b7a7d] hover:text-white transition-colors p-1"
+            aria-label="Close"
           >
-            <span
-              className="font-['Space_Grotesk'] uppercase tracking-widest"
-              style={{ fontSize: "12px", color: "#bac9cc" }}
+            <span className="material-symbols-outlined text-[18px]">close</span>
+          </button>
+        </div>
+
+        {/* Metrics grid */}
+        <div className="grid grid-cols-3 gap-3 p-6">
+          {[
+            { label: "SHARPE", value: sharpeScore.toFixed(2), color: sharpeScore > 1 ? "#00E5FF" : "#bac9cc" },
+            { label: "RETURN", value: `${totalReturn >= 0 ? "+" : ""}${(totalReturn * 100).toFixed(2)}%`, color: totalReturn >= 0 ? "#4ade80" : "#f87171" },
+            { label: "EPOCHS", value: String(epochs), color: "#e5e2e1" },
+          ].map((m) => (
+            <div key={m.label} className="p-3" style={{ background: "#131313", borderRadius: "0.5rem" }}>
+              <p className="font-['Space_Grotesk'] uppercase text-[9px] tracking-widest" style={{ color: "#6b7a7d" }}>{m.label}</p>
+              <p className="font-['Space_Grotesk'] font-bold text-lg mt-1" style={{ color: m.color }}>{m.value}</p>
+            </div>
+          ))}
+        </div>
+
+        {/* Details */}
+        <div className="px-6 pb-4 space-y-3">
+          <div className="flex justify-between text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <span style={{ color: "#6b7a7d" }}>COMMISSION ACCRUED</span>
+            <span style={{ color: "#e5e2e1" }}>${cumCommissionUsdc} USDC</span>
+          </div>
+          <div className="flex justify-between text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <span style={{ color: "#6b7a7d" }}>SURVIVAL RATE</span>
+            <span style={{ color: "#e5e2e1" }}>{survivalPct}</span>
+          </div>
+          <div className="flex justify-between text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <span style={{ color: "#6b7a7d" }}>CONTRACT (0G)</span>
+            <a
+              href={`https://chainscan-galileo.0g.ai/address/${INFT_ADDRESS}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono hover:underline"
+              style={{ color: "#00daf3" }}
             >
-              Risk Level
-            </span>
-            <span
-              className="uppercase font-['Space_Grotesk']"
-              style={{
-                fontSize: "12px",
-                color: sharpeScore < 0 ? "#f87171" : sharpeScore > 2 ? "#c4b5ff" : "#bac9cc",
-              }}
+              {truncateAddress(INFT_ADDRESS)}
+            </a>
+          </div>
+          <div className="flex justify-between text-xs" style={{ fontFamily: "'Space Grotesk', sans-serif" }}>
+            <span style={{ color: "#6b7a7d" }}>OWNER</span>
+            <a
+              href={`https://chainscan-galileo.0g.ai/address/${owner}`}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="font-mono hover:underline"
+              style={{ color: "#e5e2e1" }}
             >
-              {sharpeScore < 0 ? "Extreme" : sharpeScore > 2 ? "High" : "Moderate"}
-            </span>
+              {truncateAddress(owner)}
+            </a>
           </div>
         </div>
 
-        {/* ── Right column: Performance & Metrics ── */}
-        <div className="flex-1 p-8" style={{ background: "#0e0e0e" }}>
-          {/* Header row */}
-          <div className="flex justify-between items-start mb-10">
-            <div>
-              <p
-                className="font-['Space_Grotesk'] uppercase mb-1"
-                style={{
-                  fontSize: "10px",
-                  color: "#bac9cc",
-                  letterSpacing: "0.4em",
-                }}
-              >
-                Dossier Access
-              </p>
-              <h3
-                className="font-['Space_Grotesk'] font-bold uppercase tracking-tight"
-                style={{ fontSize: "20px", color: "#e5e2e1" }}
-              >
-                Strategy Performance Analysis
-              </h3>
-            </div>
-            <button
-              onClick={onClose}
-              className="p-2 transition-colors"
-              style={{ color: "#bac9cc" }}
-              aria-label="Close deep scan"
-            >
-              <span className="material-symbols-outlined" aria-hidden="true">
-                close
-              </span>
-            </button>
-          </div>
-
-          {/* Metrics bento */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-10">
-            <MetricCard
-              icon="radar"
-              label="Sharpe EMA"
-              value={sharpeScore.toFixed(2)}
-              sub={`${sharpeScore > 0 ? "+" : ""}${Math.round(sharpeScore * 4)}% vs Epoch-${epochs - 1}`}
-              valueColor={sharpeScore > 1.5 ? "#00E5FF" : sharpeScore > 0.5 ? "#4ade80" : sharpeScore >= 0 ? "#bac9cc" : "#f87171"}
-            />
-            <MetricCard
-              icon="payments"
-              label="Cum. Commission"
-              value={`$${cumCommissionUsdc}`}
-              sub="Total Fee Capture"
-              subColor="#bac9cc"
-            />
-            <MetricCard
-              icon="history"
-              label="Arena Tenure"
-              value={`${epochs} Epochs`}
-              sub={`${survivalPct} Survival Rate`}
-              subColor="#c4b5ff"
-            />
-          </div>
-
-          {/* Performance chart */}
-          <div className="mb-10">
-            <div className="flex justify-between items-center mb-4">
-              <h4
-                className="font-['Space_Grotesk'] uppercase tracking-[0.2em]"
-                style={{ fontSize: "12px", color: "#c3f5ff" }}
-              >
-                Historical Performance Yield
-              </h4>
-              <div className="flex gap-2 items-center">
-                <span
-                  className="w-3 h-3 inline-block"
-                  style={{ background: "#00e5ff" }}
-                  aria-hidden="true"
-                />
-                <span
-                  className="font-['Space_Grotesk'] uppercase"
-                  style={{ fontSize: "10px", color: "#bac9cc" }}
-                >
-                  Agent-X Yield Curve
-                </span>
-              </div>
-            </div>
-            <PerformanceChart totalReturn={totalReturn} epochs={epochs} />
-          </div>
-
-          {/* Action area */}
-          <div
-            className="flex items-center justify-between mt-12 p-6"
+        {/* Footer */}
+        <div className="p-6 pt-3">
+          <button
+            className="w-full py-3 font-['Space_Grotesk'] font-black text-xs uppercase tracking-[0.2em] transition-all hover:opacity-90 active:scale-[0.98]"
             style={{
-              background: "rgba(42,42,42,0.5)",
-              borderTop: "1px solid rgba(0,229,255,0.3)",
+              background: "#00e5ff",
+              color: "#00363d",
+              borderRadius: "0.5rem",
             }}
           >
-            <div className="flex items-center gap-6">
-              <div>
-                <p
-                  className="font-['Space_Grotesk'] uppercase"
-                  style={{ fontSize: "10px", color: "#bac9cc" }}
-                >
-                  Accrued Commission
-                </p>
-                <p
-                  className="font-['Space_Grotesk'] font-black"
-                  style={{ fontSize: "24px", color: "#e5e2e1" }}
-                >
-                  ${cumCommissionUsdc}
-                </p>
-              </div>
-              <div
-                className="h-8 w-px"
-                style={{ background: "rgba(59,73,76,0.4)" }}
-              />
-              <div>
-                <p
-                  className="font-['Space_Grotesk'] uppercase"
-                  style={{ fontSize: "10px", color: "#bac9cc" }}
-                >
-                  Epochs Completed
-                </p>
-                <p
-                  className="font-['Space_Grotesk'] font-bold"
-                  style={{ fontSize: "18px", color: "#00daf3" }}
-                >
-                  {epochs}
-                </p>
-              </div>
-            </div>
-
-            <button
-              className="px-10 py-4 font-['Space_Grotesk'] font-black uppercase transition-all transform hover:scale-[1.02] active:scale-95"
-              style={{
-                background: "#00e5ff",
-                color: "#00363d",
-                letterSpacing: "0.25em",
-                boxShadow: "0 0 30px rgba(0,229,255,0.3)",
-                fontSize: "12px",
-              }}
-            >
-              PURCHASE iNFT OWNERSHIP
-            </button>
-          </div>
-
-          <p
-            className="text-center font-['Space_Grotesk'] uppercase tracking-widest mt-4"
-            style={{ fontSize: "9px", color: "rgba(186,201,204,0.4)" }}
-          >
-            Ownership transfer is instantaneous via 0G Layer-1 Settlement Protocol
-          </p>
+            PURCHASE iNFT OWNERSHIP
+          </button>
         </div>
       </div>
     </div>

@@ -206,15 +206,6 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
         style={{ borderLeftColor: "#00e5ff" }}
       >
         <div>
-          <span
-            className="text-xs uppercase tracking-[0.3em]"
-            style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              color: "#bac9cc",
-            }}
-          >
-            Tactical Overview
-          </span>
           <h1
             className="text-5xl font-black tracking-tighter mt-1"
             style={{
@@ -246,33 +237,10 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
               />
               PHASE: {agent.phase.toUpperCase()}
             </span>
-            <span
-              className="text-xs"
-              style={{
-                fontFamily: "'Space Grotesk', sans-serif",
-                color: "#bac9cc",
-              }}
-            >
-              EMA SHARPE:{" "}
-              <span className="font-black" style={{ color: "#e5e2e1" }}>
-                {agent.sharpeScore.toFixed(2)}
-              </span>
-            </span>
           </div>
         </div>
 
         <div className="flex gap-4">
-          <button
-            type="button"
-            className="px-6 py-3 border text-xs tracking-widest uppercase transition-all"
-            style={{
-              fontFamily: "'Space Grotesk', sans-serif",
-              borderColor: "rgba(123,63,228,0.3)",
-              color: "#c4b5ff",
-            }}
-          >
-            Pause Agent
-          </button>
           <button
             type="button"
             onClick={handleClaimCommissions}
