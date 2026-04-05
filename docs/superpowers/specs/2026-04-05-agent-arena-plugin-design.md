@@ -68,7 +68,6 @@ The plugin uses two environment variables. All other values (contract addresses,
 | Variable | Source | Purpose |
 |---|---|---|
 | `AGENT_PRIVATE_KEY` | User provides | Signs `submitIntent()` transactions on 0G testnet |
-| `OG_COMPUTE_API_KEY` | User provides | Authenticates to 0G Compute for LLM inference |
 
 **Hardcoded in the plugin (same for all users):**
 
@@ -78,12 +77,12 @@ const CONFIG = {
   AGENT_MANAGER_ADDRESS: "0xbab8565cacfbfde89b76d37cdcad68a80ca686f0",
   MCP_SERVER_URL: "https://us-central1-subgraph-mcp.cloudfunctions.net/mcp",
   POOL_ADDRESS: "0x6Ce0896eAE6D4BD668fDe41BB784548fb8F59b50",
-  OG_COMPUTE_URL: "https://compute-network-6.integratenetwork.work/v1/proxy",
-  OG_COMPUTE_MODEL: "qwen/qwen-2.5-7b-instruct",
   CHAIN_ID: 16602,
   SEPOLIA_CHAIN_ID: 11155111,
 };
 ```
+
+**LLM routing:** The plugin does NOT call 0G Compute directly. It uses OpenClaw's gateway (or Claude Code's built-in model routing) to handle inference. The user configures their preferred model in OpenClaw/Claude Code settings — 0G Compute is the recommended default but any OpenAI-compatible model works. The user's `AGENTS.md` is automatically used as the system prompt by the host (OpenClaw injects it from the workspace).
 
 **Derived automatically from AGENT_PRIVATE_KEY:**
 - Wallet address (`ethers.Wallet(key).address`)
@@ -102,8 +101,7 @@ const CONFIG = {
 **Flow:**
 
 1. Ask for private key if `AGENT_PRIVATE_KEY` not set
-2. Ask for 0G Compute API key if `OG_COMPUTE_API_KEY` not set
-3. Derive wallet address from private key
+2. Derive wallet address from private key
 4. Check 0G testnet balance — warn if zero, direct to faucet at https://faucet.0g.ai
 5. Query `AgentManager.addressToAgentId(address)`:
    - If > 0: already registered. Report agentId, provingBalance, phase. Done.
@@ -116,35 +114,44 @@ const CONFIG = {
 
 **Trigger phrases:** "start trading", "run agent", "start arena agent", "begin trading"
 
+**How it works with OpenClaw/.md skill reading:**
+
+The SKILL.md instructs the host (OpenClaw or Claude Code) to run an autonomous trading loop. The host already knows the user's configured model (0G Compute, Claude, etc.) and injects `AGENTS.md` as the system prompt. The skill orchestrates the cycle:
+
+1. Call `query-pool` skill → get pool state from MCP
+2. The host's LLM reasons with the strategy (AGENTS.md) + pool data → outputs a JSON decision
+3. Call `submit-intent` skill → send the decision on-chain
+4. Sleep for interval → repeat
+
+**The SKILL.md is the loop controller.** It tells the host: "You are an autonomous agent. Every N seconds, use query-pool to get market data, make your LP decision based on your AGENTS.md strategy, then use submit-intent to execute it."
+
 **Flow:**
 
-1. Check `AGENT_PRIVATE_KEY` and `OG_COMPUTE_API_KEY` are set
+1. Check `AGENT_PRIVATE_KEY` is set
 2. Derive address → query agentId → verify registered
-3. Read `AGENTS.md` from the user's workspace root — if missing, error: "Write your strategy in AGENTS.md first. See AGENTS.md.example for a template."
+3. Check `AGENTS.md` exists in the user's workspace — if missing, error with pointer to `AGENTS.md.example`
 4. Parse interval from user message (default 120s). Examples: "start trading every 60 seconds", "start trading every 5 minutes"
-5. Start background loop (`arena-loop.mjs`):
+5. Start the autonomous loop (`arena-loop.mjs`):
 
 **Each iteration of the loop:**
 
 ```
-a. Call MCP (query-pool.mjs):
-   - Initialize session (Streamable HTTP, SSE-aware)
+a. Call query-pool.mjs:
+   - Initialize MCP session (Streamable HTTP, SSE-aware)
    - get_pool_price → currentPrice, currentTick
    - get_pool_ticks → nearbyTicks (10 closest)
    - get_positions → openPosition for this wallet
 
-b. Call 0G Compute:
-   - System prompt: contents of AGENTS.md
-   - User message: "Epoch trigger. Pool state: {JSON}. Output your JSON decision now."
-   - Model: qwen/qwen-2.5-7b-instruct
-   - API key: OG_COMPUTE_API_KEY
-   - Endpoint: OG_COMPUTE_URL
+b. LLM decision (routed through OpenClaw gateway / host):
+   - The host sends pool state to the configured model
+   - AGENTS.md is the system prompt (injected by the host)
+   - The model returns a JSON decision
 
-c. Parse JSON decision from response:
+c. Parse JSON decision:
    - Strip <tool_call> tags if present
    - Extract {"action": "open/close/hold", ...}
 
-d. If action != "hold": call submitIntent on-chain
+d. If action != "hold": call submit-intent.mjs
    - Map: open→OPEN_POSITION(0), close→CLOSE_POSITION(1), rebalance→MODIFY_POSITION(2)
    - ABI-encode IntentParams (amountUSDC, tickLower, tickUpper)
    - Sign and send via ethers v6
@@ -157,8 +164,10 @@ f. Sleep for interval
 6. The loop runs until the user says "stop trading"
 
 **Executables:**
-- `arena-loop.mjs` — the main loop (called by the skill as a background process)
-- `query-pool.mjs` — MCP client (Streamable HTTP, SSE-aware, identical to existing `data-seed/workspaces/agent-alpha/skills/query-pool.mjs`)
+- `arena-loop.mjs` — the main loop. Calls `query-pool.mjs` for data, calls the OpenClaw gateway HTTP endpoint for LLM inference (same pattern as `cron-trigger.js`), calls `submit-intent.mjs` for on-chain execution.
+- `query-pool.mjs` — MCP client (Streamable HTTP, SSE-aware, identical to existing skill)
+
+**Model flexibility:** Because inference goes through the host, the user can run their strategy on any model — 0G Compute (Qwen 2.5 7B), Claude, Gemini, a local model — just by changing their OpenClaw/Claude Code model config. The plugin doesn't care which model generates the decision.
 
 ### 3. submit-intent
 
@@ -204,21 +213,24 @@ beyond 80% of your range boundary. Otherwise hold.
 
 ---
 
-## 0G Compute Integration
+## LLM Integration (via OpenClaw / Host)
 
-The `arena-loop.mjs` calls 0G Compute directly (not through OpenClaw gateway). This is the standard OpenAI-compatible API:
+The `arena-loop.mjs` calls the **OpenClaw gateway HTTP endpoint** for LLM inference — the same `/v1/chat/completions` pattern used by `cron-trigger.js`. The gateway handles:
+- Model routing (0G Compute, Claude, Gemini, local — whatever the user configured)
+- System prompt injection from `AGENTS.md`
+- Authentication to the underlying model provider
 
 ```javascript
-const response = await fetch(`${OG_COMPUTE_URL}/chat/completions`, {
+// arena-loop.mjs calls the local gateway (same as cron-trigger.js)
+const response = await fetch(`${GATEWAY_URL}/v1/chat/completions`, {
   method: "POST",
   headers: {
     "Content-Type": "application/json",
-    "Authorization": `Bearer ${OG_COMPUTE_API_KEY}`,
+    "Authorization": `Bearer ${GATEWAY_TOKEN}`,
   },
   body: JSON.stringify({
-    model: OG_COMPUTE_MODEL,
+    model: "openclaw/default",  // routes to configured model
     messages: [
-      { role: "system", content: agentsMdContent },
       { role: "user", content: `Epoch trigger. Pool state: ${JSON.stringify(poolState)}. Output your JSON decision now.` },
     ],
     max_tokens: 256,
@@ -226,7 +238,23 @@ const response = await fetch(`${OG_COMPUTE_URL}/chat/completions`, {
 });
 ```
 
-No OpenClaw gateway needed. The 0G Compute endpoint is OpenAI-compatible and returns `choices[0].message.content`.
+The `AGENTS.md` system prompt is injected by OpenClaw automatically — the plugin doesn't read or send it. The user's model configuration lives in their OpenClaw config, not in the plugin.
+
+**Recommended model config for 0G Compute** (in user's `openclaw.json`):
+```json
+{
+  "models": {
+    "providers": {
+      "0g": {
+        "baseUrl": "https://compute-network-6.integratenetwork.work/v1/proxy",
+        "apiKey": { "source": "env", "id": "OG_COMPUTE_API_KEY" },
+        "api": "openai-completions",
+        "models": [{ "id": "qwen/qwen-2.5-7b-instruct", "name": "Qwen 2.5 7B" }]
+      }
+    }
+  }
+}
+```
 
 ---
 
@@ -254,12 +282,12 @@ No other dependencies. `ethers` is expected to be available in the user's enviro
 | Error | Plugin behavior |
 |---|---|
 | `AGENT_PRIVATE_KEY` not set | Skill asks user to provide it |
-| `OG_COMPUTE_API_KEY` not set | Skill asks user to provide it |
 | No `AGENTS.md` in workspace | Error with pointer to `AGENTS.md.example` |
 | 0G balance = 0 | Warn + link to faucet, don't start loop |
 | Agent not registered | Direct to dashboard for registration |
 | MCP unavailable | Log warning, use mock pool data as fallback |
-| 0G Compute timeout | Log, skip epoch, retry next iteration |
+| OpenClaw gateway not running | Error: "Start OpenClaw gateway first" |
+| LLM timeout / error | Log, skip epoch, retry next iteration |
 | submitIntent reverts | Log revert reason (cooldown, paused, insufficient balance), continue loop |
 | User says "stop trading" | Kill background loop cleanly |
 
@@ -269,6 +297,7 @@ No other dependencies. `ethers` is expected to be available in the user's enviro
 
 - **Does not hold funds** — proving capital is deposited via the dashboard on Sepolia, not through the plugin
 - **Does not manage wallets** — user provides their own private key
-- **Does not run the OpenClaw gateway** — calls 0G Compute directly
+- **Does not bundle a model** — uses whatever model the user configured in OpenClaw/Claude Code (0G Compute recommended)
 - **Does not modify the user's workspace** — only reads `AGENTS.md`
 - **Does not store any state** — each loop iteration is stateless (position data comes from MCP)
+- **Does not bypass OpenClaw** — LLM inference goes through the gateway, respecting the user's model config and AGENTS.md injection
