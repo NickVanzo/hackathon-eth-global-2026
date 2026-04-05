@@ -4,45 +4,14 @@ metadata:
   name: hasura-ingress
   namespace: arena-subgraph
   annotations:
-    # GKE will provision a Google-managed HTTPS load balancer
     kubernetes.io/ingress.class: "gce"
-    networking.gke.io/managed-certificates: "hasura-cert"
     kubernetes.io/ingress.global-static-ip-name: "arena-subgraph-ip"
-    # Redirect HTTP to HTTPS
-    networking.gke.io/v1beta1.FrontendConfig: "hasura-frontend-config"
+    kubernetes.io/ingress.allow-http: "true"
 spec:
+  tls:
+    - secretName: hasura-tls
   defaultBackend:
     service:
       name: hasura-service
       port:
         number: 8080
-  rules:
-  - host: subgraph.arena.example.com
-    http:
-      paths:
-      - path: /
-        pathType: Prefix
-        backend:
-          service:
-            name: hasura-service
-            port:
-              number: 8080
----
-apiVersion: networking.gke.io/v1
-kind: ManagedCertificate
-metadata:
-  name: hasura-cert
-  namespace: arena-subgraph
-spec:
-  domains:
-    - subgraph.arena.example.com
----
-apiVersion: networking.gke.io/v1beta1
-kind: FrontendConfig
-metadata:
-  name: hasura-frontend-config
-  namespace: arena-subgraph
-spec:
-  redirectToHttps:
-    enabled: true
-    responseCodeName: MOVED_PERMANENTLY_DEFAULT
