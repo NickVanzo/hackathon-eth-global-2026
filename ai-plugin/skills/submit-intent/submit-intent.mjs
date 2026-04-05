@@ -61,13 +61,16 @@ try {
 // ---------------------------------------------------------------------------
 
 /**
- * Build the intentData bytes passed to submitIntent.
+ * Build the params bytes for submitIntent.
  *
- * Layout (ABI-encoded):
+ * Contract signature: submitIntent(uint256 agentId, uint8 actionType, bytes params)
+ * actionType is a SEPARATE argument (not packed in bytes).
+ *
+ * params layout (ABI-encoded IntentParams):
  *   CLOSE  → 0x  (empty bytes — no position params needed)
- *   OPEN / MODIFY → abi.encode(uint8 actionType, uint256 amountUSDC6, int24 tickLower, int24 tickUpper)
+ *   OPEN / MODIFY → abi.encode(uint256 amountUSDC, int24 tickLower, int24 tickUpper)
  */
-function buildIntentData(actionType, params) {
+function buildParamsBytes(actionType, params) {
   if (actionType === ACTION_CLOSE) {
     return "0x";
   }
@@ -93,8 +96,8 @@ function buildIntentData(actionType, params) {
 
   const abiCoder = ethers.AbiCoder.defaultAbiCoder();
   return abiCoder.encode(
-    ["uint8", "uint256", "int24", "int24"],
-    [actionType, amountUSDC6, tickLowerInt, tickUpperInt]
+    ["uint256", "int24", "int24"],
+    [amountUSDC6, tickLowerInt, tickUpperInt]
   );
 }
 
@@ -127,11 +130,11 @@ function buildIntentData(actionType, params) {
   console.log(`Agent ID       : ${agentId}`);
   console.log(`Action type    : ${actionType} (${ACTION_NAMES[actionType]})`);
 
-  // --- Build intent payload ---
-  const intentData = buildIntentData(actionType, params);
-  console.log(`Intent data    : ${intentData}`);
+  // --- Build params bytes ---
+  const paramsBytes = buildParamsBytes(actionType, params);
+  console.log(`Params bytes   : ${paramsBytes}`);
 
-  // --- Submit ---
+  // --- Submit: submitIntent(uint256 agentId, uint8 actionType, bytes params) ---
   const agentManager = new ethers.Contract(
     CONFIG.AGENT_MANAGER_ADDRESS,
     AGENT_MANAGER_ABI,
@@ -140,7 +143,7 @@ function buildIntentData(actionType, params) {
 
   let tx;
   try {
-    tx = await agentManager.submitIntent(agentId, intentData);
+    tx = await agentManager.submitIntent(agentId, actionType, paramsBytes);
   } catch (err) {
     console.error(`Error submitting intent: ${err.message}`);
     process.exit(1);
