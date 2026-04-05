@@ -103,6 +103,7 @@ export default function AgentDetail() {
                 letterSpacing: "0.1em",
                 textTransform: "uppercase",
                 padding: "8px 16px",
+                borderRadius: "0.5rem",
                 background: agentId === a.id ? "#00e5ff" : "#201f1f",
                 color: agentId === a.id ? "#00363d" : "#849396",
                 border: agentId === a.id ? "none" : "1px solid rgba(59,73,76,0.3)",

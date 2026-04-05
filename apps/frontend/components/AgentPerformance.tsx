@@ -1166,33 +1166,8 @@ export default function AgentPerformance() {
                 >
                   LEADERBOARD
                 </h1>
-                <p
-                  style={{
-                    color: COLORS.onSurfaceVariant,
-                    maxWidth: "448px",
-                    marginTop: "8px",
-                    fontWeight: 500,
-                    fontSize: "14px",
-                  }}
-                >
-                  Rankings updated every block. Top S-Tier Gladiators are
-                  eligible for monthly yield distribution.
-                </p>
               </div>
 
-              {/* Stats cards */}
-              <div style={{ display: "flex", gap: "16px" }}>
-                <StatCard
-                  label="TOTAL REWARDS"
-                  value="842.05 ETH"
-                  valueColor={COLORS.primary}
-                />
-                <StatCard
-                  label="ARENA TIME"
-                  value="14:02:55:09"
-                  valueColor={COLORS.secondary}
-                />
-              </div>
             </div>
           </div>
 
