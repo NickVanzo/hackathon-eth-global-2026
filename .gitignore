@@ -181,3 +181,6 @@ data-seed/intents/
 *.swo
 .DS_Store
 Thumbs.db
+
+
+*-secret.yaml

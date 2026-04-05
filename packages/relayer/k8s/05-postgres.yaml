@@ -1,0 +1,98 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: arena-relayer
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: standard-rwo
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: postgres
+  namespace: arena-relayer
+spec:
+  serviceName: postgres-service
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+    spec:
+      securityContext:
+        fsGroup: 999
+
+      containers:
+        - name: postgres
+          image: postgres:17.5
+          imagePullPolicy: IfNotPresent
+
+          resources:
+            requests:
+              cpu: "250m"
+              memory: "256Mi"
+            limits:
+              cpu: "1000m"
+              memory: "1Gi"
+
+          ports:
+            - containerPort: 5432
+              name: postgres
+
+          env:
+            - name: POSTGRES_USER
+              value: "arena"
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: relayer-secret
+                  key: ENVIO_PG_PASSWORD
+            - name: POSTGRES_DB
+              value: "arena_indexer"
+            - name: PGDATA
+              value: "/var/lib/postgresql/data/pgdata"
+
+          volumeMounts:
+            - name: postgres-storage
+              mountPath: /var/lib/postgresql/data
+
+          readinessProbe:
+            exec:
+              command: ["pg_isready", "-U", "arena", "-d", "arena_indexer"]
+            initialDelaySeconds: 5
+            periodSeconds: 5
+            failureThreshold: 5
+
+          livenessProbe:
+            exec:
+              command: ["pg_isready", "-U", "arena", "-d", "arena_indexer"]
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            failureThreshold: 3
+
+      volumes:
+        - name: postgres-storage
+          persistentVolumeClaim:
+            claimName: postgres-pvc
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres-service
+  namespace: arena-relayer
+spec:
+  type: ClusterIP
+  selector:
+    app: postgres
+  ports:
+    - port: 5432
+      targetPort: 5432
+      protocol: TCP

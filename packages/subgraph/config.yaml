@@ -1,0 +1,53 @@
+# yaml-language-server: $schema=./node_modules/envio/evm.schema.json
+name: envio-indexer
+networks:
+- id: 16602
+  start_block: 25765666
+  rpc: https://evmrpc-testnet.0g.ai
+  contracts:
+  - name: Vault
+    address:
+    - 0x9f449f9045ab87729d2fa1c4a68aa694a5c2c06e
+    handler: src/EventHandlers.ts
+    events:
+    - event: Approval(address indexed owner, address indexed spender, uint256 value)
+    - event: CommissionAccrued(uint256 indexed agentId, uint256 amount)
+    - event: CommissionApproved(uint256 indexed agentId, address indexed caller, uint256 amount)
+    - event: EpochSettled(uint256 sharePrice, uint256 totalShares, uint256 totalAssets)
+    - event: ForceCloseRequested(uint256 indexed agentId, uint8 source)
+    - event: ProtocolFeeAccrued(uint256 amount)
+    - event: RecoveryRecorded(uint256 indexed agentId, uint256 recoveredAmount)
+    - event: Transfer(address indexed from, address indexed to, uint256 value)
+    - event: WithdrawApproved(address indexed user, uint256 tokenAmount)
+    - event: WithdrawReleased(address indexed user, uint256 tokenAmount)
+  - name: AgentManager
+    address:
+    - 0xbab8565cacfbfde89b76d37cdcad68a80ca686f0
+    handler: src/EventHandlers.ts
+    events:
+    - event: IntentQueued(uint256 indexed agentId, uint8 actionType, bytes params, uint256 blockNumber)
+    - event: AgentPromoted(uint256 indexed agentId)
+    - event: AgentEvicted(uint256 indexed agentId, bool fullEviction)
+    - event: ForceCloseRequested(uint256 indexed agentId, uint8 source)
+- id: 11155111
+  start_block: 10591812
+  rpc: https://ethereum-sepolia.publicnode.com
+  contracts:
+  - name: Satellite
+    address:
+    - 0x76df8d1925cc8e62d65f1dbc1a3ce3ed73e797b3
+    handler: src/EventHandlers.ts
+    events:
+    - event: AgentRegistered(uint256 indexed agentId, address agentAddress, address indexed deployer, uint256 provingAmount)
+    - event: ClaimWithdrawRequested(address indexed user, uint256 tokenAmount)
+    - event: CommissionClaimRequested(uint256 indexed agentId, address indexed caller)
+    - event: Deposited(address indexed user, uint256 amount)
+    - event: PauseRequested(uint256 indexed agentId, address indexed caller, bool paused)
+    - event: PositionOpened(uint256 indexed agentId, uint256 indexed tokenId, int24 tickLower, int24 tickUpper, uint128 liquidity, uint256 amountUSDC)
+    - event: PositionClosed(uint256 indexed agentId, uint256 indexed positionId, uint256 recoveredAmount)
+    - event: ValuesReported(uint256 indexed agentId, uint256 positionValue, uint256 feesCollected)
+    - event: WithdrawFromArenaRequested(uint256 indexed agentId, address indexed caller)
+    - event: WithdrawRequested(address indexed user, uint256 tokenAmount)
+    - event: WithdrawalCompleted(address indexed user, uint256 tokenAmount)
+unordered_multichain_mode: true
+preload_handlers: true

@@ -10,46 +10,58 @@ steps:
         gcloud artifacts repositories create ${_REPOSITORY} \
           --repository-format=docker \
           --location=${_REGION} \
-          --description="Docker images for Envio relayer"
+          --description="Docker images for Arena platform"
 
-  - id: build-image
+  - id: build-relayer
     name: gcr.io/cloud-builders/docker
     args:
       - build
       - -f
       - packages/relayer/Dockerfile
       - -t
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:$BUILD_ID
+      - -t
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:latest
       - packages/relayer
 
-  - id: push-image
+  - id: push-relayer
     name: gcr.io/cloud-builders/docker
     args:
       - push
-      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID
+      - --all-tags
+      - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer
 
-  - id: deploy-cloud-run
+  - id: deploy-relayer
     name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
-    entrypoint: gcloud
+    entrypoint: bash
     args:
-      - run
-      - deploy
-      - ${_SERVICE}
-      - --image=${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID
-      - --region=${_REGION}
-      - --platform=managed
-      - --port=8080
-      - --allow-unauthenticated
-      - --set-env-vars=ENVIO_INDEXER_HOST=0.0.0.0,TUI_OFF=true,SEPOLIA_RPC_URL=https://ethereum-sepolia.publicnode.com,ZG_RPC_URL=https://evmrpc-testnet.0g.ai,SATELLITE_ADDRESS=0x8453bac9b7767ae47fd3b86ac9ee100c24913a37,VAULT_ADDRESS=0x7215ffdf9204fd2e2e6e3fed1fc305b9417a108b,AGENT_MANAGER_ADDRESS=0x253552073176a642737f111027b1709a6e33376d,USDC_E_ADDRESS=0x1c7D4B196Cb0C7B01d743Fbc6116a902379C7238,WETH_ADDRESS=0xfFf9976782d46CC05630D1f6eBAb18b2324d6B14,ENVIO_PG_HOST=envio-postgres,ENVIO_PG_PORT=5432,ENVIO_PG_USER=postgres,ENVIO_PG_DATABASE=envio-dev,ENVIO_PG_SSL_MODE=false,HASURA_GRAPHQL_ROLE=admin,HASURA_GRAPHQL_ENDPOINT=http://graphql-engine:8081/v1/metadata,HASURA_GRAPHQL_ADMIN_SECRET=testing,ENVIO_THROTTLE_CHAIN_METADATA_INTERVAL_MILLIS=5000,ENVIO_THROTTLE_PRUNE_STALE_DATA_INTERVAL_MILLIS=5000,ENVIO_THROTTLE_LIVE_METRICS_BENCHMARK_INTERVAL_MILLIS=5000,ENVIO_THROTTLE_JSON_FILE_BENCHMARK_INTERVAL_MILLIS=5000
-      - --set-secrets=PRIVATE_KEY_RELAYER=PRIVATE_KEY_RELAYER:latest,UNISWAP_API_KEY=UNISWAP_API_KEY:latest,ENVIO_API_TOKEN=ENVIO_API_TOKEN:latest
+      - -c
+      - |
+        gcloud container clusters get-credentials ${_CLUSTER} \
+          --region=${_REGION} --project=$PROJECT_ID
+        # Update the relayer image in kustomization
+        cd packages/relayer/k8s
+        sed -i "s|image: relayer:.*|image: ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:$BUILD_ID|" 04-deployment.yaml
+        kubectl apply -k .
+
+  - id: deploy-subgraph
+    name: gcr.io/google.com/cloudsdktool/cloud-sdk:slim
+    entrypoint: bash
+    args:
+      - -c
+      - |
+        gcloud container clusters get-credentials ${_CLUSTER} \
+          --region=${_REGION} --project=$PROJECT_ID
+        kubectl apply -k packages/subgraph/k8s/
 
 images:
-  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/${_SERVICE}:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:$BUILD_ID
+  - ${_REGION}-docker.pkg.dev/$PROJECT_ID/${_REPOSITORY}/relayer:latest
 
 substitutions:
   _REGION: us-central1
-  _REPOSITORY: relayer
-  _SERVICE: envio-relayer
+  _REPOSITORY: arena-images
+  _CLUSTER: arena-autopilot
 
 options:
   logging: CLOUD_LOGGING_ONLY
