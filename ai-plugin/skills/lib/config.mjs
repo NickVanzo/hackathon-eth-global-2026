@@ -31,7 +31,7 @@ export const AGENT_MANAGER_ABI = [
   "function provingDeployed(uint256 agentId) external view returns (uint256)",
 
   // isPaused() → bool
-  "function isPaused() external view returns (bool)",
+  "function isPaused(uint256 agentId) external view returns (bool)",
 
   // credits(agentId) → credit balance
   "function credits(uint256 agentId) external view returns (uint256)",

@@ -60,7 +60,7 @@ export async function getAgentInfo(address) {
       contract.agentPhase(agentId),
       contract.provingBalance(agentId),
       contract.provingDeployed(agentId),
-      contract.isPaused(),
+      contract.isPaused(agentId),
     ]);
 
   return {
