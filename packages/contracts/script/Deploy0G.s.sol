@@ -35,9 +35,9 @@ contract Deploy0G is Script {
     // -------------------------------------------------------------------------
 
     uint256 constant ALPHA                  = 3000;       // 0.30 EMA decay
-    uint256 constant MAX_AGENTS             = 10;         // max vault-phase agents
+    uint256 constant MAX_AGENTS             = 2;          // max vault-phase agents (2 of 3 compete)
     uint256 constant TOTAL_REFILL_BUDGET    = 1_000_000e6;// 1M USDC credits per epoch
-    uint256 constant PROVING_EPOCHS_REQUIRED = 3;         // epochs before promotion eligible
+    uint256 constant PROVING_EPOCHS_REQUIRED = 2;         // epochs before promotion eligible
     uint256 constant MIN_PROMOTION_SHARPE   = 500;        // 0.05 Sharpe minimum (scaled x10000)
     uint256 constant MIN_ACTION_INTERVAL    = 10;         // blocks between actions
     uint256 constant MAX_PROMOTION_SHARE    = 1000;       // 10% max vault share for new promotee

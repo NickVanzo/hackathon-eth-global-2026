@@ -383,13 +383,24 @@ contract AgentManager is IAgentManager {
         _AgentResult[] memory results = new _AgentResult[](n);
 
         // Pass 1: iterate backwards (so swap-and-pop doesn't skip entries)
+        // Track vault count so promotion respects maxAgents cap
+        uint256 vaultCount;
+        for (uint256 k = 0; k < n; k++) {
+            if (agents[activeAgentIds[k]].phase == IShared.AgentPhase.VAULT) vaultCount++;
+        }
+
         uint256 i = n;
         uint256 outputIdx = 0;
         while (i > 0) {
             i--;
             _AgentResult memory res = _settleOneAgent(
-                activeAgentIds[i], _totalAssets, _maxExposureRatio
+                activeAgentIds[i], _totalAssets, _maxExposureRatio, vaultCount
             );
+            if (res.promoted) vaultCount++; // newly promoted, increment for next iterations
+            if (res.evicted && agents[res.aid].phase == IShared.AgentPhase.PROVING) {
+                // vault agent demoted to proving — one slot freed
+                if (vaultCount > 0) vaultCount--;
+            }
             if (res.deregistered) continue; // agent gone, skip
             if (res.isVaultAfter && !res.evicted) {
                 aggregateVaultPositionValue += res.positionValue;
@@ -436,7 +447,8 @@ contract AgentManager is IAgentManager {
     function _settleOneAgent(
         uint256 aid,
         uint256 _totalAssets,
-        uint256 _maxExposureRatio
+        uint256 _maxExposureRatio,
+        uint256 _vaultCount
     ) internal returns (_AgentResult memory res) {
         res.aid = aid;
         Agent  storage agent  = agents[aid];
@@ -494,8 +506,9 @@ contract AgentManager is IAgentManager {
             }
         }
 
-        // 6. Promotion
+        // 6. Promotion (only if vault has capacity)
         if (!res.evicted && !isVault &&
+            _vaultCount < maxAgents &&
             agent.epochsCompleted >= provingEpochsRequired &&
             res.sharpe >= minPromotionSharpe)
         {
