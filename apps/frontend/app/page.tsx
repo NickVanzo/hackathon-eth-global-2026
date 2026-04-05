@@ -62,12 +62,13 @@ export default function Home() {
       {/* ── Top Navigation Bar ─────────────────────────────────────────── */}
       <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313]/80 backdrop-blur-md shadow-[0_0_20px_rgba(0,229,255,0.08)]">
         {/* Left: branding */}
-        <div className="flex items-center">
+        <div className="flex items-center gap-3">
+          <img src="/koi-logo.svg" alt="KOI" className="w-11 h-11" />
           <span
             className="text-xl font-black italic text-[#00E5FF] tracking-tighter uppercase"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
-            ARENA_OS
+            KOI
           </span>
         </div>
 

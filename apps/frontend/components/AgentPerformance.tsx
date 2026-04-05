@@ -391,19 +391,22 @@ function TopNav() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "32px" }}>
-        <span
-          style={{
-            fontSize: "20px",
-            fontWeight: 900,
-            fontStyle: "italic",
-            color: COLORS.primaryContainer,
-            fontFamily: "'Space Grotesk', sans-serif",
-            letterSpacing: "-0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          ARENA_OS
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <img src="/koi-logo.svg" alt="KOI" style={{ width: "44px", height: "44px" }} />
+          <span
+            style={{
+              fontSize: "20px",
+              fontWeight: 900,
+              fontStyle: "italic",
+              color: COLORS.primaryContainer,
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: "-0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            KOI
+          </span>
+        </div>
         <nav
           style={{ display: "flex", alignItems: "center", gap: "24px" }}
           aria-label="Stats"

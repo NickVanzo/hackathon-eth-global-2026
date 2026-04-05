@@ -18,7 +18,7 @@ const manrope = Manrope({
 });
 
 export const metadata: Metadata = {
-  title: "ARENA_OS",
+  title: "KOI",
   description: "On-chain agent performance dashboard",
 };
 
@@ -33,6 +33,8 @@ export default function RootLayout({
       className={`${spaceGrotesk.variable} ${manrope.variable} dark`}
     >
       <head>
+        {/* Favicon — KOI logo */}
+        <link rel="icon" href="/koi-logo.svg" type="image/svg+xml" />
         {/* Material Symbols icon font */}
         <link
           rel="stylesheet"

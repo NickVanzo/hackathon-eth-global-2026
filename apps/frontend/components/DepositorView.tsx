@@ -133,7 +133,7 @@ export default function DepositorView() {
             style={{ fontFamily: "'Manrope', sans-serif", color: "#bac9cc" }}
           >
             High-efficiency algorithmic liquidity management. Securely deposit{" "}
-            <span style={{ color: "#c3f5ff" }}>USDC.e</span> into the ARENA_OS core.
+            <span style={{ color: "#c3f5ff" }}>USDC.e</span> into the KOI vault.
             Governance-managed 20% idle reserve maintained for immediate Tier 1 liquidity.
           </p>
         </div>
@@ -649,7 +649,7 @@ export default function DepositorView() {
                   style={{ color: "#bac9cc" }}
                 >
                   <li>1. Request enters global exit queue.</li>
-                  <li>2. ARENA_OS identifies over-leveraged agents.</li>
+                  <li>2. KOI identifies over-leveraged agents.</li>
                   <li>3. Automated de-leveraging of riskier clusters.</li>
                   <li>4. Realized PnL flows to Satellite custodian.</li>
                   <li>5. Queue fills until withdrawal amount is met.</li>
