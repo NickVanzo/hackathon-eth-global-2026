@@ -266,8 +266,8 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
             className="px-6 py-3 border text-xs tracking-widest uppercase transition-all"
             style={{
               fontFamily: "'Space Grotesk', sans-serif",
-              borderColor: "rgba(215,59,0,0.3)",
-              color: "#ffb5a0",
+              borderColor: "rgba(123,63,228,0.3)",
+              color: "#c4b5ff",
             }}
           >
             Pause Agent
@@ -287,7 +287,7 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
             {isClaiming ? "SIGN TX..." : isConfirmingClaim ? "CONFIRMING..." : claimConfirmed ? "CLAIMED" : "Claim Commissions"}
           </button>
           {claimError && (
-            <p style={{ color: "#ffb5a0", fontSize: "10px", fontFamily: "'Space Grotesk', sans-serif" }}>
+            <p style={{ color: "#f87171", fontSize: "10px", fontFamily: "'Space Grotesk', sans-serif" }}>
               {claimError.message.slice(0, 80)}
             </p>
           )}
@@ -489,7 +489,7 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
                 className="text-lg font-bold"
                 style={{
                   fontFamily: "'Space Grotesk', sans-serif",
-                  color: "#ffb5a0",
+                  color: "#c4b5ff",
                 }}
               >
                 {agent.epochsCompleted}
@@ -670,7 +670,7 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
                   value: `${INFT_ADDRESS.slice(0, 6)}...${INFT_ADDRESS.slice(-4)}`,
                   color: "#00e5ff",
                 },
-                { label: "RARITY", value: "LEGENDARY", color: "#ffb5a0" },
+                { label: "RARITY", value: "LEGENDARY", color: "#c4b5ff" },
               ].map((row) => (
                 <div
                   key={row.label}
@@ -754,7 +754,7 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
             >
               <span
                 className="w-2 h-2 rounded-full animate-pulse"
-                style={{ backgroundColor: "#d73b00" }}
+                style={{ backgroundColor: "#7B3FE4" }}
               />
               LIVE EVENT LOG
             </div>
@@ -800,14 +800,14 @@ function AgentDetailInner({ agentId, isOwner }: AgentDetailInnerProps) {
                   key={i}
                   className="opacity-70"
                   style={{
-                    color: entry.type === "warning" ? "#ffb5a0" : "#bac9cc",
+                    color: entry.type === "warning" ? "#f87171" : "#bac9cc",
                   }}
                 >
                   <span
                     style={{
                       color:
                         entry.type === "warning"
-                          ? "rgba(255,181,160,0.6)"
+                          ? "rgba(248,113,113,0.6)"
                           : "rgba(0,229,255,0.6)",
                     }}
                   >

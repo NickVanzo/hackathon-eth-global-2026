@@ -20,8 +20,8 @@ const variantStyles: Record<BadgeVariant, string> = {
     "bg-[#353534] border border-[#3b494c]/30 text-[#e5e2e1]",
   // Tier classification badge (e.g. VAULT_TIER, PROVING_GROUNDS)
   tier: "bg-[#00e5ff]/10 text-[#c3f5ff] border border-[#00e5ff]/20",
-  // Warning / alert state — secondary container
-  warning: "bg-[#d73b00]/10 text-[#ffb5a0] border border-[#d73b00]/20",
+  // Warning / alert state — purple accent
+  warning: "bg-[#7B3FE4]/10 text-[#c4b5ff] border border-[#7B3FE4]/20",
 };
 
 export function Badge({

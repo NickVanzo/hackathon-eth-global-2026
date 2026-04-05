@@ -10,7 +10,7 @@ const LightweightChart = dynamic(() => import("@/components/LightweightChart"), 
 
 // ─── Design tokens (extracted from Stitch arena.html) ────────────────────────
 // Primary:              #00E5FF  (primary / primary-container)
-// Secondary-container:  #d73b00  (orange-red accent)
+// Secondary-container:  #7B3FE4  (purple accent)
 // Background:           #131313  (surface / bg)
 // Surface-container:    #201f1f
 // Surface-container-low: #1c1b1b
@@ -111,7 +111,7 @@ type FeedAccent = { border: string; icon: string; nameColor: string };
 const FEED_ACCENT: Record<ActionType, FeedAccent> = {
   OPEN_POSITION:  { border: "border-l-[#00E5FF]", icon: "text-[#00E5FF]", nameColor: "text-[#00E5FF]" },
   MODIFY_POSITION:{ border: "border-l-[#00E5FF]", icon: "text-[#00E5FF]", nameColor: "text-[#00E5FF]" },
-  CLOSE_POSITION: { border: "border-l-[#d73b00]", icon: "text-[#d73b00]", nameColor: "text-[#d73b00]" },
+  CLOSE_POSITION: { border: "border-l-[#f87171]", icon: "text-[#f87171]", nameColor: "text-[#f87171]" },
 };
 
 const STATUS_SUFFIX: Record<IntentStatus, string> = {
@@ -125,12 +125,12 @@ const STATUS_SUFFIX: Record<IntentStatus, string> = {
 function getTierLabel(phase: string): { label: string; classes: string } {
   return phase === "vault"
     ? { label: "VAULT TIER",      classes: "bg-[#00E5FF]/10 text-[#00E5FF]" }
-    : { label: "PROVING GROUNDS", classes: "bg-[#FF5722]/10 text-[#ffb5a0]" };
+    : { label: "PROVING GROUNDS", classes: "bg-[#7B3FE4]/10 text-[#c4b5ff]" };
 }
 
 function getStatusDisplay(agent: AgentInfo) {
   if (agent.sharpeScore > 1.5) return { label: "ACTIVE",  color: "text-[#00E5FF]", dot: "bg-[#00E5FF] shadow-[0_0_4px_#00E5FF]" };
-  if (agent.sharpeScore > 0)   return { label: "HUNTING", color: "text-[#d73b00]", dot: "bg-[#d73b00] shadow-[0_0_4px_#d73b00]" };
+  if (agent.sharpeScore > 0)   return { label: "HUNTING", color: "text-[#7B3FE4]", dot: "bg-[#7B3FE4] shadow-[0_0_4px_#7B3FE4]" };
   return                               { label: "IDLE",    color: "text-[#bac9cc]", dot: "bg-[#bac9cc]" };
 }
 
@@ -178,9 +178,9 @@ function VaultPerformanceChart({ stats, yieldData }: { stats: ReturnType<typeof 
           <div className="grid grid-cols-4 gap-4">
             {[
               { label: "APY",      value: stats.apy,      color: "border-[#00E5FF]", valueColor: "text-[#00E5FF]" },
-              { label: "DRAWDOWN", value: stats.drawdown,  color: "border-[#d73b00]", valueColor: "text-[#d73b00]" },
+              { label: "DRAWDOWN", value: stats.drawdown,  color: "border-[#f87171]", valueColor: "text-[#f87171]" },
               { label: "SHARPE",   value: stats.sharpe,    color: "border-[#00E5FF]", valueColor: "text-[#00E5FF]" },
-              { label: "VOL",      value: stats.vol,       color: "border-[#bac9cc]", valueColor: "text-white"     },
+              { label: "VOL",      value: stats.vol,       color: "border-[#7B3FE4]", valueColor: "text-[#c4b5ff]" },
             ].map(({ label, value, color, valueColor }) => (
               <div key={label} className={`bg-[#2a2a2a]/80 p-4 border-l-2 ${color}`}>
                 <div className="font-[family-name:var(--font-space-grotesk)] text-[10px] font-bold text-[#bac9cc] tracking-widest">
@@ -221,7 +221,7 @@ function LiveBattleFeed({ agents, intents: indexedIntents }: { agents: AgentInfo
     <div className="xl:col-span-4 flex flex-col h-full">
       {/* Section header */}
       <div className="flex items-center gap-2 mb-6">
-        <div className="w-2 h-2 rounded-full bg-[#d73b00] animate-pulse shadow-[0_0_8px_#d73b00]" aria-hidden="true" />
+        <div className="w-2 h-2 rounded-full bg-[#7B3FE4] animate-pulse shadow-[0_0_8px_#7B3FE4]" aria-hidden="true" />
         <h2 className="font-[family-name:var(--font-space-grotesk)] text-lg font-bold tracking-widest uppercase text-[#e5e2e1]">
           LIVE BATTLE FEED
         </h2>
@@ -275,9 +275,9 @@ function GladiatorCard({ agent, positions }: { agent: AgentInfo; positions: Inde
   const status = getStatusDisplay(agent);
   const isVault = agent.phase === "vault";
 
-  const hoverBorder  = isVault ? "hover:border-[#00E5FF]/40" : "hover:border-[#d73b00]/40";
-  const hoverAmbient = isVault ? "group-hover:bg-[#00E5FF]/10" : "group-hover:bg-[#d73b00]/10";
-  const hoverName    = isVault ? "group-hover:text-[#00E5FF]"  : "group-hover:text-[#d73b00]";
+  const hoverBorder  = isVault ? "hover:border-[#00E5FF]/40" : "hover:border-[#7B3FE4]/40";
+  const hoverAmbient = isVault ? "group-hover:bg-[#00E5FF]/10" : "group-hover:bg-[#7B3FE4]/10";
+  const hoverName    = isVault ? "group-hover:text-[#00E5FF]"  : "group-hover:text-[#7B3FE4]";
 
   const agentPositions = positions.filter((p) => Number(p.agentId) === agent.id);
   const totalFees      = agentPositions.reduce((sum, p) => sum + Number(p.feesCollected), 0);
@@ -312,10 +312,10 @@ function GladiatorCard({ agent, positions }: { agent: AgentInfo; positions: Inde
         </h4>
         <p className="font-[family-name:var(--font-space-grotesk)] text-[10px] text-[#bac9cc] tracking-widest uppercase font-bold">
           SHARPE:{" "}
-          <span style={{ color: agent.sharpeScore > 1.5 ? "#00E5FF" : agent.sharpeScore > 0.5 ? "#4ade80" : agent.sharpeScore >= 0 ? "#bac9cc" : "#FF5722" }}>
+          <span style={{ color: agent.sharpeScore > 1.5 ? "#00E5FF" : agent.sharpeScore > 0.5 ? "#4ade80" : agent.sharpeScore >= 0 ? "#bac9cc" : "#f87171" }}>
             {agent.sharpeScore.toFixed(2)}
           </span>{" "}
-          // RTN: {returnStr}
+          // RTN: <span style={{ color: agent.totalReturn >= 0 ? "#4ade80" : "#f87171" }}>{returnStr}</span>
         </p>
       </div>
 
@@ -352,7 +352,7 @@ function GladiatorCard({ agent, positions }: { agent: AgentInfo; positions: Inde
                   {pos.tickLower.toLocaleString()} → {pos.tickUpper.toLocaleString()}
                 </span>
                 <span className="text-[#00E5FF]">{formatLiquidity(pos.liquidity)}</span>
-                <span className={`font-[family-name:var(--font-space-grotesk)] px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase ${isActive ? "text-[#00E5FF] bg-[#00E5FF]/10" : "text-[#d73b00] bg-[#d73b00]/10"}`}>
+                <span className={`font-[family-name:var(--font-space-grotesk)] px-1.5 py-0.5 text-[9px] font-bold tracking-widest uppercase ${isActive ? "text-[#00E5FF] bg-[#00E5FF]/10" : "text-[#f87171] bg-[#f87171]/10"}`}>
                   {isActive ? "ACTIVE" : "CLOSED"}
                 </span>
                 <span className="text-[#bac9cc]/60">{formatUsdc(pos.feesCollected)} USDC</span>
@@ -409,7 +409,7 @@ function ArenaLogs() {
         {ARENA_LOGS.map((log) => (
           <div key={log.time} className="flex gap-4">
             <span className="text-[#bac9cc]">{log.time}</span>
-            <span className={log.accent ? "text-[#d73b00]" : undefined}>{log.message}</span>
+            <span className={log.accent ? "text-[#7B3FE4]" : undefined}>{log.message}</span>
           </div>
         ))}
       </div>

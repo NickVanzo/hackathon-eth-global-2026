@@ -18,8 +18,8 @@ const COLORS = {
   primary: "#c3f5ff",
   primaryContainer: "#00e5ff",
   onPrimary: "#00363d",
-  secondary: "#ffb5a0",
-  secondaryContainer: "#d73b00",
+  secondary: "#c4b5ff",
+  secondaryContainer: "#7B3FE4",
   outlineVariant: "#3b494c",
   outline: "#849396",
 } as const;
@@ -119,7 +119,7 @@ function StatusDot({ active = true, dimmed = false }: StatusDotProps) {
         height: "8px",
         borderRadius: "50%",
         backgroundColor: dimmed ? COLORS.secondary : color,
-        boxShadow: dimmed ? `0 0 8px rgba(255,87,34,0.8)` : shadow,
+        boxShadow: dimmed ? `0 0 8px rgba(123,63,228,0.8)` : shadow,
         flexShrink: 0,
       }}
     />
@@ -175,7 +175,7 @@ function SideNav() {
                 width: "100%",
                 height: "100%",
                 background:
-                  "linear-gradient(135deg, rgba(0,229,255,0.3) 0%, rgba(0,54,61,0.8) 100%)",
+                  "linear-gradient(135deg, rgba(0,229,255,0.3) 0%, rgba(123,63,228,0.3) 100%)",
               }}
             />
           </div>
@@ -292,7 +292,7 @@ function NavLink({ icon, label, active }: NavLinkProps) {
         ...(active
           ? {
               background:
-                "linear-gradient(to right, rgba(0,229,255,0.1), transparent)",
+                "linear-gradient(to right, rgba(0,229,255,0.1), rgba(123,63,228,0.04), transparent)",
               color: COLORS.primaryContainer,
               borderLeft: `4px solid ${COLORS.primaryContainer}`,
             }
@@ -391,19 +391,22 @@ function TopNav() {
       }}
     >
       <div style={{ display: "flex", alignItems: "center", gap: "32px" }}>
-        <span
-          style={{
-            fontSize: "20px",
-            fontWeight: 900,
-            fontStyle: "italic",
-            color: COLORS.primaryContainer,
-            fontFamily: "'Space Grotesk', sans-serif",
-            letterSpacing: "-0.05em",
-            textTransform: "uppercase",
-          }}
-        >
-          ARENA_OS
-        </span>
+        <div style={{ display: "flex", alignItems: "center", gap: "12px" }}>
+          <img src="/koi-logo.svg" alt="KOI" style={{ width: "44px", height: "44px" }} />
+          <span
+            style={{
+              fontSize: "20px",
+              fontWeight: 900,
+              fontStyle: "italic",
+              color: COLORS.primaryContainer,
+              fontFamily: "'Space Grotesk', sans-serif",
+              letterSpacing: "-0.05em",
+              textTransform: "uppercase",
+            }}
+          >
+            KOI
+          </span>
+        </div>
         <nav
           style={{ display: "flex", alignItems: "center", gap: "24px" }}
           aria-label="Stats"
@@ -629,7 +632,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
           fontSize: "14px",
-          color: agent.sharpeScore > 1.5 ? "#00E5FF" : agent.sharpeScore > 0.5 ? "#4ade80" : agent.sharpeScore >= 0 ? "#bac9cc" : "#FF5722",
+          color: agent.sharpeScore > 1.5 ? "#00E5FF" : agent.sharpeScore > 0.5 ? "#4ade80" : agent.sharpeScore >= 0 ? "#bac9cc" : "#f87171",
         }}
       >
         {agent.sharpeScore.toFixed(2)}
@@ -680,7 +683,7 @@ function AgentRow({ agent, rank, isAlt }: AgentRowProps) {
           fontFamily: "'Space Grotesk', sans-serif",
           fontWeight: 700,
           fontSize: "14px",
-          color: perfPositive ? COLORS.primary : COLORS.secondary,
+          color: perfPositive ? "#4ade80" : "#f87171",
         }}
       >
         {formatPerf(agent.totalReturn)}
@@ -965,7 +968,7 @@ function PromoCard() {
           position: "absolute",
           inset: 0,
           background:
-            "linear-gradient(135deg, #0e0e0e 0%, #1a2a2b 40%, #0e1a1c 100%)",
+            "linear-gradient(135deg, #0e0e0e 0%, #1a1a2b 30%, #1a0e2b 60%, #0e1a1c 100%)",
         }}
       />
       {/* Decorative grid overlay */}

@@ -133,7 +133,7 @@ export default function DepositorView() {
             style={{ fontFamily: "'Manrope', sans-serif", color: "#bac9cc" }}
           >
             High-efficiency algorithmic liquidity management. Securely deposit{" "}
-            <span style={{ color: "#c3f5ff" }}>USDC.e</span> into the ARENA_OS core.
+            <span style={{ color: "#c3f5ff" }}>USDC.e</span> into the KOI vault.
             Governance-managed 20% idle reserve maintained for immediate Tier 1 liquidity.
           </p>
         </div>
@@ -226,7 +226,7 @@ export default function DepositorView() {
               className="p-6 rounded-lg shadow-lg border-l-2"
               style={{
                 backgroundColor: "#1c1b1b",
-                borderLeftColor: "rgba(215,59,0,0.5)",
+                borderLeftColor: "rgba(123,63,228,0.5)",
               }}
             >
               <div
@@ -237,13 +237,13 @@ export default function DepositorView() {
               </div>
               <div
                 className="text-3xl font-bold tracking-tighter"
-                style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
+                style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#c4b5ff" }}
               >
                 {isLoading ? <LoadingPulse className="h-8 w-28" /> : formatIdleReserve(vault.totalAssets)}
               </div>
               <div
                 className="text-[10px] mt-1 font-mono uppercase"
-                style={{ color: "rgba(255,181,160,0.6)" }}
+                style={{ color: "rgba(196,181,255,0.6)" }}
               >
                 20.00% UTILIZATION
               </div>
@@ -367,7 +367,7 @@ export default function DepositorView() {
               <div className="p-8" style={{ backgroundColor: "rgba(28,27,27,0.5)" }}>
                 <h3
                   className="text-lg font-bold mb-6 tracking-widest uppercase flex items-center gap-2"
-                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
+                  style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#c4b5ff" }}
                 >
                   <span className="material-symbols-outlined" style={{ fontSize: 20 }}>output</span>
                   WITHDRAW INTERFACE
@@ -425,7 +425,7 @@ export default function DepositorView() {
                         backgroundColor: "#2a2a2a",
                         borderColor:
                           withdrawTier === "tier2"
-                            ? "rgba(215,59,0,0.5)"
+                            ? "rgba(123,63,228,0.5)"
                             : "rgba(59,73,76,0.3)",
                       }}
                     >
@@ -444,7 +444,7 @@ export default function DepositorView() {
                           style={{
                             fontSize: 20,
                             color:
-                              withdrawTier === "tier2" ? "#d73b00" : "#bac9cc",
+                              withdrawTier === "tier2" ? "#7B3FE4" : "#bac9cc",
                           }}
                         >
                           hourglass_top
@@ -478,7 +478,7 @@ export default function DepositorView() {
                         borderBottomColor: "#3b494c",
                         color: "#e5e2e1",
                       }}
-                      onFocus={(e) => (e.currentTarget.style.borderBottomColor = "#ffb5a0")}
+                      onFocus={(e) => (e.currentTarget.style.borderBottomColor = "#c4b5ff")}
                       onBlur={(e) => (e.currentTarget.style.borderBottomColor = "#3b494c")}
                     />
                   </div>
@@ -513,14 +513,14 @@ export default function DepositorView() {
                     style={{
                       fontFamily: "'Space Grotesk', sans-serif",
                       backgroundColor: "transparent",
-                      color: "#ffb5a0",
-                      border: "1px solid rgba(215,59,0,0.4)",
+                      color: "#c4b5ff",
+                      border: "1px solid rgba(123,63,228,0.4)",
                     }}
                   >
                     {isWithdrawing ? "SIGN TX..." : isConfirmingWithdraw ? "PROCESSING..." : withdrawConfirmed ? "QUEUED ✓" : "EXECUTE WITHDRAW"}
                   </button>
                   {withdrawConfirmed && withdrawHash && (
-                    <p className="text-[10px] text-center font-mono" style={{ color: "#ffb5a0" }}>
+                    <p className="text-[10px] text-center font-mono" style={{ color: "#c4b5ff" }}>
                       TX: {withdrawHash.slice(0, 10)}...{withdrawHash.slice(-6)}
                     </p>
                   )}
@@ -611,7 +611,7 @@ export default function DepositorView() {
             <div className="absolute -right-8 -bottom-8 opacity-10 pointer-events-none">
               <span
                 className="material-symbols-outlined"
-                style={{ fontSize: 160, color: "#ffb5a0" }}
+                style={{ fontSize: 160, color: "#c4b5ff" }}
               >
                 warning
               </span>
@@ -620,7 +620,7 @@ export default function DepositorView() {
               className="text-xs font-black mb-6 tracking-[0.25em] uppercase border-b pb-4 relative z-10"
               style={{
                 fontFamily: "'Space Grotesk', sans-serif",
-                color: "#ffb5a0",
+                color: "#c4b5ff",
                 borderColor: "rgba(59,73,76,0.2)",
               }}
             >
@@ -632,7 +632,7 @@ export default function DepositorView() {
                 style={{ fontFamily: "'Manrope', sans-serif", color: "#bac9cc" }}
               >
                 Tier 2 withdrawals trigger a{" "}
-                <span style={{ color: "#ffb5a0" }}>
+                <span style={{ color: "#c4b5ff" }}>
                   Withdrawal-Driven Force-Close (WDFC)
                 </span>{" "}
                 sequence.
@@ -641,7 +641,7 @@ export default function DepositorView() {
                 className="p-4 border-l"
                 style={{
                   backgroundColor: "rgba(53,53,52,0.5)",
-                  borderLeftColor: "rgba(255,181,160,0.3)",
+                  borderLeftColor: "rgba(196,181,255,0.3)",
                 }}
               >
                 <ol
@@ -649,7 +649,7 @@ export default function DepositorView() {
                   style={{ color: "#bac9cc" }}
                 >
                   <li>1. Request enters global exit queue.</li>
-                  <li>2. ARENA_OS identifies over-leveraged agents.</li>
+                  <li>2. KOI identifies over-leveraged agents.</li>
                   <li>3. Automated de-leveraging of riskier clusters.</li>
                   <li>4. Realized PnL flows to Satellite custodian.</li>
                   <li>5. Queue fills until withdrawal amount is met.</li>
@@ -695,7 +695,7 @@ export default function DepositorView() {
               </div>
               <div className="flex justify-between text-[10px] font-mono">
                 <span style={{ color: "#bac9cc" }}>EXIT FEE (TIER 1):</span>
-                <span style={{ color: "#ffb5a0" }}>0.10%</span>
+                <span style={{ color: "#c4b5ff" }}>0.10%</span>
               </div>
             </div>
           </section>

@@ -122,7 +122,7 @@ function EpochRow({ row, isCurrent }: { row: FeeEpoch; isCurrent: boolean }) {
 
       {/* Commission */}
       <td style={{ padding: "8px 12px", textAlign: "right" }}>
-        <span style={{ fontFamily: "'JetBrains Mono', 'SF Mono', monospace", fontSize: "12px", color: "#ffb5a0" }}>
+        <span style={{ fontFamily: "'JetBrains Mono', 'SF Mono', monospace", fontSize: "12px", color: "#c4b5ff" }}>
           {formatUsdc(row.commission)}
         </span>
       </td>
@@ -307,7 +307,7 @@ export default function FeeWaterfall() {
       {/* ── Summary pills ── */}
       <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "1px", background: "rgba(59,73,76,0.15)" }}>
         <StatPill label="Protocol Fees" value={formatUsdc(protocolFeesAccrued)} accent="#c4adff" />
-        <StatPill label="Commission Pool" value={formatUsdc(commissionPool)} accent="#ffb5a0" />
+        <StatPill label="Commission Pool" value={formatUsdc(commissionPool)} accent="#c4b5ff" />
       </div>
 
       {/* ── Epoch table ── */}

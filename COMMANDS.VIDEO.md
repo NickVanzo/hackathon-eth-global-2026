@@ -15,3 +15,17 @@ Each agent makes a live LLM decision, submits intents on 0G, reports values, set
 ```bash
 ./scripts/demo-epoch.sh
 ```
+
+## Auto-Run Epochs (background)
+
+Settles epochs automatically in a loop — reports values, waits for epoch boundary, settles.
+
+```bash
+./scripts/epoch-cron.sh &
+```
+
+Settle just one epoch (no loop):
+
+```bash
+./scripts/epoch-cron.sh --once
+```
