@@ -156,19 +156,62 @@ body {
 
 /* ── Shared layout utilities ────────────────────────────────────────────── */
 
-/* Dot-grid background — used on main canvas areas */
+/* Flowing wave background — animated gradient blobs on page wrapper */
+.wave-bg {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  overflow: hidden;
+}
+
+.wave-bg::before,
+.wave-bg::after {
+  content: "";
+  position: absolute;
+  border-radius: 50%;
+  filter: blur(140px);
+  opacity: 0.25;
+  will-change: transform;
+}
+
+.wave-bg::before {
+  width: 800px;
+  height: 800px;
+  background: radial-gradient(circle, #00E5FF 0%, transparent 70%);
+  top: -200px;
+  left: -200px;
+  animation: wave-drift-1 25s ease-in-out infinite;
+}
+
+.wave-bg::after {
+  width: 600px;
+  height: 600px;
+  background: radial-gradient(circle, #7B3FE4 0%, transparent 70%);
+  bottom: -100px;
+  right: -100px;
+  animation: wave-drift-2 20s ease-in-out infinite;
+}
+
+@keyframes wave-drift-1 {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(30vw, 20vh) scale(1.1); }
+  50%  { transform: translate(50vw, 40vh) scale(0.9); }
+  75%  { transform: translate(20vw, 60vh) scale(1.05); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+@keyframes wave-drift-2 {
+  0%   { transform: translate(0, 0) scale(1); }
+  25%  { transform: translate(-30vw, -15vh) scale(1.15); }
+  50%  { transform: translate(-45vw, -35vh) scale(0.85); }
+  75%  { transform: translate(-15vw, -50vh) scale(1.1); }
+  100% { transform: translate(0, 0) scale(1); }
+}
+
+/* bg-grid is now just a simple marker, blobs are on .wave-bg */
 .bg-grid {
-  background-image: linear-gradient(
-      to right,
-      rgba(59, 73, 76, 0.05) 1px,
-      transparent 1px
-    ),
-    linear-gradient(
-      to bottom,
-      rgba(59, 73, 76, 0.05) 1px,
-      transparent 1px
-    );
-  background-size: 24px 24px;
+  position: relative;
 }
 
 /* Dot-grid radial variant */

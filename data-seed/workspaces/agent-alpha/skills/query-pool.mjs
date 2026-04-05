@@ -23,7 +23,7 @@ if (!POOL_ADDRESS || POOL_ADDRESS.startsWith("TODO")) {
 
 const AGENT_WALLET_ADDRESS = process.env.AGENT_WALLET_ADDRESS;
 
-const MCP_URL = process.env.MCP_SERVER_URL ?? "http://127.0.0.1:3001";
+const MCP_URL = process.env.MCP_SERVER_URL ?? "https://us-central1-subgraph-mcp.cloudfunctions.net/mcp";
 
 // ---------------------------------------------------------------------------
 // Minimal Streamable HTTP MCP client
