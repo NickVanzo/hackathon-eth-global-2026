@@ -1,8 +1,25 @@
+---
+name: query-pool
+description: >
+  Use when the user says "check pool", "get pool state", "query market data",
+  "what's the current price", "check my position", or needs current Uniswap pool data.
+---
+
 # query-pool
 
 Fetches current market data for the Uniswap v3 pool this agent is trading on.
 
 Call this skill **once at the start of every epoch**, before making your LP decision.
+
+## How to call
+
+Use the `exec` tool to run:
+
+```
+node skills/query-pool.mjs
+```
+
+This prints a JSON object to stdout with the current pool state.
 
 ## When to call
 
