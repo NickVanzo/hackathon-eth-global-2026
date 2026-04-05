@@ -2,7 +2,7 @@
 
 export const CONFIG = {
   OG_RPC_URL: "https://evmrpc-testnet.0g.ai",
-  AGENT_MANAGER_ADDRESS: "0xbab8565cacfbfde89b76d37cdcad68a80ca686f0",
+  AGENT_MANAGER_ADDRESS: "0x9571BDFB6a767Da89Fe5365016Ec72FB55d0244a",
   MCP_SERVER_URL: "https://us-central1-subgraph-mcp.cloudfunctions.net/mcp",
   POOL_ADDRESS: "0x6Ce0896eAE6D4BD668fDe41BB784548fb8F59b50",
   CHAIN_ID: 16602,
