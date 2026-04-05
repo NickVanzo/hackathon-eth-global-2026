@@ -27,21 +27,21 @@
   --color-inverse-primary: #006875;
   --color-surface-tint: #00daf3;
 
-  /* Secondary — orange/coral */
-  --color-secondary: #ffb5a0;
-  --color-secondary-fixed: #ffdbd1;
-  --color-secondary-fixed-dim: #ffb5a0;
-  --color-secondary-container: #d73b00;
-  --color-on-secondary: #5f1500;
-  --color-on-secondary-fixed: #3b0900;
-  --color-on-secondary-fixed-variant: #862200;
-  --color-on-secondary-container: #fffbff;
+  /* Secondary — purple (Koi brand) */
+  --color-secondary: #c4b5ff;
+  --color-secondary-fixed: #e0d6ff;
+  --color-secondary-fixed-dim: #c4b5ff;
+  --color-secondary-container: #7B3FE4;
+  --color-on-secondary: #1a0050;
+  --color-on-secondary-fixed: #0f0030;
+  --color-on-secondary-fixed-variant: #5700c9;
+  --color-on-secondary-container: #f2e9ff;
 
-  /* Tertiary — purple */
+  /* Tertiary — deep violet */
   --color-tertiary: #f2e9ff;
   --color-tertiary-fixed: #e9ddff;
   --color-tertiary-fixed-dim: #d1bcff;
-  --color-tertiary-container: #d9c8ff;
+  --color-tertiary-container: #4A1D96;
   --color-on-tertiary: #3c0090;
   --color-on-tertiary-fixed: #23005b;
   --color-on-tertiary-fixed-variant: #5700c9;
@@ -232,12 +232,25 @@ button:disabled, [aria-disabled="true"] {
   box-shadow: 0 0 32px rgba(0, 229, 255, 0.25), 0 0 8px rgba(0, 229, 255, 0.1);
 }
 
+.glow-purple {
+  box-shadow: 0 0 20px rgba(123, 63, 228, 0.2);
+}
+
+.glow-purple-strong {
+  box-shadow: 0 0 32px rgba(123, 63, 228, 0.3), 0 0 8px rgba(123, 63, 228, 0.12);
+}
+
 .border-glow-cyan {
   border-color: rgba(0, 229, 255, 0.4);
   box-shadow: 0 0 12px rgba(0, 229, 255, 0.12);
 }
 
-/* Header glow shadow */
+.border-glow-purple {
+  border-color: rgba(123, 63, 228, 0.4);
+  box-shadow: 0 0 12px rgba(123, 63, 228, 0.12);
+}
+
+/* Header glow shadow — cyan + purple blend */
 .shadow-header {
-  box-shadow: 0 0 20px rgba(0, 229, 255, 0.08);
+  box-shadow: 0 0 20px rgba(0, 229, 255, 0.06), 0 0 40px rgba(123, 63, 228, 0.06);
 }

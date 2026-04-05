@@ -31,16 +31,16 @@ export function ErrorBanner({ message }: { message: string }) {
     <div
       className="flex items-center gap-3 p-4 rounded border-l-2"
       style={{
-        backgroundColor: "rgba(255,87,34,0.08)",
-        borderLeftColor: "#FF5722",
+        backgroundColor: "rgba(248,113,113,0.08)",
+        borderLeftColor: "#f87171",
       }}
     >
-      <span className="material-symbols-outlined" style={{ color: "#FF5722", fontSize: 18 }}>
+      <span className="material-symbols-outlined" style={{ color: "#f87171", fontSize: 18 }}>
         error
       </span>
       <span
         className="text-xs font-bold uppercase tracking-widest"
-        style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#ffb5a0" }}
+        style={{ fontFamily: "'Space Grotesk', sans-serif", color: "#fca5a5" }}
       >
         {message}
       </span>

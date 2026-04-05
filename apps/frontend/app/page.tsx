@@ -60,7 +60,7 @@ export default function Home() {
   return (
     <div className="bg-[#0e0e0e] text-[#e5e2e1] min-h-screen overflow-x-hidden">
       {/* ── Top Navigation Bar ─────────────────────────────────────────── */}
-      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313]/80 backdrop-blur-md shadow-[0_0_20px_rgba(0,229,255,0.08)]">
+      <header className="fixed top-0 w-full z-50 flex justify-between items-center px-6 h-16 bg-[#131313]/80 backdrop-blur-md shadow-[0_0_20px_rgba(0,229,255,0.06),0_0_40px_rgba(123,63,228,0.06)]">
         {/* Left: branding */}
         <div className="flex items-center gap-3">
           <img src="/koi-logo.svg" alt="KOI" className="w-11 h-11" />
@@ -97,7 +97,7 @@ export default function Home() {
                 className={[
                   "flex items-center justify-center lg:justify-start gap-4 py-3 px-3 lg:px-6 text-xs font-bold tracking-widest uppercase transition-colors duration-200",
                   isActive
-                    ? "bg-gradient-to-r from-[#00E5FF]/10 to-transparent text-[#00E5FF] border-l-4 border-[#00E5FF]"
+                    ? "bg-gradient-to-r from-[#00E5FF]/10 via-[#7B3FE4]/5 to-transparent text-[#00E5FF] border-l-4 border-[#00E5FF]"
                     : "text-[#bac9cc] border-l-4 border-transparent hover:bg-[#1c1b1b] hover:text-white",
                 ].join(" ")}
                 style={{ fontFamily: "var(--font-space-grotesk)" }}
@@ -116,7 +116,7 @@ export default function Home() {
           <button
             type="button"
             onClick={() => setShowJoinDialog(true)}
-            className="bg-[#00e5ff] text-[#00363d] w-full py-3 text-xs font-black tracking-widest uppercase hover:opacity-90 transition-all flex items-center justify-center gap-2"
+            className="bg-gradient-to-r from-[#00e5ff] to-[#7B3FE4] text-[#00363d] w-full py-3 text-xs font-black tracking-widest uppercase hover:opacity-90 transition-all flex items-center justify-center gap-2"
             style={{ fontFamily: "var(--font-space-grotesk)" }}
           >
             <span className="material-symbols-outlined text-[18px] flex-shrink-0">rocket_launch</span>
@@ -136,9 +136,9 @@ export default function Home() {
             className="w-full max-w-md p-8 relative"
             style={{
               background: "#1c1b1b",
-              border: "1px solid rgba(0,229,255,0.2)",
+              border: "1px solid rgba(123,63,228,0.3)",
               borderRadius: "0.75rem",
-              boxShadow: "0 0 40px rgba(0,229,255,0.1)",
+              boxShadow: "0 0 40px rgba(123,63,228,0.12), 0 0 20px rgba(0,229,255,0.06)",
             }}
             onClick={(e) => e.stopPropagation()}
           >

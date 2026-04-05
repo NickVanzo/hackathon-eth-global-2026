@@ -318,14 +318,14 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
               style={{
                 fontSize: "10px",
                 letterSpacing: "0.2em",
-                background: "rgba(215,59,0,0.1)",
-                border: "1px solid #d73b00",
-                color: "#ffb5a0",
+                background: "rgba(123,63,228,0.1)",
+                border: "1px solid #7B3FE4",
+                color: "#c4b5ff",
               }}
             >
               <span
                 className="w-2 h-2 rounded-full animate-pulse"
-                style={{ background: "#ffb5a0" }}
+                style={{ background: "#c4b5ff" }}
               />
               ACTIVE EMITTER
             </div>
@@ -405,7 +405,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
               className="uppercase font-['Space_Grotesk']"
               style={{
                 fontSize: "12px",
-                color: sharpeScore < 0 ? "#ffb5a0" : sharpeScore > 2 ? "#ffb5a0" : "#bac9cc",
+                color: sharpeScore < 0 ? "#f87171" : sharpeScore > 2 ? "#c4b5ff" : "#bac9cc",
               }}
             >
               {sharpeScore < 0 ? "Extreme" : sharpeScore > 2 ? "High" : "Moderate"}
@@ -454,7 +454,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
               label="Sharpe EMA"
               value={sharpeScore.toFixed(2)}
               sub={`${sharpeScore > 0 ? "+" : ""}${Math.round(sharpeScore * 4)}% vs Epoch-${epochs - 1}`}
-              valueColor={sharpeScore > 1.5 ? "#00E5FF" : sharpeScore > 0.5 ? "#4ade80" : sharpeScore >= 0 ? "#bac9cc" : "#FF5722"}
+              valueColor={sharpeScore > 1.5 ? "#00E5FF" : sharpeScore > 0.5 ? "#4ade80" : sharpeScore >= 0 ? "#bac9cc" : "#f87171"}
             />
             <MetricCard
               icon="payments"
@@ -468,7 +468,7 @@ function DeepScanModal({ inft, onClose }: DeepScanModalProps) {
               label="Arena Tenure"
               value={`${epochs} Epochs`}
               sub={`${survivalPct} Survival Rate`}
-              subColor="#ffb5a0"
+              subColor="#c4b5ff"
             />
           </div>
 
@@ -583,19 +583,19 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
   const accentColor = isHighPerformer
     ? "#00daf3"
     : isNegative
-    ? "#ffb5a0"
+    ? "#f87171"
     : "#bac9cc";
 
   const borderStyle = isHighPerformer
     ? "1px solid rgba(0,218,243,0.3)"
     : isNegative
-    ? "1px solid rgba(255,181,160,0.2)"
+    ? "1px solid rgba(248,113,113,0.2)"
     : "1px solid rgba(59,73,76,0.2)";
 
   const glowStyle = isHighPerformer
     ? "0 0 16px -4px rgba(0,218,243,0.5)"
     : isNegative
-    ? "0 0 16px -4px rgba(255,181,160,0.3)"
+    ? "0 0 16px -4px rgba(248,113,113,0.3)"
     : "none";
 
   return (
@@ -663,13 +663,13 @@ function INFTCard({ inft, onDeepScan }: INFTCardProps) {
           {
             label: "Sharpe EMA",
             value: sharpeScore.toFixed(2),
-            color: sharpeScore > 1.5 ? "#00E5FF" : sharpeScore > 0.5 ? "#4ade80" : sharpeScore >= 0 ? "#bac9cc" : "#FF5722",
+            color: sharpeScore > 1.5 ? "#00E5FF" : sharpeScore > 0.5 ? "#4ade80" : sharpeScore >= 0 ? "#bac9cc" : "#f87171",
             large: true,
           },
           {
             label: "Total Return",
             value: formatPercent(totalReturn),
-            color: totalReturn >= 0 ? "#00daf3" : "#ffb5a0",
+            color: totalReturn >= 0 ? "#4ade80" : "#f87171",
             large: false,
           },
           {
